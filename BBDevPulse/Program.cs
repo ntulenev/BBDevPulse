@@ -2,17 +2,27 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Configuration;
 using Spectre.Console;
 
 Console.OutputEncoding = Encoding.UTF8;
 
 
-var filterDate = DateTimeOffset.UtcNow.AddDays(-30);
-var workspace = "";
-var repoNameFilter = "";
-var pageLength = 50;
-var username = "";
-var appPassword = "";
+var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+    .Build();
+
+var settings = LoadSettings(config);
+
+var filterDate = DateTimeOffset.UtcNow.AddDays(-settings.Days);
+var workspace = settings.Workspace;
+var repoNameFilter = settings.RepoNameFilter;
+var repoNameList = settings.RepoNameList;
+var repoSearchMode = settings.RepoSearchMode;
+var pageLength = settings.PageLength;
+var username = settings.Username;
+var appPassword = settings.AppPassword;
 
 using var httpClient = new HttpClient
 {
@@ -40,11 +50,11 @@ var filteredRepos = await AnsiConsole.Status()
             $"repositories/{workspace}?pagelen={pageLength}",
             page => AnsiConsole.MarkupLine($"[grey]Filtering repositories: page {page}[/]"));
         return repositories
-            .Where(repo => RepoMatchesFilter(repo, repoNameFilter))
+            .Where(repo => RepoMatchesFilter(repo, repoSearchMode, repoNameFilter, repoNameList))
             .ToList();
     });
 
-RenderRepositoryTable(filteredRepos, repoNameFilter);
+RenderRepositoryTable(filteredRepos, repoSearchMode, repoNameFilter, repoNameList);
 
 await AnsiConsole.Progress()
     .AutoClear(false)
@@ -171,24 +181,18 @@ await AnsiConsole.Progress()
                         authorIdentity.Value;
                 }
 
-                foreach (var participant in participants.Values)
-                {
-                    GetOrAddDeveloper(developerStats, participant);
-                }
-
                 var mergedOnResolved = mergedOnFromActivity ?? pr.MergedOn;
 
                 if (authorIdentity.HasValue)
                 {
-                    var authorStats = GetOrAddDeveloper(developerStats, authorIdentity.Value);
                     if (pr.CreatedOn >= filterDate)
                     {
-                        authorStats.PrsOpenedSince++;
+                        GetOrAddDeveloper(developerStats, authorIdentity.Value).PrsOpenedSince++;
                     }
 
                     if (mergedOnResolved.HasValue && mergedOnResolved.Value >= filterDate)
                     {
-                        authorStats.PrsMergedAfter++;
+                        GetOrAddDeveloper(developerStats, authorIdentity.Value).PrsMergedAfter++;
                     }
                 }
 
@@ -214,6 +218,8 @@ await AnsiConsole.Progress()
                         pr.CreatedOn,
                         lastActivity,
                         mergedOnResolved,
+                        ResolveRejectedOn(pr),
+                        pr.State,
                         pr.Id,
                         totalComments
                     ));
@@ -330,6 +336,66 @@ static string GetEnvOrPromptSecret(string envName, string label)
                 : ValidationResult.Success()));
 }
 
+static AppSettings LoadSettings(IConfiguration config)
+{
+    var section = config.GetSection("Bitbucket");
+    if (!section.Exists())
+    {
+        throw new InvalidOperationException("Missing Bitbucket section in appsettings.json.");
+    }
+
+    var repoList = section.GetSection("RepoNameList").Get<string[]>() ?? Array.Empty<string>();
+    var searchMode = GetRequiredEnum<RepoSearchMode>(section, "RepoSearchMode");
+
+    return new AppSettings(
+        GetRequiredInt(section, "Days"),
+        GetRequiredString(section, "Workspace"),
+        GetRequiredInt(section, "PageLength"),
+        GetRequiredString(section, "Username"),
+        GetRequiredString(section, "AppPassword"),
+        GetOptionalString(section, "RepoNameFilter"),
+        repoList,
+        searchMode);
+}
+
+static string GetRequiredString(IConfiguration section, string key)
+{
+    var value = section[key];
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        throw new InvalidOperationException($"Missing Bitbucket:{key} in appsettings.json.");
+    }
+
+    return value;
+}
+
+static string GetOptionalString(IConfiguration section, string key)
+{
+    return section[key] ?? string.Empty;
+}
+
+static int GetRequiredInt(IConfiguration section, string key)
+{
+    var value = section[key];
+    if (string.IsNullOrWhiteSpace(value) || !int.TryParse(value, out var parsed))
+    {
+        throw new InvalidOperationException($"Missing or invalid Bitbucket:{key} in appsettings.json.");
+    }
+
+    return parsed;
+}
+
+static T GetRequiredEnum<T>(IConfiguration section, string key) where T : struct
+{
+    var value = section[key];
+    if (string.IsNullOrWhiteSpace(value) || !Enum.TryParse<T>(value, ignoreCase: true, out var parsed))
+    {
+        throw new InvalidOperationException($"Missing or invalid Bitbucket:{key} in appsettings.json.");
+    }
+
+    return parsed;
+}
+
 static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> reports)
 {
     var table = new Table()
@@ -340,6 +406,8 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
         .AddColumn("Created")
         .AddColumn("Last Activity")
         .AddColumn("Merged")
+        .AddColumn("Rejected")
+        .AddColumn("PR Age (days)")
         .AddColumn("Days to Merge")
         .AddColumn("Comments")
         .AddColumn("PR ID");
@@ -350,6 +418,9 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
         var daysToMerge = report.MergedOn.HasValue
             ? (report.MergedOn.Value - report.CreatedOn).TotalDays.ToString("0.0")
             : "-";
+        var prAge = string.Equals(report.State, "OPEN", StringComparison.OrdinalIgnoreCase)
+            ? (DateTimeOffset.UtcNow - report.CreatedOn).TotalDays.ToString("0.0")
+            : "-";
 
         table.AddRow(
             index.ToString(),
@@ -358,6 +429,8 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
             report.CreatedOn.ToString("yyyy-MM-dd"),
             report.LastActivity.ToString("yyyy-MM-dd"),
             report.MergedOn?.ToString("yyyy-MM-dd") ?? "-",
+            report.RejectedOn?.ToString("yyyy-MM-dd") ?? "-",
+            prAge,
             daysToMerge,
             report.Comments.ToString(),
             report.Id.ToString()
@@ -370,7 +443,11 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
     AnsiConsole.Write(table);
 }
 
-static void RenderRepositoryTable(IReadOnlyCollection<Repository> repositories, string filter)
+static void RenderRepositoryTable(
+    IReadOnlyCollection<Repository> repositories,
+    RepoSearchMode searchMode,
+    string filter,
+    IReadOnlyList<string> repoList)
 {
     var table = new Table()
         .Border(TableBorder.Rounded)
@@ -385,9 +462,14 @@ static void RenderRepositoryTable(IReadOnlyCollection<Repository> repositories, 
         index++;
     }
 
-    var title = string.IsNullOrWhiteSpace(filter)
-        ? "Repositories (all)"
-        : $"Repositories (contains: {filter})";
+    var title = searchMode switch
+    {
+        RepoSearchMode.FilterFromTheList when repoList.Count > 0
+            => $"Repositories (list count: {repoList.Count})",
+        RepoSearchMode.SearchByFilter when !string.IsNullOrWhiteSpace(filter)
+            => $"Repositories (contains: {filter})",
+        _ => "Repositories (all)"
+    };
 
     AnsiConsole.Write(new Rule(title).RuleStyle("grey"));
     AnsiConsole.Write(table);
@@ -701,17 +783,36 @@ static void AddParticipant(
     }
 }
 
-static bool RepoMatchesFilter(Repository repo, string filter)
+static DateTimeOffset? ResolveRejectedOn(PullRequest pr)
 {
-    if (string.IsNullOrWhiteSpace(filter))
+    if (!string.Equals(pr.State, "DECLINED", StringComparison.OrdinalIgnoreCase) &&
+        !string.Equals(pr.State, "SUPERSEDED", StringComparison.OrdinalIgnoreCase))
     {
-        return true;
+        return null;
     }
 
+    return pr.ClosedOn ?? pr.UpdatedOn;
+}
+
+static bool RepoMatchesFilter(
+    Repository repo,
+    RepoSearchMode searchMode,
+    string filter,
+    IReadOnlyList<string> repoList)
+{
     var name = repo.Name ?? string.Empty;
     var slug = repo.Slug ?? string.Empty;
-    return name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-        slug.Contains(filter, StringComparison.OrdinalIgnoreCase);
+
+    return searchMode switch
+    {
+        RepoSearchMode.FilterFromTheList => repoList.Count == 0 ||
+            repoList.Any(entry =>
+                name.Equals(entry, StringComparison.OrdinalIgnoreCase) ||
+                slug.Equals(entry, StringComparison.OrdinalIgnoreCase)),
+        _ => string.IsNullOrWhiteSpace(filter) ||
+            name.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
+            slug.Contains(filter, StringComparison.OrdinalIgnoreCase)
+    };
 }
 
 sealed class BitbucketClient
@@ -816,6 +917,12 @@ sealed class PullRequest
     [JsonPropertyName("id")]
     public int Id { get; init; }
 
+    [JsonPropertyName("state")]
+    public string? State { get; init; }
+
+    [JsonPropertyName("closed_on")]
+    public DateTimeOffset? ClosedOn { get; init; }
+
     [JsonPropertyName("created_on")]
     public DateTimeOffset CreatedOn { get; init; }
 
@@ -844,6 +951,8 @@ sealed record PullRequestReport(
     DateTimeOffset CreatedOn,
     DateTimeOffset LastActivity,
     DateTimeOffset? MergedOn,
+    DateTimeOffset? RejectedOn,
+    string? State,
     int Id,
     int Comments);
 
@@ -862,3 +971,19 @@ sealed class DeveloperStats
 }
 
 readonly record struct DeveloperIdentity(string? Uuid, string DisplayName);
+
+sealed record AppSettings(
+    int Days,
+    string Workspace,
+    int PageLength,
+    string Username,
+    string AppPassword,
+    string RepoNameFilter,
+    IReadOnlyList<string> RepoNameList,
+    RepoSearchMode RepoSearchMode);
+
+enum RepoSearchMode
+{
+    SearchByFilter = 1,
+    FilterFromTheList = 2
+}
