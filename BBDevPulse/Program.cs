@@ -408,20 +408,19 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
         .AddColumn("Merged")
         .AddColumn("Rejected")
         .AddColumn("PR Age (days)")
-        .AddColumn("Days to Merge")
+        .AddColumn("Time to Merge")
         .AddColumn("Comments")
         .AddColumn("PR ID");
 
     var index = 1;
     foreach (var report in reports)
     {
-        var daysToMerge = report.MergedOn.HasValue
-            ? (report.MergedOn.Value - report.CreatedOn).TotalDays.ToString("0.0")
+        var timeToMerge = report.MergedOn.HasValue
+            ? FormatDuration((report.MergedOn.Value - report.CreatedOn).TotalDays)
             : "-";
         var prAge = string.Equals(report.State, "OPEN", StringComparison.OrdinalIgnoreCase)
             ? (DateTimeOffset.UtcNow - report.CreatedOn).TotalDays.ToString("0.0")
             : "-";
-
         table.AddRow(
             index.ToString(),
             report.Repository,
@@ -431,7 +430,7 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
             report.MergedOn?.ToString("yyyy-MM-dd") ?? "-",
             report.RejectedOn?.ToString("yyyy-MM-dd") ?? "-",
             prAge,
-            daysToMerge,
+            timeToMerge,
             report.Comments.ToString(),
             report.Id.ToString()
         );
@@ -545,23 +544,27 @@ static void RenderDeveloperStatsTable(
 {
     var table = new Table()
         .Border(TableBorder.Rounded)
+        .AddColumn("#")
         .AddColumn("Developer")
         .AddColumn("PRs Opened")
         .AddColumn("PRs Merged")
         .AddColumn("Comments")
         .AddColumn("Approvals");
 
+    var index = 1;
     foreach (var stat in stats.Values
         .OrderByDescending(s => s.PrsOpenedSince)
         .ThenBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase))
     {
         table.AddRow(
+            index.ToString(),
             stat.DisplayName,
             stat.PrsOpenedSince.ToString(),
             stat.PrsMergedAfter.ToString(),
             stat.CommentsAfter.ToString(),
             stat.ApprovalsAfter.ToString()
         );
+        index++;
     }
 
     AnsiConsole.Write(new Rule($"Developer Stats (since {filterDate:yyyy-MM-dd})").RuleStyle("grey"));
