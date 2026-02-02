@@ -20,6 +20,7 @@ var workspace = settings.Workspace;
 var repoNameFilter = settings.RepoNameFilter;
 var repoNameList = settings.RepoNameList;
 var repoSearchMode = settings.RepoSearchMode;
+var prTimeFilterMode = settings.PrTimeFilterMode;
 var pageLength = settings.PageLength;
 var username = settings.Username;
 var appPassword = settings.AppPassword;
@@ -92,8 +93,7 @@ await AnsiConsole.Progress()
 
                 foreach (var pr in pullRequests)
                 {
-                    var lastKnownUpdate = pr.UpdatedOn ?? pr.CreatedOn;
-                    if (lastKnownUpdate < filterDate && pr.CreatedOn < filterDate)
+                    if (ShouldStopByTimeFilter(pr, filterDate, prTimeFilterMode))
                     {
                         shouldStop = true;
                         break;
@@ -346,6 +346,10 @@ static AppSettings LoadSettings(IConfiguration config)
 
     var repoList = section.GetSection("RepoNameList").Get<string[]>() ?? Array.Empty<string>();
     var searchMode = GetRequiredEnum<RepoSearchMode>(section, "RepoSearchMode");
+    var prTimeFilterMode = GetOptionalEnum(
+        section,
+        "PrTimeFilterMode",
+        PrTimeFilterMode.LastKnownUpdateAndCreated);
 
     return new AppSettings(
         GetRequiredInt(section, "Days"),
@@ -355,7 +359,8 @@ static AppSettings LoadSettings(IConfiguration config)
         GetRequiredString(section, "AppPassword"),
         GetOptionalString(section, "RepoNameFilter"),
         repoList,
-        searchMode);
+        searchMode,
+        prTimeFilterMode);
 }
 
 static string GetRequiredString(IConfiguration section, string key)
@@ -394,6 +399,36 @@ static T GetRequiredEnum<T>(IConfiguration section, string key) where T : struct
     }
 
     return parsed;
+}
+
+static T GetOptionalEnum<T>(IConfiguration section, string key, T defaultValue) where T : struct
+{
+    var value = section[key];
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return defaultValue;
+    }
+
+    if (!Enum.TryParse<T>(value, ignoreCase: true, out var parsed))
+    {
+        throw new InvalidOperationException($"Invalid Bitbucket:{key} in appsettings.json.");
+    }
+
+    return parsed;
+}
+
+static bool ShouldStopByTimeFilter(
+    PullRequest pr,
+    DateTimeOffset filterDate,
+    PrTimeFilterMode filterMode)
+{
+    return filterMode switch
+    {
+        PrTimeFilterMode.CreatedOnOnly => pr.CreatedOn < filterDate,
+        _ =>
+            (pr.UpdatedOn ?? pr.CreatedOn) < filterDate &&
+            pr.CreatedOn < filterDate
+    };
 }
 
 static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> reports)
@@ -983,10 +1018,17 @@ sealed record AppSettings(
     string AppPassword,
     string RepoNameFilter,
     IReadOnlyList<string> RepoNameList,
-    RepoSearchMode RepoSearchMode);
+    RepoSearchMode RepoSearchMode,
+    PrTimeFilterMode PrTimeFilterMode);
 
 enum RepoSearchMode
 {
     SearchByFilter = 1,
     FilterFromTheList = 2
+}
+
+enum PrTimeFilterMode
+{
+    LastKnownUpdateAndCreated = 1,
+    CreatedOnOnly = 2
 }
