@@ -100,6 +100,9 @@ await AnsiConsole.Progress()
                     }
 
                     var lastActivity = pr.CreatedOn;
+                    var authorIdentity = BuildDeveloperKey(pr.Author);
+                    var shouldCalculateTtfr = pr.CreatedOn >= filterDate;
+                    DateTimeOffset? firstReactionOn = null;
                     DateTimeOffset? mergedOnFromActivity = null;
                     var participants = new Dictionary<string, DeveloperIdentity>(StringComparer.OrdinalIgnoreCase);
                     var commentCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -152,14 +155,38 @@ await AnsiConsole.Progress()
                                         commentCounts[commentKey] = commentCounts.GetValueOrDefault(commentKey) + 1;
                                         AddParticipant(participants, commentUser);
                                     }
+
+                                    if (shouldCalculateTtfr &&
+                                        commentDate >= pr.CreatedOn &&
+                                        (!authorIdentity.HasValue ||
+                                         !IsSameIdentity(authorIdentity.Value, commentUser)))
+                                    {
+                                        if (!firstReactionOn.HasValue || commentDate < firstReactionOn.Value)
+                                        {
+                                            firstReactionOn = commentDate;
+                                        }
+                                    }
                                 }
 
-                                if (TryGetApprovalInfo(activity, out var approvalUser, out var approvalDate) &&
-                                    approvalDate >= filterDate)
+                                if (TryGetApprovalInfo(activity, out var approvalUser, out var approvalDate))
                                 {
-                                    var approvalKey = approvalUser.Uuid ?? approvalUser.DisplayName;
-                                    approvalCounts[approvalKey] = approvalCounts.GetValueOrDefault(approvalKey) + 1;
-                                    AddParticipant(participants, approvalUser);
+                                    if (approvalDate >= filterDate)
+                                    {
+                                        var approvalKey = approvalUser.Uuid ?? approvalUser.DisplayName;
+                                        approvalCounts[approvalKey] = approvalCounts.GetValueOrDefault(approvalKey) + 1;
+                                        AddParticipant(participants, approvalUser);
+                                    }
+
+                                    if (shouldCalculateTtfr &&
+                                        approvalDate >= pr.CreatedOn &&
+                                        (!authorIdentity.HasValue ||
+                                         !IsSameIdentity(authorIdentity.Value, approvalUser)))
+                                    {
+                                        if (!firstReactionOn.HasValue || approvalDate < firstReactionOn.Value)
+                                        {
+                                            firstReactionOn = approvalDate;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -173,8 +200,6 @@ await AnsiConsole.Progress()
                     continue;
                 }
 
-                
-                var authorIdentity = BuildDeveloperKey(pr.Author);
                 if (authorIdentity.HasValue)
                 {
                     participants[authorIdentity.Value.Uuid ?? authorIdentity.Value.DisplayName] =
@@ -182,7 +207,6 @@ await AnsiConsole.Progress()
                 }
 
                 var mergedOnResolved = mergedOnFromActivity ?? pr.MergedOn;
-
                 if (authorIdentity.HasValue)
                 {
                     if (pr.CreatedOn >= filterDate)
@@ -221,7 +245,8 @@ await AnsiConsole.Progress()
                         ResolveRejectedOn(pr),
                         pr.State,
                         pr.Id,
-                        totalComments
+                        totalComments,
+                        firstReactionOn
                     ));
                 }
 
@@ -238,6 +263,7 @@ var sortedReports = reports
 
 RenderPullRequestTable(sortedReports);
 RenderMergeTimeStats(sortedReports);
+RenderTtfrStats(sortedReports);
 RenderDeveloperStatsTable(developerStats, filterDate);
 
 static DateTimeOffset PromptForDate(string label)
@@ -439,6 +465,7 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
         .AddColumn("Repository")
         .AddColumn("Author")
         .AddColumn("Created")
+        .AddColumn("TTFR")
         .AddColumn("Last Activity")
         .AddColumn("Merged")
         .AddColumn("Rejected")
@@ -456,11 +483,15 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
         var prAge = string.Equals(report.State, "OPEN", StringComparison.OrdinalIgnoreCase)
             ? (DateTimeOffset.UtcNow - report.CreatedOn).TotalDays.ToString("0.0")
             : "-";
+        var ttfr = report.FirstReactionOn.HasValue
+            ? FormatDuration((report.FirstReactionOn.Value - report.CreatedOn).TotalDays)
+            : "-";
         table.AddRow(
             index.ToString(),
             report.Repository,
             report.Author,
             report.CreatedOn.ToString("yyyy-MM-dd"),
+            ttfr,
             report.LastActivity.ToString("yyyy-MM-dd"),
             report.MergedOn?.ToString("yyyy-MM-dd") ?? "-",
             report.RejectedOn?.ToString("yyyy-MM-dd") ?? "-",
@@ -543,6 +574,40 @@ static void RenderMergeTimeStats(IReadOnlyCollection<PullRequestReport> reports)
     AnsiConsole.Write(table);
 }
 
+static void RenderTtfrStats(IReadOnlyCollection<PullRequestReport> reports)
+{
+    var ttfrDays = reports
+        .Where(r => r.FirstReactionOn.HasValue)
+        .Select(r => (r.FirstReactionOn!.Value - r.CreatedOn).TotalDays)
+        .OrderBy(days => days)
+        .ToList();
+
+    if (ttfrDays.Count == 0)
+    {
+        AnsiConsole.Write(new Rule("TTFR Stats").RuleStyle("grey"));
+        AnsiConsole.MarkupLine("[yellow]No TTFR data available in the report.[/]");
+        return;
+    }
+
+    var best = ttfrDays.First();
+    var longest = ttfrDays.Last();
+    var median = Percentile(ttfrDays, 50);
+    var p75 = Percentile(ttfrDays, 75);
+
+    var table = new Table()
+        .Border(TableBorder.Rounded)
+        .AddColumn("Metric")
+        .AddColumn("Time");
+
+    table.AddRow("Best TTFR", FormatDuration(best));
+    table.AddRow("Longest TTFR", FormatDuration(longest));
+    table.AddRow("Median", FormatDuration(median));
+    table.AddRow("75P", FormatDuration(p75));
+
+    AnsiConsole.Write(new Rule("TTFR Stats").RuleStyle("grey"));
+    AnsiConsole.Write(table);
+}
+
 static double Percentile(IReadOnlyList<double> sortedValues, int percentile)
 {
     if (sortedValues.Count == 0)
@@ -567,6 +632,11 @@ static string FormatDuration(double days)
     if (days < 1)
     {
         var hours = days * 24;
+        if (hours < 1)
+        {
+            return "<1h";
+        }
+
         return $"{hours:0.0} hours";
     }
 
@@ -821,6 +891,16 @@ static void AddParticipant(
     }
 }
 
+static bool IsSameIdentity(DeveloperIdentity left, DeveloperIdentity right)
+{
+    if (!string.IsNullOrWhiteSpace(left.Uuid) && !string.IsNullOrWhiteSpace(right.Uuid))
+    {
+        return string.Equals(left.Uuid, right.Uuid, StringComparison.OrdinalIgnoreCase);
+    }
+
+    return string.Equals(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase);
+}
+
 static DateTimeOffset? ResolveRejectedOn(PullRequest pr)
 {
     if (!string.Equals(pr.State, "DECLINED", StringComparison.OrdinalIgnoreCase) &&
@@ -992,7 +1072,8 @@ sealed record PullRequestReport(
     DateTimeOffset? RejectedOn,
     string? State,
     int Id,
-    int Comments);
+    int Comments,
+    DateTimeOffset? FirstReactionOn);
 
 sealed class DeveloperStats
 {
