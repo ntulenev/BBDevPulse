@@ -21,6 +21,7 @@ var repoNameFilter = settings.RepoNameFilter;
 var repoNameList = settings.RepoNameList;
 var repoSearchMode = settings.RepoSearchMode;
 var prTimeFilterMode = settings.PrTimeFilterMode;
+var branchNameList = settings.BranchNameList;
 var pageLength = settings.PageLength;
 var username = settings.Username;
 var appPassword = settings.AppPassword;
@@ -56,6 +57,7 @@ var filteredRepos = await AnsiConsole.Status()
     });
 
 RenderRepositoryTable(filteredRepos, repoSearchMode, repoNameFilter, repoNameList);
+RenderBranchFilterInfo(branchNameList);
 
 await AnsiConsole.Progress()
     .AutoClear(false)
@@ -97,6 +99,11 @@ await AnsiConsole.Progress()
                     {
                         shouldStop = true;
                         break;
+                    }
+
+                    if (!BranchMatchesFilter(pr.Destination?.Branch?.Name, branchNameList))
+                    {
+                        continue;
                     }
 
                     var lastActivity = pr.CreatedOn;
@@ -239,6 +246,7 @@ await AnsiConsole.Progress()
                     reports.Add(new PullRequestReport(
                         repo.Name ?? repo.Slug ?? "unknown",
                         pr.Author?.DisplayName ?? "unknown",
+                        pr.Destination?.Branch?.Name ?? "-",
                         pr.CreatedOn,
                         lastActivity,
                         mergedOnResolved,
@@ -371,6 +379,7 @@ static AppSettings LoadSettings(IConfiguration config)
     }
 
     var repoList = section.GetSection("RepoNameList").Get<string[]>() ?? Array.Empty<string>();
+    var branchList = section.GetSection("BranchNameList").Get<string[]>() ?? Array.Empty<string>();
     var searchMode = GetRequiredEnum<RepoSearchMode>(section, "RepoSearchMode");
     var prTimeFilterMode = GetOptionalEnum(
         section,
@@ -385,6 +394,7 @@ static AppSettings LoadSettings(IConfiguration config)
         GetRequiredString(section, "AppPassword"),
         GetOptionalString(section, "RepoNameFilter"),
         repoList,
+        branchList,
         searchMode,
         prTimeFilterMode);
 }
@@ -466,6 +476,7 @@ static void RenderPullRequestTable(
         .AddColumn("#")
         .AddColumn("Repository")
         .AddColumn("Author")
+        .AddColumn("Target")
         .AddColumn("Created")
         .AddColumn("TTFR")
         .AddColumn("Last Activity")
@@ -495,6 +506,7 @@ static void RenderPullRequestTable(
             index.ToString(),
             report.Repository,
             report.Author,
+            report.TargetBranch,
             createdCell,
             ttfr,
             report.LastActivity.ToString("yyyy-MM-dd"),
@@ -543,6 +555,17 @@ static void RenderRepositoryTable(
 
     AnsiConsole.Write(new Rule(title).RuleStyle("grey"));
     AnsiConsole.Write(table);
+}
+
+static void RenderBranchFilterInfo(IReadOnlyList<string> branchList)
+{
+    if (branchList.Count == 0)
+    {
+        return;
+    }
+
+    var joined = string.Join(", ", branchList);
+    AnsiConsole.MarkupLine($"[grey]Filtering PRs by target branches:[/] {joined}");
 }
 
 static void RenderMergeTimeStats(IReadOnlyCollection<PullRequestReport> reports)
@@ -938,6 +961,22 @@ static bool RepoMatchesFilter(
     };
 }
 
+static bool BranchMatchesFilter(string? targetBranch, IReadOnlyList<string> branchList)
+{
+    if (branchList.Count == 0)
+    {
+        return true;
+    }
+
+    if (string.IsNullOrWhiteSpace(targetBranch))
+    {
+        return false;
+    }
+
+    return branchList.Any(branch =>
+        targetBranch.Equals(branch, StringComparison.OrdinalIgnoreCase));
+}
+
 sealed class BitbucketClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -1057,6 +1096,21 @@ sealed class PullRequest
 
     [JsonPropertyName("author")]
     public User? Author { get; init; }
+
+    [JsonPropertyName("destination")]
+    public PullRequestDestination? Destination { get; init; }
+}
+
+sealed class PullRequestDestination
+{
+    [JsonPropertyName("branch")]
+    public PullRequestBranch? Branch { get; init; }
+}
+
+sealed class PullRequestBranch
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
 }
 
 sealed class User
@@ -1071,6 +1125,7 @@ sealed class User
 sealed record PullRequestReport(
     string Repository,
     string Author,
+    string TargetBranch,
     DateTimeOffset CreatedOn,
     DateTimeOffset LastActivity,
     DateTimeOffset? MergedOn,
@@ -1104,6 +1159,7 @@ sealed record AppSettings(
     string AppPassword,
     string RepoNameFilter,
     IReadOnlyList<string> RepoNameList,
+    IReadOnlyList<string> BranchNameList,
     RepoSearchMode RepoSearchMode,
     PrTimeFilterMode PrTimeFilterMode);
 
