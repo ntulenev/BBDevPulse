@@ -26,4 +26,19 @@ public readonly struct DeveloperIdentity
     /// Display name for reporting.
     /// </summary>
     public DisplayName DisplayName { get; }
+
+    /// <summary>
+    /// Determines whether this identity refers to the same developer as another identity.
+    /// </summary>
+    /// <param name="other">Other identity.</param>
+    /// <returns>True when identities match.</returns>
+    public bool IsSameIdentity(DeveloperIdentity other)
+    {
+        if (Uuid is not null && other.Uuid is not null)
+        {
+            return string.Equals(Uuid.Value, other.Uuid.Value, StringComparison.OrdinalIgnoreCase);
+        }
+
+        return string.Equals(DisplayName.Value, other.DisplayName.Value, StringComparison.OrdinalIgnoreCase);
+    }
 }
