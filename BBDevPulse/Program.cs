@@ -5,7 +5,9 @@ using BBDevPulse.Abstractions;
 using BBDevPulse.API;
 using BBDevPulse.Configuration;
 using BBDevPulse.Logic;
+using BBDevPulse.Math;
 using BBDevPulse.Presentation;
+using BBDevPulse.Presentation.Formatters;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +29,8 @@ using var host = Host.CreateDefaultBuilder(args)
             .ValidateOnStart();
         _ = services.AddSingleton<IValidateOptions<BitbucketOptions>, BitbucketOptionsValidator>();
 
+        _ = services.AddSingleton<IPullRequestActivityMapper, BBDevPulse.API.Mappers.PullRequestActivityMapper>();
+
         _ = services.AddHttpClient<IBitbucketClient, BitbucketClient>((sp, client) =>
         {
             var options = sp.GetRequiredService<IOptions<BitbucketOptions>>().Value;
@@ -39,6 +43,8 @@ using var host = Host.CreateDefaultBuilder(args)
         });
 
         _ = services.AddSingleton<IReportPresenter, SpectreReportPresenter>();
+        _ = services.AddSingleton<IStatisticsCalculator, StatisticsCalculator>();
+        _ = services.AddSingleton<IDateDiffFormatter, DateDiffFormatter>();
         _ = services.AddSingleton<IReportRunner, ReportRunner>();
     })
     .Build();
