@@ -20,12 +20,18 @@ public sealed class BitbucketClient : IBitbucketClient
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
     /// <param name="options">Bitbucket options.</param>
-    public BitbucketClient(HttpClient httpClient, IOptions<BitbucketOptions> options)
+    /// <param name="activityMapper">Activity mapper.</param>
+    public BitbucketClient(
+        HttpClient httpClient,
+        IOptions<BitbucketOptions> options,
+        IPullRequestActivityMapper activityMapper)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(activityMapper);
         _httpClient = httpClient;
         _options = options.Value;
+        _activityMapper = activityMapper;
     }
 
     /// <inheritdoc />
@@ -137,7 +143,7 @@ public sealed class BitbucketClient : IBitbucketClient
             foreach (var activity in activities)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var model = new PullRequestActivity(activity);
+                var model = _activityMapper.Map(activity);
                 if (shouldStop(model))
                 {
                     stop = true;
@@ -273,4 +279,5 @@ public sealed class BitbucketClient : IBitbucketClient
 
     private readonly HttpClient _httpClient;
     private readonly BitbucketOptions _options;
+    private readonly IPullRequestActivityMapper _activityMapper;
 }
