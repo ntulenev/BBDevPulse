@@ -68,6 +68,16 @@ public readonly struct DeveloperKey : IEquatable<DeveloperKey>
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is DeveloperKey other && Equals(other);
 
+    /// <summary>
+    /// Equality operator.
+    /// </summary>
+    public static bool operator ==(DeveloperKey left, DeveloperKey right) => left.Equals(right);
+
+    /// <summary>
+    /// Inequality operator.
+    /// </summary>
+    public static bool operator !=(DeveloperKey left, DeveloperKey right) => !left.Equals(right);
+
     /// <inheritdoc />
     public override int GetHashCode()
     {
