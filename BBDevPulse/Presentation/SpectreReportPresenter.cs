@@ -12,6 +12,20 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 public sealed class SpectreReportPresenter : IReportPresenter
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="SpectreReportPresenter"/> class.
+    /// </summary>
+    /// <param name="statisticsCalculator">Statistics calculator.</param>
+    public SpectreReportPresenter(
+        IStatisticsCalculator statisticsCalculator,
+        IDateDiffFormatter dateDiffFormatter)
+    {
+        ArgumentNullException.ThrowIfNull(statisticsCalculator);
+        ArgumentNullException.ThrowIfNull(dateDiffFormatter);
+        _statisticsCalculator = statisticsCalculator;
+        _dateDiffFormatter = dateDiffFormatter;
+    }
+
     /// <inheritdoc />
     public async Task AnnounceAuthAsync(Func<CancellationToken, Task<AuthUser>> fetchUser, CancellationToken cancellationToken)
     {
@@ -44,7 +58,7 @@ public sealed class SpectreReportPresenter : IReportPresenter
                 var result = new List<Repository>();
                 await foreach (var repo in fetchRepositories(
                                    page => AnsiConsole.MarkupLine($"[grey]Loading repositories: page {page}[/]"),
-                                   cancellationToken))
+                                   cancellationToken).ConfigureAwait(false))
                 {
                     result.Add(repo);
                 }
@@ -79,7 +93,7 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
                 foreach (var repo in repositories)
                 {
-                    task.Description = $"Analyzing {ResolveRepoName(repo)}";
+                    task.Description = $"Analyzing {repo.DisplayName}";
                     await analyzeRepository(repo, cancellationToken).ConfigureAwait(false);
                     task.Increment(1);
                 }
@@ -104,11 +118,11 @@ public sealed class SpectreReportPresenter : IReportPresenter
             .AddColumn("Slug");
 
         var index = 1;
-        foreach (var repo in repositories.OrderBy(ResolveRepoName))
+        foreach (var repo in repositories.OrderBy(repo => repo.DisplayName))
         {
             _ = table.AddRow(
                 index.ToString(CultureInfo.InvariantCulture),
-                ResolveRepoName(repo),
+                repo.DisplayName,
                 repo.Slug.Value);
             index++;
         }
@@ -124,12 +138,6 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
         AnsiConsole.Write(new Rule(title).RuleStyle("grey"));
         AnsiConsole.Write(table);
-    }
-
-    private static string ResolveRepoName(Repository repo)
-    {
-        ArgumentNullException.ThrowIfNull(repo);
-        return string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value;
     }
 
     /// <inheritdoc />
@@ -171,13 +179,13 @@ public sealed class SpectreReportPresenter : IReportPresenter
         foreach (var report in reports)
         {
             var timeToMerge = report.MergedOn.HasValue
-                ? FormatDuration((report.MergedOn.Value - report.CreatedOn).TotalDays)
+                ? _dateDiffFormatter.Format(report.CreatedOn, report.MergedOn.Value)
                 : "-";
             var prAge = report.State == PullRequestState.Open
                 ? (DateTimeOffset.UtcNow - report.CreatedOn).TotalDays.ToString("0.0", CultureInfo.InvariantCulture)
                 : "-";
             var ttfr = report.FirstReactionOn.HasValue
-                ? FormatDuration((report.FirstReactionOn.Value - report.CreatedOn).TotalDays)
+                ? _dateDiffFormatter.Format(report.CreatedOn, report.FirstReactionOn.Value)
                 : "-";
             var createdCell = report.CreatedOn < filterDate
                 ? $"[red]{report.CreatedOn:yyyy-MM-dd}[/]"
@@ -224,18 +232,18 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
         var best = mergeDays.First();
         var longest = mergeDays.Last();
-        var median = Percentile(mergeDays, 50);
-        var p75 = Percentile(mergeDays, 75);
+        var median = _statisticsCalculator.Percentile(mergeDays, 50);
+        var p75 = _statisticsCalculator.Percentile(mergeDays, 75);
 
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("Metric")
             .AddColumn("Time");
 
-        _ = table.AddRow("Best Merge Time", FormatDuration(best));
-        _ = table.AddRow("Longest Merge Time", FormatDuration(longest));
-        _ = table.AddRow("Median", FormatDuration(median));
-        _ = table.AddRow("75P", FormatDuration(p75));
+        _ = table.AddRow("Best Merge Time", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(best)));
+        _ = table.AddRow("Longest Merge Time", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(longest)));
+        _ = table.AddRow("Median", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(median)));
+        _ = table.AddRow("75P", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(p75)));
 
         AnsiConsole.Write(new Rule("Merge Time Stats").RuleStyle("grey"));
         AnsiConsole.Write(table);
@@ -260,18 +268,18 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
         var best = ttfrDays.First();
         var longest = ttfrDays.Last();
-        var median = Percentile(ttfrDays, 50);
-        var p75 = Percentile(ttfrDays, 75);
+        var median = _statisticsCalculator.Percentile(ttfrDays, 50);
+        var p75 = _statisticsCalculator.Percentile(ttfrDays, 75);
 
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("Metric")
             .AddColumn("Time");
 
-        _ = table.AddRow("Best TTFR", FormatDuration(best));
-        _ = table.AddRow("Longest TTFR", FormatDuration(longest));
-        _ = table.AddRow("Median", FormatDuration(median));
-        _ = table.AddRow("75P", FormatDuration(p75));
+        _ = table.AddRow("Best TTFR", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(best)));
+        _ = table.AddRow("Longest TTFR", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(longest)));
+        _ = table.AddRow("Median", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(median)));
+        _ = table.AddRow("75P", _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(p75)));
 
         AnsiConsole.Write(new Rule("TTFR Stats").RuleStyle("grey"));
         AnsiConsole.Write(table);
@@ -279,7 +287,7 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
     /// <inheritdoc />
     public void RenderDeveloperStatsTable(
-        IReadOnlyDictionary<string, DeveloperStats> stats,
+        IReadOnlyDictionary<DeveloperKey, DeveloperStats> stats,
         DateTimeOffset filterDate)
     {
         ArgumentNullException.ThrowIfNull(stats);
@@ -312,33 +320,6 @@ public sealed class SpectreReportPresenter : IReportPresenter
         AnsiConsole.Write(table);
     }
 
-    private static double Percentile(List<double> sortedValues, int percentile)
-    {
-        if (sortedValues.Count == 0)
-        {
-            return 0;
-        }
-
-        var position = percentile / 100.0 * (sortedValues.Count - 1);
-        var lowerIndex = (int)Math.Floor(position);
-        var upperIndex = (int)Math.Ceiling(position);
-        if (lowerIndex == upperIndex)
-        {
-            return sortedValues[lowerIndex];
-        }
-
-        var weight = position - lowerIndex;
-        return sortedValues[lowerIndex] + (weight * (sortedValues[upperIndex] - sortedValues[lowerIndex]));
-    }
-
-    private static string FormatDuration(double days)
-    {
-        if (days < 1)
-        {
-            var hours = days * 24;
-            return hours < 1 ? "<1h" : $"{hours:0.0} hours";
-        }
-
-        return $"{days:0.0} days";
-    }
+    private readonly IStatisticsCalculator _statisticsCalculator;
+    private readonly IDateDiffFormatter _dateDiffFormatter;
 }
