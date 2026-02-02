@@ -26,8 +26,6 @@ public sealed class PullRequest
         User? author,
         PullRequestDestination? destination)
     {
-        ArgumentNullException.ThrowIfNull(id);
-
         Id = id;
         State = state;
         ClosedOn = closedOn;
@@ -77,4 +75,58 @@ public sealed class PullRequest
     /// Pull request destination.
     /// </summary>
     public PullRequestDestination? Destination { get; }
+
+    /// <summary>
+    /// Determines whether a pull request should stop processing based on time filter mode.
+    /// </summary>
+    /// <param name="filterDate">Filter cutoff date.</param>
+    /// <param name="filterMode">Filter mode.</param>
+    /// <returns>True when processing should stop.</returns>
+    public bool ShouldStopByTimeFilter(DateTimeOffset filterDate, PrTimeFilterMode filterMode)
+    {
+        return filterMode switch
+        {
+            PrTimeFilterMode.CreatedOnOnly => CreatedOn < filterDate,
+            PrTimeFilterMode.LastKnownUpdateAndCreated =>
+                (UpdatedOn ?? CreatedOn) < filterDate &&
+                CreatedOn < filterDate,
+            _ => throw new NotImplementedException(),
+        };
+    }
+
+    /// <summary>
+    /// Determines whether the pull request matches the branch filter list.
+    /// </summary>
+    /// <param name="branchList">Branch names to filter by.</param>
+    /// <returns>True when the pull request should be included.</returns>
+    public bool MatchesBranchFilter(IReadOnlyList<BranchName> branchList)
+    {
+        ArgumentNullException.ThrowIfNull(branchList);
+
+        if (branchList.Count == 0)
+        {
+            return true;
+        }
+
+        var targetBranch = Destination?.Branch?.Name;
+        if (string.IsNullOrWhiteSpace(targetBranch))
+        {
+            return false;
+        }
+
+        return branchList.Any(branch =>
+            targetBranch.Equals(branch.Value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Resolves the rejection timestamp when the pull request is declined or superseded.
+    /// </summary>
+    /// <returns>Rejection timestamp if applicable; otherwise null.</returns>
+    public DateTimeOffset? ResolveRejectedOn()
+    {
+        return State is not PullRequestState.Declined and
+            not PullRequestState.Superseded
+            ? null
+            : ClosedOn ?? UpdatedOn;
+    }
 }
