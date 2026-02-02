@@ -37,6 +37,7 @@ All settings are under the `Bitbucket` object.
   - `CreatedOnOnly`: stop PR paging when `createdOn` is older than `filterDate`.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
+- `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
 
 ## Example configuration
 ```json
@@ -53,6 +54,9 @@ All settings are under the `Bitbucket` object.
     "RepoNameList": [
       "Service.A",
       "Service.B"
+    ],
+    "BranchNameList": [
+      "develop"
     ]
   }
 }
