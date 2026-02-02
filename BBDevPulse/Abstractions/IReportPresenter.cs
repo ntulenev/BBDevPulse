@@ -81,6 +81,6 @@ public interface IReportPresenter
     /// <param name="stats">Developer statistics keyed by identity.</param>
     /// <param name="filterDate">Filter cutoff date.</param>
     void RenderDeveloperStatsTable(
-        IReadOnlyDictionary<string, DeveloperStats> stats,
+        IReadOnlyDictionary<DeveloperKey, DeveloperStats> stats,
         DateTimeOffset filterDate);
 }
