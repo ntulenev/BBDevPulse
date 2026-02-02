@@ -80,7 +80,7 @@ public sealed class ReportRunner : IReportRunner
                 {
                     continue;
                 }
-                
+
                 var lastActivity = pr.CreatedOn;
                 var authorIdentity = BuildDeveloperKey(pr.Author);
                 var shouldCalculateTtfr = pr.CreatedOn >= filterDate;
