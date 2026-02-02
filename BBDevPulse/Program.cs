@@ -261,7 +261,7 @@ var sortedReports = reports
     .OrderBy(r => r.CreatedOn)
     .ToList();
 
-RenderPullRequestTable(sortedReports);
+RenderPullRequestTable(sortedReports, filterDate);
 RenderMergeTimeStats(sortedReports);
 RenderTtfrStats(sortedReports);
 RenderDeveloperStatsTable(developerStats, filterDate);
@@ -457,7 +457,9 @@ static bool ShouldStopByTimeFilter(
     };
 }
 
-static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> reports)
+static void RenderPullRequestTable(
+    IReadOnlyCollection<PullRequestReport> reports,
+    DateTimeOffset filterDate)
 {
     var table = new Table()
         .Border(TableBorder.Rounded)
@@ -486,11 +488,14 @@ static void RenderPullRequestTable(IReadOnlyCollection<PullRequestReport> report
         var ttfr = report.FirstReactionOn.HasValue
             ? FormatDuration((report.FirstReactionOn.Value - report.CreatedOn).TotalDays)
             : "-";
+        var createdCell = report.CreatedOn < filterDate
+            ? $"[red]{report.CreatedOn:yyyy-MM-dd}[/]"
+            : report.CreatedOn.ToString("yyyy-MM-dd");
         table.AddRow(
             index.ToString(),
             report.Repository,
             report.Author,
-            report.CreatedOn.ToString("yyyy-MM-dd"),
+            createdCell,
             ttfr,
             report.LastActivity.ToString("yyyy-MM-dd"),
             report.MergedOn?.ToString("yyyy-MM-dd") ?? "-",
