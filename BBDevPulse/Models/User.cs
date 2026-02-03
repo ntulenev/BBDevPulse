@@ -28,4 +28,9 @@ public sealed class User
     /// User UUID.
     /// </summary>
     public UserUuid Uuid { get; }
+
+    /// <summary>
+    /// Builds developer identity for this user.
+    /// </summary>
+    public DeveloperIdentity ToDeveloperIdentity() => new(Uuid, DisplayName);
 }
