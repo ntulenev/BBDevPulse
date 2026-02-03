@@ -1,5 +1,4 @@
 using BBDevPulse.Abstractions;
-using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 
 namespace BBDevPulse.Logic;
