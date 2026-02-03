@@ -46,6 +46,12 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddTransient<IBitbucketClient, BitbucketClient>();
 
         _ = services.AddSingleton<IReportPresenter, SpectreReportPresenter>();
+        _ = services.AddSingleton<IAuthPresenter, SpectreAuthPresenter>();
+        _ = services.AddSingleton<IRepositoryListPresenter, SpectreRepositoryListPresenter>();
+        _ = services.AddSingleton<IRepositoryAnalysisPresenter, SpectreRepositoryAnalysisPresenter>();
+        _ = services.AddSingleton<IBranchFilterPresenter, SpectreBranchFilterPresenter>();
+        _ = services.AddSingleton<IPullRequestReportPresenter, SpectrePullRequestReportPresenter>();
+        _ = services.AddSingleton<IStatisticsPresenter, SpectreStatisticsPresenter>();
         _ = services.AddSingleton<IStatisticsCalculator, StatisticsCalculator>();
         _ = services.AddSingleton<IDateDiffFormatter, DateDiffFormatter>();
         _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
