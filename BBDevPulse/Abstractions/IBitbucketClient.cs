@@ -5,7 +5,7 @@ namespace BBDevPulse.Abstractions;
 /// <summary>
 /// Defines Bitbucket API operations used by the application.
 /// </summary>
-public interface IBitbucketClient
+internal interface IBitbucketClient
 {
     /// <summary>
     /// Fetches the current authenticated Bitbucket user.
