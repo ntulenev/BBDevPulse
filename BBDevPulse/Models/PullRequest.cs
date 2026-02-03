@@ -129,4 +129,11 @@ public sealed class PullRequest
             ? null
             : ClosedOn ?? UpdatedOn;
     }
+
+    /// <summary>
+    /// Determines whether TTFR should be calculated based on the filter date.
+    /// </summary>
+    /// <param name="filterDate">Filter cutoff date.</param>
+    /// <returns>True when TTFR should be calculated.</returns>
+    public bool ShouldCalculateTtfr(DateTimeOffset filterDate) => CreatedOn >= filterDate;
 }
