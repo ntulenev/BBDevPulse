@@ -61,3 +61,6 @@ All settings are under the `Bitbucket` object.
   }
 }
 ```
+## Output
+
+<img src="Pulse.png" alt="BBDevPulse output">
