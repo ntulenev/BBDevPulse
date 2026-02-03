@@ -1,8 +1,10 @@
 using System.Runtime.CompilerServices;
+
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 using BBDevPulse.Transport;
+
 using System.Text.Json;
 
 using Microsoft.Extensions.Options;
@@ -130,7 +132,8 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(pullRequestId);
         ArgumentNullException.ThrowIfNull(shouldStop);
         var firstPage = new Uri(
-            $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}/activity?pagelen={_options.PageLength}&sort=-created_on",
+            $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}/activity" +
+            $"?pagelen={_options.PageLength}&sort=-created_on",
             UriKind.Relative);
 #pragma warning disable CS0219 // Used in paginator
         var stop = false;
@@ -165,15 +168,7 @@ internal sealed class BitbucketClient : IBitbucketClient
     private Task<T> GetAsync<T>(Uri url, CancellationToken cancellationToken) =>
         _transport.GetAsync<T>(url, cancellationToken);
 
-    private static Uri? GetNextUri(string? next)
-    {
-        if (string.IsNullOrWhiteSpace(next))
-        {
-            return null;
-        }
-
-        return new Uri(next, UriKind.RelativeOrAbsolute);
-    }
+    private static Uri? GetNextUri(string? next) => string.IsNullOrWhiteSpace(next) ? null : new Uri(next, UriKind.RelativeOrAbsolute);
 
     private readonly BitbucketOptions _options;
     private readonly IBitbucketTransport _transport;
