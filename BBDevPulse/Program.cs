@@ -29,9 +29,11 @@ using var host = Host.CreateDefaultBuilder(args)
             .ValidateOnStart();
         _ = services.AddSingleton<IValidateOptions<BitbucketOptions>, BitbucketOptionsValidator>();
 
+        _ = services.AddSingleton<IBitbucketMapper, BBDevPulse.API.Mappers.BitbucketMapper>();
         _ = services.AddSingleton<IPullRequestActivityMapper, BBDevPulse.API.Mappers.PullRequestActivityMapper>();
+        _ = services.AddSingleton<IPaginatorHelper, PaginatorHelper>();
 
-        _ = services.AddHttpClient<IBitbucketClient, BitbucketClient>((sp, client) =>
+        _ = services.AddHttpClient<IBitbucketTransport, BitbucketTransport>((sp, client) =>
         {
             var options = sp.GetRequiredService<IOptions<BitbucketOptions>>().Value;
             client.BaseAddress = new Uri("https://api.bitbucket.org/2.0/");
@@ -41,6 +43,7 @@ using var host = Host.CreateDefaultBuilder(args)
                 new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         });
+        _ = services.AddTransient<IBitbucketClient, BitbucketClient>();
 
         _ = services.AddSingleton<IReportPresenter, SpectreReportPresenter>();
         _ = services.AddSingleton<IStatisticsCalculator, StatisticsCalculator>();
