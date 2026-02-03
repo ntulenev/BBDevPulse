@@ -5,7 +5,7 @@ namespace BBDevPulse.Configuration;
 /// <summary>
 /// Validates <see cref="BitbucketOptions"/>.
 /// </summary>
-public sealed class BitbucketOptionsValidator : IValidateOptions<BitbucketOptions>
+internal sealed class BitbucketOptionsValidator : IValidateOptions<BitbucketOptions>
 {
     /// <summary>
     /// Validates the provided options instance.
