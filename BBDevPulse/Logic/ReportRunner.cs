@@ -9,7 +9,7 @@ namespace BBDevPulse.Logic;
 /// <summary>
 /// Coordinates Bitbucket data collection and report generation.
 /// </summary>
-public sealed class ReportRunner : IReportRunner
+internal sealed class ReportRunner : IReportRunner
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ReportRunner"/> class.
