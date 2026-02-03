@@ -15,17 +15,21 @@ internal sealed class ReportRunner : IReportRunner
     /// Initializes a new instance of the <see cref="ReportRunner"/> class.
     /// </summary>
     /// <param name="client">Bitbucket API client.</param>
+    /// <param name="analyzer">Pull request analyzer.</param>
     /// <param name="presenter">Report presenter.</param>
     /// <param name="options">Bitbucket options.</param>
     public ReportRunner(
         IBitbucketClient client,
+        IPullRequestAnalyzer analyzer,
         IReportPresenter presenter,
         IOptions<BitbucketOptions> options)
     {
         ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(analyzer);
         ArgumentNullException.ThrowIfNull(presenter);
         ArgumentNullException.ThrowIfNull(options);
         _client = client;
+        _analyzer = analyzer;
         _presenter = presenter;
         _options = options.Value;
     }
@@ -68,146 +72,15 @@ internal sealed class ReportRunner : IReportRunner
 
         await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
         {
-            token.ThrowIfCancellationRequested();
-
-            await foreach (var pr in _client.GetPullRequestsAsync(
-                               workspace,
-                               repo.Slug,
-                               pr => pr.ShouldStopByTimeFilter(filterDate, prTimeFilterMode),
-                               token).ConfigureAwait(false))
-            {
-                if (!pr.MatchesBranchFilter(branchNameList))
-                {
-                    continue;
-                }
-
-                var lastActivity = pr.CreatedOn;
-                var authorIdentity = pr.Author?.ToDeveloperIdentity();
-                var shouldCalculateTtfr = pr.ShouldCalculateTtfr(filterDate);
-                DateTimeOffset? firstReactionOn = null;
-                DateTimeOffset? mergedOnFromActivity = null;
-                var participants = new Dictionary<string, DeveloperIdentity>(StringComparer.OrdinalIgnoreCase);
-                var commentCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                var totalComments = 0;
-                var approvalCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-                await foreach (var activity in _client.GetPullRequestActivityAsync(
-                                   workspace,
-                                   repo.Slug,
-                                   pr.Id,
-                                   activity => activity.IsBefore(filterDate),
-                                   token).ConfigureAwait(false))
-                {
-#pragma warning disable IDE0058 // Expression value is never used
-                    activity.TryUpdateLastActivity(ref lastActivity);
-                    activity.TryUpdateMergedOn(ref mergedOnFromActivity);
-#pragma warning restore IDE0058 // Expression value is never used
-
-                    if (!activity.TryGetActor(out var activityUser))
-                    {
-                        continue;
-                    }
-
-                    AddParticipant(participants, activityUser);
-
-                    if (activity.Comment is not null)
-                    {
-                        totalComments++;
-                        if (activity.Comment.IsOnOrAfter(filterDate))
-                        {
-                            var commentUser = activity.Comment.User;
-                            var commentKey = commentUser.ToKey();
-                            commentCounts[commentKey] = commentCounts.GetValueOrDefault(commentKey) + 1;
-                            AddParticipant(participants, commentUser);
-                        }
-
-                        if (shouldCalculateTtfr &&
-                            activity.Comment.IsOnOrAfter(pr.CreatedOn) &&
-                            activity.Comment.IsByDifferentDeveloper(authorIdentity))
-                        {
-#pragma warning disable IDE0058 // Expression value is never used
-                            activity.Comment.TryUpdateFirstReaction(ref firstReactionOn);
-#pragma warning restore IDE0058 // Expression value is never used
-                        }
-                    }
-
-                    if (activity.Approval is not null)
-                    {
-                        if (activity.Approval.IsOnOrAfter(filterDate))
-                        {
-                            var approvalUser = activity.Approval.User;
-                            var approvalKey = activity.Approval.User.ToKey();
-                            approvalCounts[approvalKey] = approvalCounts.GetValueOrDefault(approvalKey) + 1;
-                            AddParticipant(participants, approvalUser);
-                        }
-
-                        if (shouldCalculateTtfr &&
-                            activity.Approval.IsOnOrAfter(pr.CreatedOn) &&
-                            activity.Approval.IsByDifferentDeveloper(authorIdentity))
-                        {
-#pragma warning disable IDE0058 // Expression value is never used
-                            activity.Approval.TryUpdateFirstReaction(ref firstReactionOn);
-#pragma warning restore IDE0058 // Expression value is never used
-                        }
-                    }
-                }
-
-                var matchesFilter = pr.CreatedOn >= filterDate || lastActivity >= filterDate;
-                if (!matchesFilter)
-                {
-                    continue;
-                }
-
-                if (authorIdentity.HasValue)
-                {
-                    participants[authorIdentity.Value.ToKey()] =
-                        authorIdentity.Value;
-                }
-
-                var mergedOnResolved = mergedOnFromActivity ?? pr.MergedOn;
-                if (authorIdentity.HasValue)
-                {
-                    if (pr.CreatedOn >= filterDate)
-                    {
-                        GetOrAddDeveloper(developerStats, authorIdentity.Value).PrsOpenedSince++;
-                    }
-
-                    if (mergedOnResolved.HasValue && mergedOnResolved.Value >= filterDate)
-                    {
-                        GetOrAddDeveloper(developerStats, authorIdentity.Value).PrsMergedAfter++;
-                    }
-                }
-
-                foreach (var entry in commentCounts)
-                {
-                    if (participants.TryGetValue(entry.Key, out var participant))
-                    {
-                        GetOrAddDeveloper(developerStats, participant).CommentsAfter += entry.Value;
-                    }
-                }
-
-                foreach (var entry in approvalCounts)
-                {
-                    if (participants.TryGetValue(entry.Key, out var participant))
-                    {
-                        GetOrAddDeveloper(developerStats, participant).ApprovalsAfter += entry.Value;
-                    }
-                }
-
-                reports.Add(new PullRequestReport(
-                    string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
-                    pr.Author?.DisplayName.Value ?? "unknown",
-                    pr.Destination?.Branch?.Name ?? "-",
-                    pr.CreatedOn,
-                    lastActivity,
-                    mergedOnResolved,
-                    pr.ResolveRejectedOn(),
-                    pr.State,
-                    pr.Id,
-                    totalComments,
-                    firstReactionOn
-                ));
-            }
+            await _analyzer.AnalyzeAsync(
+                workspace,
+                repo,
+                filterDate,
+                prTimeFilterMode,
+                branchNameList,
+                reports,
+                developerStats,
+                token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
 
         var sortedReports = reports
@@ -220,38 +93,8 @@ internal sealed class ReportRunner : IReportRunner
         _presenter.RenderDeveloperStatsTable(developerStats, filterDate);
     }
 
-    private static DeveloperStats GetOrAddDeveloper(
-        Dictionary<DeveloperKey, DeveloperStats> stats,
-        DeveloperIdentity identity)
-    {
-        var key = DeveloperKey.FromIdentity(identity);
-        if (stats.TryGetValue(key, out var existing))
-        {
-            if (!string.IsNullOrWhiteSpace(identity.DisplayName.Value))
-            {
-                existing.DisplayName = identity.DisplayName;
-            }
-
-            return existing;
-        }
-
-        var created = new DeveloperStats(identity.DisplayName);
-        stats[key] = created;
-        return created;
-    }
-
-    private static void AddParticipant(
-        Dictionary<string, DeveloperIdentity> participants,
-        DeveloperIdentity identity)
-    {
-        var key = identity.Uuid?.Value ?? identity.DisplayName.Value;
-        if (!participants.ContainsKey(key))
-        {
-            participants[key] = identity;
-        }
-    }
-
     private readonly IBitbucketClient _client;
+    private readonly IPullRequestAnalyzer _analyzer;
     private readonly IReportPresenter _presenter;
     private readonly BitbucketOptions _options;
 }
