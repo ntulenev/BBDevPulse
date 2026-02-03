@@ -48,6 +48,8 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IReportPresenter, SpectreReportPresenter>();
         _ = services.AddSingleton<IStatisticsCalculator, StatisticsCalculator>();
         _ = services.AddSingleton<IDateDiffFormatter, DateDiffFormatter>();
+        _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
+        _ = services.AddSingleton<IPullRequestAnalyzer, PullRequestAnalyzer>();
         _ = services.AddSingleton<IReportRunner, ReportRunner>();
     })
     .Build();
