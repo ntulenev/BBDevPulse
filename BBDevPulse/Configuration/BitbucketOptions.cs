@@ -3,7 +3,7 @@ namespace BBDevPulse.Configuration;
 /// <summary>
 /// Bitbucket configuration settings bound from appsettings.json.
 /// </summary>
-public sealed class BitbucketOptions
+internal sealed class BitbucketOptions
 {
     /// <summary>
     /// Configuration section name.
