@@ -82,7 +82,7 @@ internal sealed class ReportRunner : IReportRunner
                 }
 
                 var lastActivity = pr.CreatedOn;
-                var authorIdentity = BuildDeveloperKey(pr.Author);
+                var authorIdentity = pr.Author?.ToDeveloperIdentity();
                 var shouldCalculateTtfr = pr.CreatedOn >= filterDate;
                 DateTimeOffset? firstReactionOn = null;
                 DateTimeOffset? mergedOnFromActivity = null;
@@ -235,16 +235,6 @@ internal sealed class ReportRunner : IReportRunner
         _presenter.RenderMergeTimeStats(sortedReports);
         _presenter.RenderTtfrStats(sortedReports);
         _presenter.RenderDeveloperStatsTable(developerStats, filterDate);
-    }
-
-    private static DeveloperIdentity? BuildDeveloperKey(User? user)
-    {
-        if (user is null)
-        {
-            return null;
-        }
-
-        return new DeveloperIdentity(user.Uuid, user.DisplayName);
     }
 
     private static DeveloperStats GetOrAddDeveloper(
