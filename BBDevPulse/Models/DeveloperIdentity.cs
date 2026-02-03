@@ -41,4 +41,10 @@ public readonly struct DeveloperIdentity
 
         return string.Equals(DisplayName.Value, other.DisplayName.Value, StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Builds a stable dictionary key for this identity.
+    /// </summary>
+    /// <returns>UUID when available; otherwise display name.</returns>
+    public string ToKey() => Uuid?.Value ?? DisplayName.Value;
 }
