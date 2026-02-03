@@ -83,7 +83,7 @@ internal sealed class ReportRunner : IReportRunner
 
                 var lastActivity = pr.CreatedOn;
                 var authorIdentity = pr.Author?.ToDeveloperIdentity();
-                var shouldCalculateTtfr = pr.CreatedOn >= filterDate;
+                var shouldCalculateTtfr = pr.ShouldCalculateTtfr(filterDate);
                 DateTimeOffset? firstReactionOn = null;
                 DateTimeOffset? mergedOnFromActivity = null;
                 var participants = new Dictionary<string, DeveloperIdentity>(StringComparer.OrdinalIgnoreCase);
@@ -95,76 +95,59 @@ internal sealed class ReportRunner : IReportRunner
                                    workspace,
                                    repo.Slug,
                                    pr.Id,
-                                   activity =>
-                                   {
-                                       var activityDate = activity.ActivityDate;
-                                       return activityDate.HasValue && activityDate.Value < filterDate;
-                                   },
+                                   activity => activity.IsBefore(filterDate),
                                    token).ConfigureAwait(false))
                 {
-                    var activityDate = activity.ActivityDate;
-                    if (activityDate.HasValue && activityDate.Value > lastActivity)
+#pragma warning disable IDE0058 // Expression value is never used
+                    activity.TryUpdateLastActivity(ref lastActivity);
+                    activity.TryUpdateMergedOn(ref mergedOnFromActivity);
+#pragma warning restore IDE0058 // Expression value is never used
+
+                    if (!activity.TryGetActor(out var activityUser))
                     {
-                        lastActivity = activityDate.Value;
+                        continue;
                     }
 
-                    if (activity.MergeDate.HasValue)
+                    AddParticipant(participants, activityUser);
+
+                    if (activity.Comment is not null)
                     {
-                        var mergeDate = activity.MergeDate.Value;
-                        if (!mergedOnFromActivity.HasValue || mergeDate < mergedOnFromActivity.Value)
+                        totalComments++;
+                        if (activity.Comment.IsOnOrAfter(filterDate))
                         {
-                            mergedOnFromActivity = mergeDate;
+                            var commentUser = activity.Comment.User;
+                            var commentKey = commentUser.ToKey();
+                            commentCounts[commentKey] = commentCounts.GetValueOrDefault(commentKey) + 1;
+                            AddParticipant(participants, commentUser);
+                        }
+
+                        if (shouldCalculateTtfr &&
+                            activity.Comment.IsOnOrAfter(pr.CreatedOn) &&
+                            activity.Comment.IsByDifferentDeveloper(authorIdentity))
+                        {
+#pragma warning disable IDE0058 // Expression value is never used
+                            activity.Comment.TryUpdateFirstReaction(ref firstReactionOn);
+#pragma warning restore IDE0058 // Expression value is never used
                         }
                     }
 
-                    var activityUser = activity.Actor;
-                    if (activityUser.HasValue)
+                    if (activity.Approval is not null)
                     {
-                        AddParticipant(participants, activityUser.Value);
-
-                        if (activity.Comment is not null)
+                        if (activity.Approval.IsOnOrAfter(filterDate))
                         {
-                            totalComments++;
-                            if (activity.Comment.Date >= filterDate)
-                            {
-                                var commentUser = activity.Comment.User;
-                                var commentKey = commentUser.Uuid?.Value ?? commentUser.DisplayName.Value;
-                                commentCounts[commentKey] = commentCounts.GetValueOrDefault(commentKey) + 1;
-                                AddParticipant(participants, commentUser);
-                            }
-
-                            if (shouldCalculateTtfr &&
-                                activity.Comment.Date >= pr.CreatedOn &&
-                                (!authorIdentity.HasValue ||
-                                 !authorIdentity.Value.IsSameIdentity(activity.Comment.User)))
-                            {
-                                if (!firstReactionOn.HasValue || activity.Comment.Date < firstReactionOn.Value)
-                                {
-                                    firstReactionOn = activity.Comment.Date;
-                                }
-                            }
+                            var approvalUser = activity.Approval.User;
+                            var approvalKey = activity.Approval.User.ToKey();
+                            approvalCounts[approvalKey] = approvalCounts.GetValueOrDefault(approvalKey) + 1;
+                            AddParticipant(participants, approvalUser);
                         }
 
-                        if (activity.Approval is not null)
+                        if (shouldCalculateTtfr &&
+                            activity.Approval.IsOnOrAfter(pr.CreatedOn) &&
+                            activity.Approval.IsByDifferentDeveloper(authorIdentity))
                         {
-                            if (activity.Approval.Date >= filterDate)
-                            {
-                                var approvalUser = activity.Approval.User;
-                                var approvalKey = approvalUser.Uuid?.Value ?? approvalUser.DisplayName.Value;
-                                approvalCounts[approvalKey] = approvalCounts.GetValueOrDefault(approvalKey) + 1;
-                                AddParticipant(participants, approvalUser);
-                            }
-
-                            if (shouldCalculateTtfr &&
-                                activity.Approval.Date >= pr.CreatedOn &&
-                                (!authorIdentity.HasValue ||
-                                 !authorIdentity.Value.IsSameIdentity(activity.Approval.User)))
-                            {
-                                if (!firstReactionOn.HasValue || activity.Approval.Date < firstReactionOn.Value)
-                                {
-                                    firstReactionOn = activity.Approval.Date;
-                                }
-                            }
+#pragma warning disable IDE0058 // Expression value is never used
+                            activity.Approval.TryUpdateFirstReaction(ref firstReactionOn);
+#pragma warning restore IDE0058 // Expression value is never used
                         }
                     }
                 }
@@ -177,7 +160,7 @@ internal sealed class ReportRunner : IReportRunner
 
                 if (authorIdentity.HasValue)
                 {
-                    participants[authorIdentity.Value.Uuid?.Value ?? authorIdentity.Value.DisplayName.Value] =
+                    participants[authorIdentity.Value.ToKey()] =
                         authorIdentity.Value;
                 }
 
