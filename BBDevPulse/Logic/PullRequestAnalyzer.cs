@@ -31,15 +31,13 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         DateTimeOffset filterDate,
         PrTimeFilterMode prTimeFilterMode,
         IReadOnlyList<BranchName> branchNameList,
-        List<PullRequestReport> reports,
-        Dictionary<DeveloperKey, DeveloperStats> developerStats,
+        ReportData reportData,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repo);
         ArgumentNullException.ThrowIfNull(branchNameList);
-        ArgumentNullException.ThrowIfNull(reports);
-        ArgumentNullException.ThrowIfNull(developerStats);
+        ArgumentNullException.ThrowIfNull(reportData);
 
         await foreach (var pr in _client.GetPullRequestsAsync(
                            workspace,
@@ -84,12 +82,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 if (pr.CreatedOn >= filterDate)
                 {
-                    GetOrAddDeveloper(developerStats, authorIdentity.Value).PrsOpenedSince++;
+                    GetOrAddDeveloper(reportData.DeveloperStats, authorIdentity.Value).PrsOpenedSince++;
                 }
 
                 if (mergedOnResolved.HasValue && mergedOnResolved.Value >= filterDate)
                 {
-                    GetOrAddDeveloper(developerStats, authorIdentity.Value).PrsMergedAfter++;
+                    GetOrAddDeveloper(reportData.DeveloperStats, authorIdentity.Value).PrsMergedAfter++;
                 }
             }
 
@@ -97,7 +95,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 if (analysis.Participants.TryGetValue(entry.Key, out var participant))
                 {
-                    GetOrAddDeveloper(developerStats, participant).CommentsAfter += entry.Value;
+                    GetOrAddDeveloper(reportData.DeveloperStats, participant).CommentsAfter += entry.Value;
                 }
             }
 
@@ -105,11 +103,11 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 if (analysis.Participants.TryGetValue(entry.Key, out var participant))
                 {
-                    GetOrAddDeveloper(developerStats, participant).ApprovalsAfter += entry.Value;
+                    GetOrAddDeveloper(reportData.DeveloperStats, participant).ApprovalsAfter += entry.Value;
                 }
             }
 
-            reports.Add(new PullRequestReport(
+            reportData.Reports.Add(new PullRequestReport(
                 string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
                 pr.Author?.DisplayName.Value ?? "unknown",
                 pr.Destination?.Branch?.Name ?? "-",

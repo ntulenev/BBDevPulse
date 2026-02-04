@@ -31,10 +31,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
-    public void RenderMergeTimeStats(IReadOnlyCollection<PullRequestReport> reports)
+    public void RenderMergeTimeStats(ReportData reportData)
     {
-        ArgumentNullException.ThrowIfNull(reports);
-        var mergeDays = reports
+        ArgumentNullException.ThrowIfNull(reportData);
+        var mergeDays = reportData.Reports
             .Where(r => r.MergedOn.HasValue)
             .Select(r => (r.MergedOn!.Value - r.CreatedOn).TotalDays)
             .OrderBy(days => days)
@@ -67,10 +67,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
-    public void RenderTtfrStats(IReadOnlyCollection<PullRequestReport> reports)
+    public void RenderTtfrStats(ReportData reportData)
     {
-        ArgumentNullException.ThrowIfNull(reports);
-        var ttfrDays = reports
+        ArgumentNullException.ThrowIfNull(reportData);
+        var ttfrDays = reportData.Reports
             .Where(r => r.FirstReactionOn.HasValue)
             .Select(r => (r.FirstReactionOn!.Value - r.CreatedOn).TotalDays)
             .OrderBy(days => days)
@@ -104,10 +104,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
 
     /// <inheritdoc />
     public void RenderDeveloperStatsTable(
-        IReadOnlyDictionary<DeveloperKey, DeveloperStats> stats,
+        ReportData reportData,
         DateTimeOffset filterDate)
     {
-        ArgumentNullException.ThrowIfNull(stats);
+        ArgumentNullException.ThrowIfNull(reportData);
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("#")
@@ -118,7 +118,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .AddColumn("Approvals");
 
         var index = 1;
-        foreach (var stat in stats.Values
+        foreach (var stat in reportData.DeveloperStats.Values
             .OrderByDescending(s => s.PrsOpenedSince)
             .ThenBy(s => s.DisplayName.Value, StringComparer.OrdinalIgnoreCase))
         {

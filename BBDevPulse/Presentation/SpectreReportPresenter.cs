@@ -70,23 +70,23 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
     /// <inheritdoc />
     public void RenderPullRequestTable(
-        IReadOnlyCollection<PullRequestReport> reports,
+        ReportData reportData,
         DateTimeOffset filterDate) =>
-        _pullRequestReportPresenter.RenderPullRequestTable(reports, filterDate);
+        _pullRequestReportPresenter.RenderPullRequestTable(reportData, filterDate);
 
     /// <inheritdoc />
-    public void RenderMergeTimeStats(IReadOnlyCollection<PullRequestReport> reports) =>
-        _statisticsPresenter.RenderMergeTimeStats(reports);
+    public void RenderMergeTimeStats(ReportData reportData) =>
+        _statisticsPresenter.RenderMergeTimeStats(reportData);
 
     /// <inheritdoc />
-    public void RenderTtfrStats(IReadOnlyCollection<PullRequestReport> reports) =>
-        _statisticsPresenter.RenderTtfrStats(reports);
+    public void RenderTtfrStats(ReportData reportData) =>
+        _statisticsPresenter.RenderTtfrStats(reportData);
 
     /// <inheritdoc />
     public void RenderDeveloperStatsTable(
-        IReadOnlyDictionary<DeveloperKey, DeveloperStats> stats,
+        ReportData reportData,
         DateTimeOffset filterDate) =>
-        _statisticsPresenter.RenderDeveloperStatsTable(stats, filterDate);
+        _statisticsPresenter.RenderDeveloperStatsTable(reportData, filterDate);
 
     private readonly IAuthPresenter _authPresenter;
     private readonly IRepositoryListPresenter _repositoryListPresenter;

@@ -1,4 +1,3 @@
-using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 
 namespace BBDevPulse.Abstractions;
@@ -16,8 +15,7 @@ public interface IPullRequestAnalyzer
     /// <param name="filterDate">Filter cutoff date.</param>
     /// <param name="prTimeFilterMode">Pull request time filter mode.</param>
     /// <param name="branchNameList">Branch filter list.</param>
-    /// <param name="reports">Report output collection.</param>
-    /// <param name="developerStats">Developer statistics output collection.</param>
+    /// <param name="reportData">Report output data.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task AnalyzeAsync(
         Workspace workspace,
@@ -25,7 +23,6 @@ public interface IPullRequestAnalyzer
         DateTimeOffset filterDate,
         PrTimeFilterMode prTimeFilterMode,
         IReadOnlyList<BranchName> branchNameList,
-        List<PullRequestReport> reports,
-        Dictionary<DeveloperKey, DeveloperStats> developerStats,
+        ReportData reportData,
         CancellationToken cancellationToken);
 }

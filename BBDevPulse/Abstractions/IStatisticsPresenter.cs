@@ -10,21 +10,21 @@ public interface IStatisticsPresenter
     /// <summary>
     /// Renders merge time statistics.
     /// </summary>
-    /// <param name="reports">Pull request reports.</param>
-    void RenderMergeTimeStats(IReadOnlyCollection<PullRequestReport> reports);
+    /// <param name="reportData">Report data.</param>
+    void RenderMergeTimeStats(ReportData reportData);
 
     /// <summary>
     /// Renders TTFR statistics.
     /// </summary>
-    /// <param name="reports">Pull request reports.</param>
-    void RenderTtfrStats(IReadOnlyCollection<PullRequestReport> reports);
+    /// <param name="reportData">Report data.</param>
+    void RenderTtfrStats(ReportData reportData);
 
     /// <summary>
     /// Renders per-developer statistics.
     /// </summary>
-    /// <param name="stats">Developer statistics keyed by identity.</param>
+    /// <param name="reportData">Report data.</param>
     /// <param name="filterDate">Filter cutoff date.</param>
     void RenderDeveloperStatsTable(
-        IReadOnlyDictionary<DeveloperKey, DeveloperStats> stats,
+        ReportData reportData,
         DateTimeOffset filterDate);
 }

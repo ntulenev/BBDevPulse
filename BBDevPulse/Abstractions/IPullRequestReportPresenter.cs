@@ -10,9 +10,9 @@ public interface IPullRequestReportPresenter
     /// <summary>
     /// Renders the pull request table.
     /// </summary>
-    /// <param name="reports">Pull request reports.</param>
+    /// <param name="reportData">Report data.</param>
     /// <param name="filterDate">Filter cutoff date.</param>
     void RenderPullRequestTable(
-        IReadOnlyCollection<PullRequestReport> reports,
+        ReportData reportData,
         DateTimeOffset filterDate);
 }

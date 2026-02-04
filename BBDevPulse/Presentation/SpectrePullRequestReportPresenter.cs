@@ -26,10 +26,10 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
 
     /// <inheritdoc />
     public void RenderPullRequestTable(
-        IReadOnlyCollection<PullRequestReport> reports,
+        ReportData reportData,
         DateTimeOffset filterDate)
     {
-        ArgumentNullException.ThrowIfNull(reports);
+        ArgumentNullException.ThrowIfNull(reportData);
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("#")
@@ -47,7 +47,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
             .AddColumn("PR ID");
 
         var index = 1;
-        foreach (var report in reports)
+        foreach (var report in reportData.Reports)
         {
             var timeToMerge = report.MergedOn.HasValue
                 ? _dateDiffFormatter.Format(report.CreatedOn, report.MergedOn.Value)

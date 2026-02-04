@@ -31,70 +31,75 @@ internal sealed class ReportRunner : IReportRunner
         _client = client;
         _analyzer = analyzer;
         _presenter = presenter;
-        _options = options.Value;
+        _parameters = options.Value.CreateReportParameters();
     }
 
     /// <inheritdoc />
     public async Task RunAsync(CancellationToken cancellationToken)
     {
-        var filterDate = DateTimeOffset.UtcNow.AddDays(-_options.Days);
-        var workspace = new Workspace(_options.Workspace);
-        var repoNameFilter = new RepoNameFilter(_options.RepoNameFilter);
-        var repoNameList = (_options.RepoNameList ?? [])
-            .Where(entry => !string.IsNullOrWhiteSpace(entry))
-            .Select(entry => new RepoName(entry))
-            .ToList();
-        var repoSearchMode = _options.RepoSearchMode;
-        var prTimeFilterMode = _options.PrTimeFilterMode;
-        var branchNameList = (_options.BranchNameList ?? [])
-            .Where(entry => !string.IsNullOrWhiteSpace(entry))
-            .Select(entry => new BranchName(entry))
-            .ToList();
-        var reports = new List<PullRequestReport>();
-        var developerStats = new Dictionary<DeveloperKey, DeveloperStats>();
+        await BuildAuthAsync(cancellationToken).ConfigureAwait(false);
 
+        var filteredRepos = await BuildRepositoriesAsync(cancellationToken).ConfigureAwait(false);
+
+        await BuildReportsAsync(filteredRepos, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task BuildAuthAsync(CancellationToken cancellationToken)
+    {
         await _presenter.AnnounceAuthAsync(
-                _client.GetCurrentUserAsync,
-                cancellationToken)
-            .ConfigureAwait(false);
+       _client.GetCurrentUserAsync, cancellationToken)
+              .ConfigureAwait(false);
+    }
 
+    private async Task<List<Repository>> BuildRepositoriesAsync(CancellationToken cancellationToken)
+    {
         var repositories = await _presenter.FetchRepositoriesAsync(
-                (onPage, token) => _client.GetRepositoriesAsync(workspace, onPage, token),
-                cancellationToken)
-            .ConfigureAwait(false);
+        (onPage, token) => _client.GetRepositoriesAsync(_parameters.Workspace, onPage, token),
+        cancellationToken)
+        .ConfigureAwait(false);
 
         var filteredRepos = repositories
-            .Where(repo => repo.MatchesFilter(repoSearchMode, repoNameFilter, repoNameList))
-            .ToList();
+            .Where(repo => repo.MatchesFilter(
+                _parameters.RepoSearchMode,
+                _parameters.RepoNameFilter,
+                _parameters.RepoNameList)).ToList();
 
-        _presenter.RenderRepositoryTable(filteredRepos, repoSearchMode, repoNameFilter, repoNameList);
-        _presenter.RenderBranchFilterInfo(branchNameList);
+        _presenter.RenderRepositoryTable(
+           filteredRepos,
+           _parameters.RepoSearchMode,
+           _parameters.RepoNameFilter,
+           _parameters.RepoNameList);
+        _presenter.RenderBranchFilterInfo(_parameters.BranchNameList);
+
+        return filteredRepos;
+    }
+
+    private async Task BuildReportsAsync(List<Repository> filteredRepos, CancellationToken cancellationToken)
+    {
+        var reportData = new ReportData();
 
         await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
         {
             await _analyzer.AnalyzeAsync(
-                workspace,
+                _parameters.Workspace,
                 repo,
-                filterDate,
-                prTimeFilterMode,
-                branchNameList,
-                reports,
-                developerStats,
+                _parameters.FilterDate,
+                _parameters.PrTimeFilterMode,
+                _parameters.BranchNameList,
+                reportData,
                 token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
 
-        var sortedReports = reports
-            .OrderBy(r => r.CreatedOn)
-            .ToList();
+        reportData.Reports.Sort((left, right) => left.CreatedOn.CompareTo(right.CreatedOn));
 
-        _presenter.RenderPullRequestTable(sortedReports, filterDate);
-        _presenter.RenderMergeTimeStats(sortedReports);
-        _presenter.RenderTtfrStats(sortedReports);
-        _presenter.RenderDeveloperStatsTable(developerStats, filterDate);
+        _presenter.RenderPullRequestTable(reportData, _parameters.FilterDate);
+        _presenter.RenderMergeTimeStats(reportData);
+        _presenter.RenderTtfrStats(reportData);
+        _presenter.RenderDeveloperStatsTable(reportData, _parameters.FilterDate);
     }
 
     private readonly IBitbucketClient _client;
     private readonly IPullRequestAnalyzer _analyzer;
     private readonly IReportPresenter _presenter;
-    private readonly BitbucketOptions _options;
+    private readonly ReportParameters _parameters;
 }
