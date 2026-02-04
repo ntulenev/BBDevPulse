@@ -1,3 +1,6 @@
+using System;
+using System.Linq;
+
 namespace BBDevPulse.Configuration;
 
 /// <summary>
@@ -61,4 +64,31 @@ internal sealed class BitbucketOptions
     /// Pull request time filter mode.
     /// </summary>
     public required Models.PrTimeFilterMode PrTimeFilterMode { get; init; }
+
+    /// <summary>
+    /// Builds report parameters from the current options.
+    /// </summary>
+    public Models.ReportParameters CreateReportParameters()
+    {
+        var filterDate = DateTimeOffset.UtcNow.AddDays(-Days);
+        var workspace = new Models.Workspace(Workspace);
+        var repoNameFilter = new Models.RepoNameFilter(RepoNameFilter);
+        var repoNameList = (RepoNameList ?? [])
+            .Where(entry => !string.IsNullOrWhiteSpace(entry))
+            .Select(entry => new Models.RepoName(entry))
+            .ToList();
+        var branchNameList = (BranchNameList ?? [])
+            .Where(entry => !string.IsNullOrWhiteSpace(entry))
+            .Select(entry => new Models.BranchName(entry))
+            .ToList();
+
+        return new Models.ReportParameters(
+            filterDate,
+            workspace,
+            repoNameFilter,
+            repoNameList,
+            RepoSearchMode,
+            PrTimeFilterMode,
+            branchNameList);
+    }
 }
