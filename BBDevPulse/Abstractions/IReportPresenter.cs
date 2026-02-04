@@ -39,48 +39,20 @@ public interface IReportPresenter
     /// Renders the repository filter result table.
     /// </summary>
     /// <param name="repositories">Filtered repositories.</param>
-    /// <param name="searchMode">Repository search mode.</param>
-    /// <param name="filter">Filter text for repository names.</param>
-    /// <param name="repoList">Explicit repository list filter.</param>
+    /// <param name="parameters">Report parameters.</param>
     void RenderRepositoryTable(
         IReadOnlyCollection<Repository> repositories,
-        RepoSearchMode searchMode,
-        RepoNameFilter filter,
-        IReadOnlyList<RepoName> repoList);
+        ReportParameters parameters);
 
     /// <summary>
     /// Renders branch filter information.
     /// </summary>
-    /// <param name="branchList">Branch names to filter by.</param>
-    void RenderBranchFilterInfo(IReadOnlyList<BranchName> branchList);
+    /// <param name="parameters">Report parameters.</param>
+    void RenderBranchFilterInfo(ReportParameters parameters);
 
     /// <summary>
-    /// Renders the pull request table.
+    /// Renders the full report output.
     /// </summary>
     /// <param name="reportData">Report data.</param>
-    /// <param name="filterDate">Filter cutoff date.</param>
-    void RenderPullRequestTable(
-        ReportData reportData,
-        DateTimeOffset filterDate);
-
-    /// <summary>
-    /// Renders merge time statistics.
-    /// </summary>
-    /// <param name="reportData">Report data.</param>
-    void RenderMergeTimeStats(ReportData reportData);
-
-    /// <summary>
-    /// Renders TTFR statistics.
-    /// </summary>
-    /// <param name="reportData">Report data.</param>
-    void RenderTtfrStats(ReportData reportData);
-
-    /// <summary>
-    /// Renders per-developer statistics.
-    /// </summary>
-    /// <param name="reportData">Report data.</param>
-    /// <param name="filterDate">Filter cutoff date.</param>
-    void RenderDeveloperStatsTable(
-        ReportData reportData,
-        DateTimeOffset filterDate);
+    void RenderReport(ReportData reportData);
 }

@@ -59,34 +59,37 @@ public sealed class SpectreReportPresenter : IReportPresenter
     /// <inheritdoc />
     public void RenderRepositoryTable(
         IReadOnlyCollection<Repository> repositories,
-        RepoSearchMode searchMode,
-        RepoNameFilter filter,
-        IReadOnlyList<RepoName> repoList) =>
-        _repositoryListPresenter.RenderRepositoryTable(repositories, searchMode, filter, repoList);
+        ReportParameters parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        _repositoryListPresenter.RenderRepositoryTable(
+            repositories,
+            parameters.RepoSearchMode,
+            parameters.RepoNameFilter,
+            parameters.RepoNameList);
+    }
 
     /// <inheritdoc />
-    public void RenderBranchFilterInfo(IReadOnlyList<BranchName> branchList) =>
-        _branchFilterPresenter.RenderBranchFilterInfo(branchList);
+    public void RenderBranchFilterInfo(ReportParameters parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        _branchFilterPresenter.RenderBranchFilterInfo(parameters.BranchNameList);
+    }
 
     /// <inheritdoc />
-    public void RenderPullRequestTable(
-        ReportData reportData,
-        DateTimeOffset filterDate) =>
+    public void RenderReport(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+
+        reportData.SortReportsByCreatedOn();
+
+        var filterDate = reportData.Parameters.FilterDate;
+
         _pullRequestReportPresenter.RenderPullRequestTable(reportData, filterDate);
-
-    /// <inheritdoc />
-    public void RenderMergeTimeStats(ReportData reportData) =>
         _statisticsPresenter.RenderMergeTimeStats(reportData);
-
-    /// <inheritdoc />
-    public void RenderTtfrStats(ReportData reportData) =>
         _statisticsPresenter.RenderTtfrStats(reportData);
-
-    /// <inheritdoc />
-    public void RenderDeveloperStatsTable(
-        ReportData reportData,
-        DateTimeOffset filterDate) =>
         _statisticsPresenter.RenderDeveloperStatsTable(reportData, filterDate);
+    }
 
     private readonly IAuthPresenter _authPresenter;
     private readonly IRepositoryListPresenter _repositoryListPresenter;

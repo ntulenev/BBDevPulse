@@ -26,18 +26,18 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
     /// <inheritdoc />
     public async Task AnalyzeAsync(
-        Workspace workspace,
         Repository repo,
-        DateTimeOffset filterDate,
-        PrTimeFilterMode prTimeFilterMode,
-        IReadOnlyList<BranchName> branchNameList,
         ReportData reportData,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repo);
-        ArgumentNullException.ThrowIfNull(branchNameList);
         ArgumentNullException.ThrowIfNull(reportData);
+
+        var parameters = reportData.Parameters;
+        var workspace = parameters.Workspace;
+        var filterDate = parameters.FilterDate;
+        var prTimeFilterMode = parameters.PrTimeFilterMode;
+        var branchNameList = parameters.BranchNameList;
 
         await foreach (var pr in _client.GetPullRequestsAsync(
                            workspace,

@@ -37,17 +37,15 @@ public sealed class Repository
     /// <summary>
     /// Determines whether the repository matches the filter criteria.
     /// </summary>
-    /// <param name="searchMode">Repository search mode.</param>
-    /// <param name="filter">Repository name filter.</param>
-    /// <param name="repoList">Explicit repository list filter.</param>
+    /// <param name="parameters">Report parameters.</param>
     /// <returns>True when the repository should be included.</returns>
-    public bool MatchesFilter(
-        RepoSearchMode searchMode,
-        RepoNameFilter filter,
-        IReadOnlyList<RepoName> repoList)
+    public bool MatchesFilter(ReportParameters parameters)
     {
-        ArgumentNullException.ThrowIfNull(filter);
-        ArgumentNullException.ThrowIfNull(repoList);
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        var searchMode = parameters.RepoSearchMode;
+        var filter = parameters.RepoNameFilter;
+        var repoList = parameters.RepoNameList;
 
         var name = Name.Value;
         var slug = Slug.Value;

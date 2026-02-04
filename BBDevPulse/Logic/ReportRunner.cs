@@ -28,6 +28,7 @@ internal sealed class ReportRunner : IReportRunner
         ArgumentNullException.ThrowIfNull(analyzer);
         ArgumentNullException.ThrowIfNull(presenter);
         ArgumentNullException.ThrowIfNull(options);
+
         _client = client;
         _analyzer = analyzer;
         _presenter = presenter;
@@ -38,9 +39,7 @@ internal sealed class ReportRunner : IReportRunner
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         await BuildAuthAsync(cancellationToken).ConfigureAwait(false);
-
         var filteredRepos = await BuildRepositoriesAsync(cancellationToken).ConfigureAwait(false);
-
         await BuildReportsAsync(filteredRepos, cancellationToken).ConfigureAwait(false);
     }
 
@@ -57,45 +56,26 @@ internal sealed class ReportRunner : IReportRunner
         (onPage, token) => _client.GetRepositoriesAsync(_parameters.Workspace, onPage, token),
         cancellationToken)
         .ConfigureAwait(false);
-
         var filteredRepos = repositories
-            .Where(repo => repo.MatchesFilter(
-                _parameters.RepoSearchMode,
-                _parameters.RepoNameFilter,
-                _parameters.RepoNameList)).ToList();
-
+            .Where(repo => repo.MatchesFilter(_parameters)).ToList();
         _presenter.RenderRepositoryTable(
            filteredRepos,
-           _parameters.RepoSearchMode,
-           _parameters.RepoNameFilter,
-           _parameters.RepoNameList);
-        _presenter.RenderBranchFilterInfo(_parameters.BranchNameList);
-
+           _parameters);
+        _presenter.RenderBranchFilterInfo(_parameters);
         return filteredRepos;
     }
 
     private async Task BuildReportsAsync(List<Repository> filteredRepos, CancellationToken cancellationToken)
     {
-        var reportData = new ReportData();
-
+        var reportData = new ReportData(_parameters);
         await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
         {
             await _analyzer.AnalyzeAsync(
-                _parameters.Workspace,
                 repo,
-                _parameters.FilterDate,
-                _parameters.PrTimeFilterMode,
-                _parameters.BranchNameList,
                 reportData,
                 token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
-
-        reportData.Reports.Sort((left, right) => left.CreatedOn.CompareTo(right.CreatedOn));
-
-        _presenter.RenderPullRequestTable(reportData, _parameters.FilterDate);
-        _presenter.RenderMergeTimeStats(reportData);
-        _presenter.RenderTtfrStats(reportData);
-        _presenter.RenderDeveloperStatsTable(reportData, _parameters.FilterDate);
+        _presenter.RenderReport(reportData);
     }
 
     private readonly IBitbucketClient _client;
