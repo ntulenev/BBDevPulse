@@ -34,19 +34,13 @@ internal sealed class BitbucketTransport : IBitbucketTransport
                 $"Bitbucket API request failed ({response.StatusCode}): {body}");
         }
 
-#pragma warning disable CA2007 // Not needed here
-        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
+        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
-#pragma warning restore CA2007
+
         var result = await JsonSerializer.DeserializeAsync<T>(stream, _jsonOptions, cancellationToken)
             .ConfigureAwait(false);
 
-        if (result == null)
-        {
-            throw new InvalidOperationException("Bitbucket API response was empty.");
-        }
-
-        return result;
+        return result == null ? throw new InvalidOperationException("Bitbucket API response was empty.") : result;
     }
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
