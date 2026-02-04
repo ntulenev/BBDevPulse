@@ -27,7 +27,7 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
             return;
         }
 
-        AddParticipant(analysis.Participants, activityUser);
+        analysis.AddParticipant(activityUser);
 
         if (activity.Comment is not null)
         {
@@ -38,7 +38,7 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
                 var commentKey = commentUser.ToKey();
                 analysis.CommentCounts[commentKey] =
                     analysis.CommentCounts.GetValueOrDefault(commentKey) + 1;
-                AddParticipant(analysis.Participants, commentUser);
+                analysis.AddParticipant(commentUser);
             }
 
             if (analysis.ShouldCalculateTtfr &&
@@ -59,7 +59,7 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
                 var approvalKey = approvalUser.ToKey();
                 analysis.ApprovalCounts[approvalKey] =
                     analysis.ApprovalCounts.GetValueOrDefault(approvalKey) + 1;
-                AddParticipant(analysis.Participants, approvalUser);
+                analysis.AddParticipant(approvalUser);
             }
 
             if (analysis.ShouldCalculateTtfr &&
@@ -73,14 +73,4 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
         }
     }
 
-    private static void AddParticipant(
-        Dictionary<string, DeveloperIdentity> participants,
-        DeveloperIdentity identity)
-    {
-        var key = identity.ToKey();
-        if (!participants.ContainsKey(key))
-        {
-            participants[key] = identity;
-        }
-    }
 }

@@ -82,12 +82,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 if (pr.CreatedOn >= filterDate)
                 {
-                    GetOrAddDeveloper(reportData.DeveloperStats, authorIdentity.Value).PrsOpenedSince++;
+                    reportData.GetOrAddDeveloper(authorIdentity.Value).PrsOpenedSince++;
                 }
 
                 if (mergedOnResolved.HasValue && mergedOnResolved.Value >= filterDate)
                 {
-                    GetOrAddDeveloper(reportData.DeveloperStats, authorIdentity.Value).PrsMergedAfter++;
+                    reportData.GetOrAddDeveloper(authorIdentity.Value).PrsMergedAfter++;
                 }
             }
 
@@ -95,7 +95,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 if (analysis.Participants.TryGetValue(entry.Key, out var participant))
                 {
-                    GetOrAddDeveloper(reportData.DeveloperStats, participant).CommentsAfter += entry.Value;
+                    reportData.GetOrAddDeveloper(participant).CommentsAfter += entry.Value;
                 }
             }
 
@@ -103,7 +103,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 if (analysis.Participants.TryGetValue(entry.Key, out var participant))
                 {
-                    GetOrAddDeveloper(reportData.DeveloperStats, participant).ApprovalsAfter += entry.Value;
+                    reportData.GetOrAddDeveloper(participant).ApprovalsAfter += entry.Value;
                 }
             }
 
@@ -121,26 +121,6 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 analysis.FirstReactionOn
             ));
         }
-    }
-
-    private static DeveloperStats GetOrAddDeveloper(
-        Dictionary<DeveloperKey, DeveloperStats> stats,
-        DeveloperIdentity identity)
-    {
-        var key = DeveloperKey.FromIdentity(identity);
-        if (stats.TryGetValue(key, out var existing))
-        {
-            if (!string.IsNullOrWhiteSpace(identity.DisplayName.Value))
-            {
-                existing.DisplayName = identity.DisplayName;
-            }
-
-            return existing;
-        }
-
-        var created = new DeveloperStats(identity.DisplayName);
-        stats[key] = created;
-        return created;
     }
 
 }

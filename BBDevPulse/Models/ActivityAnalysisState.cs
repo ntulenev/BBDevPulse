@@ -38,4 +38,13 @@ internal sealed class ActivityAnalysisState
         new(StringComparer.OrdinalIgnoreCase);
 
     public int TotalComments { get; set; }
+
+    public void AddParticipant(DeveloperIdentity identity)
+    {
+        var key = identity.ToKey();
+        if (!Participants.ContainsKey(key))
+        {
+            Participants[key] = identity;
+        }
+    }
 }
