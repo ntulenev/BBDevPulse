@@ -8,9 +8,6 @@ namespace BBDevPulse.Logic;
 /// </summary>
 internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 {
-    private readonly IBitbucketClient _client;
-    private readonly IActivityAnalyzer _activityAnalyzer;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="PullRequestAnalyzer"/> class.
     /// </summary>
@@ -122,5 +119,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             ));
         }
     }
+
+    private readonly IBitbucketClient _client;
+    private readonly IActivityAnalyzer _activityAnalyzer;
 
 }
