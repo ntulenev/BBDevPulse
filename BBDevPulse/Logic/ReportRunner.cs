@@ -17,21 +17,25 @@ internal sealed class ReportRunner : IReportRunner
     /// <param name="client">Bitbucket API client.</param>
     /// <param name="analyzer">Pull request analyzer.</param>
     /// <param name="presenter">Report presenter.</param>
+    /// <param name="pdfReportRenderer">PDF report renderer.</param>
     /// <param name="options">Bitbucket options.</param>
     public ReportRunner(
         IBitbucketClient client,
         IPullRequestAnalyzer analyzer,
         IReportPresenter presenter,
+        IPdfReportRenderer pdfReportRenderer,
         IOptions<BitbucketOptions> options)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(analyzer);
         ArgumentNullException.ThrowIfNull(presenter);
+        ArgumentNullException.ThrowIfNull(pdfReportRenderer);
         ArgumentNullException.ThrowIfNull(options);
 
         _client = client;
         _analyzer = analyzer;
         _presenter = presenter;
+        _pdfReportRenderer = pdfReportRenderer;
         _parameters = options.Value.CreateReportParameters();
     }
 
@@ -76,10 +80,12 @@ internal sealed class ReportRunner : IReportRunner
                 token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
         _presenter.RenderReport(reportData);
+        _pdfReportRenderer.RenderReport(reportData);
     }
 
     private readonly IBitbucketClient _client;
     private readonly IPullRequestAnalyzer _analyzer;
     private readonly IReportPresenter _presenter;
+    private readonly IPdfReportRenderer _pdfReportRenderer;
     private readonly ReportParameters _parameters;
 }

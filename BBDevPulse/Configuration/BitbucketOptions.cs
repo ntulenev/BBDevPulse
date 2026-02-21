@@ -66,6 +66,11 @@ internal sealed class BitbucketOptions
     public required Models.PrTimeFilterMode PrTimeFilterMode { get; init; }
 
     /// <summary>
+    /// PDF report output options.
+    /// </summary>
+    public PdfOptions Pdf { get; init; } = new();
+
+    /// <summary>
     /// Builds report parameters from the current options.
     /// </summary>
     public Models.ReportParameters CreateReportParameters()

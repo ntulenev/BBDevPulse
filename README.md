@@ -19,6 +19,7 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - Pull request report
    - Merge-time statistics (best/median/75p/longest)
    - Developer statistics (PRs opened, merged, comments, approvals)
+9. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
 
 ## appsettings.json parameters
 All settings are under the `Bitbucket` object.
@@ -38,6 +39,8 @@ All settings are under the `Bitbucket` object.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
+- `Pdf.Enabled` (`bool`): Enables/disables PDF generation after console output is rendered.
+- `Pdf.OutputPath` (`string`): Output file path for the PDF. A date suffix (`dd_MM_yyyy`) is appended automatically.
 
 ## Example configuration
 ```json
@@ -57,7 +60,11 @@ All settings are under the `Bitbucket` object.
     ],
     "BranchNameList": [
       "develop"
-    ]
+    ],
+    "Pdf": {
+      "Enabled": true,
+      "OutputPath": "bbdevpulse-report.pdf"
+    }
   }
 }
 ```

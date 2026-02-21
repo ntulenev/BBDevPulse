@@ -8,6 +8,7 @@ using BBDevPulse.Logic;
 using BBDevPulse.Math;
 using BBDevPulse.Presentation;
 using BBDevPulse.Presentation.Formatters;
+using BBDevPulse.Presentation.Pdf;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,6 +55,8 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IStatisticsPresenter, SpectreStatisticsPresenter>();
         _ = services.AddSingleton<IStatisticsCalculator, StatisticsCalculator>();
         _ = services.AddSingleton<IDateDiffFormatter, DateDiffFormatter>();
+        _ = services.AddSingleton<IPdfReportFileStore, PdfReportFileStore>();
+        _ = services.AddSingleton<IPdfReportRenderer, QuestPdfReportRenderer>();
         _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
         _ = services.AddSingleton<IPullRequestAnalyzer, PullRequestAnalyzer>();
         _ = services.AddSingleton<IReportRunner, ReportRunner>();
