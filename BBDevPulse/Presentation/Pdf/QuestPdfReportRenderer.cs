@@ -58,6 +58,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .ToList();
         var outputPath = _pdfOptions.ResolveOutputPath();
         var filterDate = reportData.Parameters.FilterDate;
+        var workspace = reportData.Parameters.Workspace.Value;
 
         QuestPDF.Settings.License = QLicenseType.Community;
 
@@ -89,7 +90,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 page.Content().PaddingTop(8).Column(column =>
                 {
                     column.Spacing(8);
-                    ComposePullRequestSection(column, orderedReports, filterDate);
+                    ComposePullRequestSection(column, orderedReports, filterDate, workspace);
                     ComposeDurationSection(
                         column,
                         "Merge Time Stats",
@@ -131,7 +132,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private void ComposePullRequestSection(
         ColumnDescriptor column,
         List<PullRequestReport> reports,
-        DateTimeOffset filterDate)
+        DateTimeOffset filterDate,
+        string workspace)
     {
         _ = column.Item().Text("Pull Requests").Bold().FontSize(12);
         if (reports.Count == 0)
@@ -179,6 +181,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             var index = 1;
             foreach (var report in reports)
             {
+                var repositoryUrl = BuildRepositoryUrl(workspace, report.RepositorySlug);
+                var pullRequestUrl = BuildPullRequestUrl(workspace, report.RepositorySlug, report.Id.Value);
                 var timeToMerge = report.MergedOn.HasValue
                     ? _dateDiffFormatter.Format(report.CreatedOn, report.MergedOn.Value)
                     : "-";
@@ -195,7 +199,10 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 }
 
                 _ = table.Cell().Element(BodyCell).Text(index.ToString(CultureInfo.InvariantCulture));
-                _ = table.Cell().Element(BodyCell).Text(report.Repository);
+                table.Cell().Element(BodyCell).Hyperlink(repositoryUrl).Text(text =>
+                {
+                    text.Span(report.Repository).FontColor(Colors.Blue.Medium).Underline();
+                });
                 _ = table.Cell().Element(BodyCell).Text(report.Author);
                 _ = table.Cell().Element(BodyCell).Text(report.TargetBranch);
                 _ = table.Cell().Element(BodyCell).Text(created);
@@ -206,7 +213,10 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(prAge);
                 _ = table.Cell().Element(BodyCell).Text(timeToMerge);
                 _ = table.Cell().Element(BodyCell).Text(report.Comments.ToString(CultureInfo.InvariantCulture));
-                _ = table.Cell().Element(BodyCell).Text(report.Id.Value.ToString(CultureInfo.InvariantCulture));
+                table.Cell().Element(BodyCell).Hyperlink(pullRequestUrl).Text(text =>
+                {
+                    text.Span(report.Id.Value.ToString(CultureInfo.InvariantCulture)).FontColor(Colors.Blue.Medium).Underline();
+                });
                 index++;
             }
         });
@@ -319,6 +329,21 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 
     private string FormatDuration(double totalDays) =>
         _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(totalDays));
+
+    private static string BuildRepositoryUrl(string workspace, string repositorySlug) =>
+        string.Format(
+            CultureInfo.InvariantCulture,
+            "https://bitbucket.org/{0}/{1}/",
+            Uri.EscapeDataString(workspace),
+            Uri.EscapeDataString(repositorySlug));
+
+    private static string BuildPullRequestUrl(string workspace, string repositorySlug, int pullRequestId) =>
+        string.Format(
+            CultureInfo.InvariantCulture,
+            "https://bitbucket.org/{0}/{1}/pull-requests/{2}",
+            Uri.EscapeDataString(workspace),
+            Uri.EscapeDataString(repositorySlug),
+            pullRequestId.ToString(CultureInfo.InvariantCulture));
 
     private static IContainer HeaderCell(IContainer container) =>
         container

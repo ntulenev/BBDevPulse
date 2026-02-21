@@ -9,6 +9,7 @@ public sealed class PullRequestReport
     /// Initializes a new instance of the <see cref="PullRequestReport"/> class.
     /// </summary>
     /// <param name="repository">Repository name.</param>
+    /// <param name="repositorySlug">Repository slug.</param>
     /// <param name="author">Pull request author.</param>
     /// <param name="targetBranch">Destination branch name.</param>
     /// <param name="createdOn">Pull request creation timestamp.</param>
@@ -21,6 +22,7 @@ public sealed class PullRequestReport
     /// <param name="firstReactionOn">First non-author reaction timestamp, when available.</param>
     public PullRequestReport(
         string repository,
+        string repositorySlug,
         string author,
         string targetBranch,
         DateTimeOffset createdOn,
@@ -33,10 +35,12 @@ public sealed class PullRequestReport
         DateTimeOffset? firstReactionOn)
     {
         ArgumentNullException.ThrowIfNull(repository);
+        ArgumentNullException.ThrowIfNull(repositorySlug);
         ArgumentNullException.ThrowIfNull(author);
         ArgumentNullException.ThrowIfNull(targetBranch);
 
         Repository = repository;
+        RepositorySlug = repositorySlug;
         Author = author;
         TargetBranch = targetBranch;
         CreatedOn = createdOn;
@@ -53,6 +57,11 @@ public sealed class PullRequestReport
     /// Repository name.
     /// </summary>
     public string Repository { get; }
+
+    /// <summary>
+    /// Repository slug.
+    /// </summary>
+    public string RepositorySlug { get; }
 
     /// <summary>
     /// Pull request author.

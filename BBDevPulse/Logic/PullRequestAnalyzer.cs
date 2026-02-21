@@ -106,6 +106,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
             reportData.Reports.Add(new PullRequestReport(
                 string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
+                repo.Slug.Value,
                 pr.Author?.DisplayName.Value ?? "unknown",
                 pr.Destination?.Branch?.Name ?? "-",
                 pr.CreatedOn,
