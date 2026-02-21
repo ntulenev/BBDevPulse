@@ -1,5 +1,7 @@
 using System.Runtime.CompilerServices;
 
+using BBDevPulse.Models;
+
 namespace BBDevPulse.Abstractions;
 
 /// <summary>
@@ -24,11 +26,3 @@ internal interface IPaginatorHelper
         [EnumeratorCancellation] CancellationToken cancellationToken);
 #pragma warning restore CS8424
 }
-
-/// <summary>
-/// Pagination result with items and the next page URI.
-/// </summary>
-/// <typeparam name="T">Item type.</typeparam>
-public sealed record PaginatedResult<T>(
-    IReadOnlyList<T> Items,
-    Uri? NextPage);

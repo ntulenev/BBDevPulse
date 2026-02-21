@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 
 using BBDevPulse.Abstractions;
+using BBDevPulse.Models;
 
 namespace BBDevPulse.API;
 
