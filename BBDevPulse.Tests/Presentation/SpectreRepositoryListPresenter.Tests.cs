@@ -10,6 +10,8 @@ namespace BBDevPulse.Tests.Presentation;
 
 public sealed class SpectreRepositoryListPresenterTests
 {
+    private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
+
     [Fact(DisplayName = "FetchRepositoriesAsync throws when fetch callback is null")]
     [Trait("Category", "Unit")]
     public async Task FetchRepositoriesAsyncWhenFetchCallbackIsNullThrowsArgumentNullException()
@@ -19,7 +21,7 @@ public sealed class SpectreRepositoryListPresenterTests
         Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>> fetchRepositories = null!;
 
         // Act
-        Func<Task> act = async () => _ = await presenter.FetchRepositoriesAsync(fetchRepositories, CancellationToken.None);
+        Func<Task> act = async () => _ = await presenter.FetchRepositoriesAsync(fetchRepositories, cancellationToken);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>();
@@ -36,7 +38,7 @@ public sealed class SpectreRepositoryListPresenterTests
         IReadOnlyList<Repository> repositories = [];
         var output = await TestConsoleRunner.RunAsync(async _ =>
         {
-            repositories = await presenter.FetchRepositoriesAsync(FetchRepositoriesAsync, CancellationToken.None);
+            repositories = await presenter.FetchRepositoriesAsync(FetchRepositoriesAsync, cancellationToken);
         });
 
         // Assert
@@ -44,6 +46,25 @@ public sealed class SpectreRepositoryListPresenterTests
         repositories.Select(repo => repo.DisplayName).Should().Equal("RepoB", "RepoA");
         output.Should().Contain("Loading repositories: page 1");
         output.Should().Contain("Loading repositories: page 2");
+    }
+
+    [Fact(DisplayName = "FetchRepositoriesAsync propagates cancellation from repository stream")]
+    [Trait("Category", "Unit")]
+    public async Task FetchRepositoriesAsyncWhenStreamIsCanceledThrowsOperationCanceledException()
+    {
+        // Arrange
+        var presenter = new SpectreRepositoryListPresenter();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act
+        Func<Task> act = async () =>
+            _ = await presenter.FetchRepositoriesAsync(
+                (_, token) => CanceledRepositoryStream(token),
+                cts.Token);
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
     [Fact(DisplayName = "RenderRepositoryTable throws when repositories are null")]
@@ -175,5 +196,13 @@ public sealed class SpectreRepositoryListPresenterTests
     private static Repository CreateRepository(string name, string slug)
     {
         return new Repository(new RepoName(name), new RepoSlug(slug));
+    }
+
+    private static async IAsyncEnumerable<Repository> CanceledRepositoryStream(
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        yield return CreateRepository("Repo", "repo");
+        await Task.Yield();
     }
 }

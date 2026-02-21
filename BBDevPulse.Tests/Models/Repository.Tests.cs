@@ -2,6 +2,9 @@ using FluentAssertions;
 
 using BBDevPulse.Models;
 
+using System.Reflection;
+using System.Runtime.CompilerServices;
+
 namespace BBDevPulse.Tests.Models;
 
 public sealed class RepositoryTests
@@ -50,6 +53,21 @@ public sealed class RepositoryTests
         result.Should().Be("BBDevPulse");
     }
 
+    [Fact(DisplayName = "DisplayName falls back to slug when repository name is whitespace in invalid state")]
+    [Trait("Category", "Unit")]
+    public void DisplayNameWhenNameValueIsWhitespaceReturnsSlug()
+    {
+        // Arrange
+        var invalidName = CreateRepoNameWithoutValidation(" ");
+        var repository = new Repository(invalidName, new RepoSlug("bbdevpulse"));
+
+        // Act
+        var result = repository.DisplayName;
+
+        // Assert
+        result.Should().Be("bbdevpulse");
+    }
+
     [Fact(DisplayName = "MatchesFilter throws when parameters are null")]
     [Trait("Category", "Unit")]
     public void MatchesFilterWhenParametersAreNullThrowsArgumentNullException()
@@ -91,6 +109,23 @@ public sealed class RepositoryTests
         var parameters = CreateReportParameters(
             repoSearchMode: RepoSearchMode.FilterFromTheList,
             repoNameList: [new RepoName("BBDEVPULSE")]);
+
+        // Act
+        var result = repository.MatchesFilter(parameters);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "MatchesFilter in list mode matches repository name case-insensitively")]
+    [Trait("Category", "Unit")]
+    public void MatchesFilterWhenListModeAndNameMatchesIgnoringCaseReturnsTrue()
+    {
+        // Arrange
+        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
+        var parameters = CreateReportParameters(
+            repoSearchMode: RepoSearchMode.FilterFromTheList,
+            repoNameList: [new RepoName("bbdevpulse")]);
 
         // Act
         var result = repository.MatchesFilter(parameters);
@@ -150,6 +185,40 @@ public sealed class RepositoryTests
         result.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "MatchesFilter in fallback mode returns false when filter does not match name or slug")]
+    [Trait("Category", "Unit")]
+    public void MatchesFilterWhenSearchModeIsUnknownAndFilterDoesNotMatchReturnsFalse()
+    {
+        // Arrange
+        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
+        var parameters = CreateReportParameters(
+            repoSearchMode: (RepoSearchMode)999,
+            repoNameFilter: "other");
+
+        // Act
+        var result = repository.MatchesFilter(parameters);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "MatchesFilter in fallback mode returns true when filter is blank")]
+    [Trait("Category", "Unit")]
+    public void MatchesFilterWhenSearchModeIsUnknownAndFilterIsBlankReturnsTrue()
+    {
+        // Arrange
+        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
+        var parameters = CreateReportParameters(
+            repoSearchMode: (RepoSearchMode)999,
+            repoNameFilter: " ");
+
+        // Act
+        var result = repository.MatchesFilter(parameters);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
     private static ReportParameters CreateReportParameters(
         RepoSearchMode repoSearchMode,
         IReadOnlyList<RepoName>? repoNameList = null,
@@ -163,5 +232,15 @@ public sealed class RepositoryTests
             repoSearchMode: repoSearchMode,
             prTimeFilterMode: PrTimeFilterMode.CreatedOnOnly,
             branchNameList: []);
+    }
+
+    private static RepoName CreateRepoNameWithoutValidation(string value)
+    {
+        var repoName = (RepoName)RuntimeHelpers.GetUninitializedObject(typeof(RepoName));
+        var field = typeof(RepoName).GetField(
+            "<Value>k__BackingField",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        field.SetValue(repoName, value);
+        return repoName;
     }
 }

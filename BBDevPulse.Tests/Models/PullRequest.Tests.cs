@@ -92,6 +92,40 @@ public sealed class PullRequestTests
         result.Should().BeTrue();
     }
 
+    [Fact(DisplayName = "Should stop by time filter in last-known-update mode when updated date is missing and created date is old")]
+    [Trait("Category", "Unit")]
+    public void ShouldStopByTimeFilterWhenUpdatedDateIsMissingAndCreatedDateIsOldReturnsTrue()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
+        var pullRequest = CreatePullRequest(
+            createdOn: filterDate.AddDays(-2),
+            updatedOn: null);
+
+        // Act
+        var result = pullRequest.ShouldStopByTimeFilter(filterDate, PrTimeFilterMode.LastKnownUpdateAndCreated);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Should not stop by time filter in last-known-update mode when created date is recent and updated date is missing")]
+    [Trait("Category", "Unit")]
+    public void ShouldStopByTimeFilterWhenUpdatedDateIsMissingAndCreatedDateIsRecentReturnsFalse()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
+        var pullRequest = CreatePullRequest(
+            createdOn: filterDate,
+            updatedOn: null);
+
+        // Act
+        var result = pullRequest.ShouldStopByTimeFilter(filterDate, PrTimeFilterMode.LastKnownUpdateAndCreated);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Should stop by time filter throws when filter mode is unknown")]
     [Trait("Category", "Unit")]
     public void ShouldStopByTimeFilterWhenFilterModeIsUnknownThrowsNotImplementedException()
@@ -153,6 +187,23 @@ public sealed class PullRequestTests
         result.Should().BeFalse();
     }
 
+    [Fact(DisplayName = "Matches branch filter returns false when destination branch is whitespace")]
+    [Trait("Category", "Unit")]
+    public void MatchesBranchFilterWhenDestinationBranchIsWhitespaceReturnsFalse()
+    {
+        // Arrange
+        var pullRequest = CreatePullRequest(
+            createdOn: new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero),
+            destinationBranch: " ");
+        var branchList = new List<BranchName> { new("develop") };
+
+        // Act
+        var result = pullRequest.MatchesBranchFilter(branchList);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Matches branch filter compares branch names case-insensitively")]
     [Trait("Category", "Unit")]
     public void MatchesBranchFilterWhenTargetBranchMatchesIgnoringCaseReturnsTrue()
@@ -168,6 +219,40 @@ public sealed class PullRequestTests
 
         // Assert
         result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Matches branch filter returns true when a later list entry matches")]
+    [Trait("Category", "Unit")]
+    public void MatchesBranchFilterWhenLaterEntryMatchesReturnsTrue()
+    {
+        // Arrange
+        var pullRequest = CreatePullRequest(
+            createdOn: new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero),
+            destinationBranch: "release");
+        var branchList = new List<BranchName> { new("develop"), new("release") };
+
+        // Act
+        var result = pullRequest.MatchesBranchFilter(branchList);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Matches branch filter returns false when target branch does not match any filter")]
+    [Trait("Category", "Unit")]
+    public void MatchesBranchFilterWhenTargetBranchDoesNotMatchReturnsFalse()
+    {
+        // Arrange
+        var pullRequest = CreatePullRequest(
+            createdOn: new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero),
+            destinationBranch: "release");
+        var branchList = new List<BranchName> { new("develop"), new("main") };
+
+        // Act
+        var result = pullRequest.MatchesBranchFilter(branchList);
+
+        // Assert
+        result.Should().BeFalse();
     }
 
     [Fact(DisplayName = "Resolve rejected on returns null for non-rejected states")]

@@ -10,6 +10,8 @@ namespace BBDevPulse.Tests.Presentation;
 
 public sealed class SpectreReportPresenterTests
 {
+    private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
+
     [Fact(DisplayName = "Constructor throws when auth presenter is null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenAuthPresenterIsNullThrowsArgumentNullException()
@@ -136,17 +138,21 @@ public sealed class SpectreReportPresenterTests
     {
         // Arrange
         var authPresenter = new Mock<IAuthPresenter>(MockBehavior.Strict);
-        authPresenter.Setup(x => x.AnnounceAuthAsync(It.IsAny<Func<CancellationToken, Task<AuthUser>>>(), CancellationToken.None))
+        var announceCalls = 0;
+        authPresenter.Setup(x => x.AnnounceAuthAsync(
+                It.IsAny<Func<CancellationToken, Task<AuthUser>>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => announceCalls++)
             .Returns(Task.CompletedTask);
         var sut = CreateSut(authPresenter: authPresenter.Object);
 
         // Act
         await sut.AnnounceAuthAsync(
             _ => Task.FromResult(new AuthUser(new DisplayName("Alice"), new Username("alice"), new UserUuid("{uuid}"))),
-            CancellationToken.None);
+            cancellationToken);
 
         // Assert
-        authPresenter.VerifyAll();
+        announceCalls.Should().Be(1);
     }
 
     [Fact(DisplayName = "FetchRepositoriesAsync delegates to repository list presenter")]
@@ -156,16 +162,20 @@ public sealed class SpectreReportPresenterTests
         // Arrange
         var expected = (IReadOnlyList<Repository>)new List<Repository> { CreateRepository("RepoA", "repoa") };
         var repositoryListPresenter = new Mock<IRepositoryListPresenter>(MockBehavior.Strict);
-        repositoryListPresenter.Setup(x => x.FetchRepositoriesAsync(It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(), CancellationToken.None))
+        var fetchCalls = 0;
+        repositoryListPresenter.Setup(x => x.FetchRepositoriesAsync(
+                It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => fetchCalls++)
             .ReturnsAsync(expected);
         var sut = CreateSut(repositoryListPresenter: repositoryListPresenter.Object);
 
         // Act
-        var result = await sut.FetchRepositoriesAsync((_, _) => AsyncEmpty(), CancellationToken.None);
+        var result = await sut.FetchRepositoriesAsync((_, _) => AsyncEmpty(), cancellationToken);
 
         // Assert
         result.Should().BeSameAs(expected);
-        repositoryListPresenter.VerifyAll();
+        fetchCalls.Should().Be(1);
     }
 
     [Fact(DisplayName = "AnalyzeRepositoriesAsync delegates to repository analysis presenter")]
@@ -175,18 +185,20 @@ public sealed class SpectreReportPresenterTests
         // Arrange
         var repositories = (IReadOnlyList<Repository>)new List<Repository> { CreateRepository("RepoA", "repoa") };
         var repositoryAnalysisPresenter = new Mock<IRepositoryAnalysisPresenter>(MockBehavior.Strict);
+        var analyzeCalls = 0;
         repositoryAnalysisPresenter.Setup(x => x.AnalyzeRepositoriesAsync(
                 repositories,
                 It.IsAny<Func<Repository, CancellationToken, Task>>(),
-                CancellationToken.None))
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => analyzeCalls++)
             .Returns(Task.CompletedTask);
         var sut = CreateSut(repositoryAnalysisPresenter: repositoryAnalysisPresenter.Object);
 
         // Act
-        await sut.AnalyzeRepositoriesAsync(repositories, (_, _) => Task.CompletedTask, CancellationToken.None);
+        await sut.AnalyzeRepositoriesAsync(repositories, (_, _) => Task.CompletedTask, cancellationToken);
 
         // Assert
-        repositoryAnalysisPresenter.VerifyAll();
+        analyzeCalls.Should().Be(1);
     }
 
     [Fact(DisplayName = "RenderRepositoryTable throws when parameters are null")]
@@ -212,19 +224,20 @@ public sealed class SpectreReportPresenterTests
         var repositories = (IReadOnlyCollection<Repository>)new List<Repository> { CreateRepository("RepoA", "repoa") };
         var parameters = CreateReportParameters();
         var repositoryListPresenter = new Mock<IRepositoryListPresenter>(MockBehavior.Strict);
+        var renderCalls = 0;
         repositoryListPresenter.Setup(x => x.RenderRepositoryTable(
                 repositories,
                 parameters.RepoSearchMode,
                 parameters.RepoNameFilter,
                 parameters.RepoNameList))
-            .Verifiable();
+            .Callback(() => renderCalls++);
         var sut = CreateSut(repositoryListPresenter: repositoryListPresenter.Object);
 
         // Act
         sut.RenderRepositoryTable(repositories, parameters);
 
         // Assert
-        repositoryListPresenter.VerifyAll();
+        renderCalls.Should().Be(1);
     }
 
     [Fact(DisplayName = "RenderBranchFilterInfo throws when parameters are null")]
@@ -249,15 +262,16 @@ public sealed class SpectreReportPresenterTests
         // Arrange
         var parameters = CreateReportParameters();
         var branchFilterPresenter = new Mock<IBranchFilterPresenter>(MockBehavior.Strict);
+        var renderCalls = 0;
         branchFilterPresenter.Setup(x => x.RenderBranchFilterInfo(parameters.BranchNameList))
-            .Verifiable();
+            .Callback(() => renderCalls++);
         var sut = CreateSut(branchFilterPresenter: branchFilterPresenter.Object);
 
         // Act
         sut.RenderBranchFilterInfo(parameters);
 
         // Assert
-        branchFilterPresenter.VerifyAll();
+        renderCalls.Should().Be(1);
     }
 
     [Fact(DisplayName = "RenderReport throws when report data is null")]
@@ -286,13 +300,20 @@ public sealed class SpectreReportPresenterTests
         reportData.Reports.Add(CreateReport(1, new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero)));
 
         var pullRequestReportPresenter = new Mock<IPullRequestReportPresenter>(MockBehavior.Strict);
+        var renderPullRequestCalls = 0;
         pullRequestReportPresenter.Setup(x => x.RenderPullRequestTable(reportData, parameters.FilterDate))
-            .Verifiable();
+            .Callback(() => renderPullRequestCalls++);
 
         var statisticsPresenter = new Mock<IStatisticsPresenter>(MockBehavior.Strict);
-        statisticsPresenter.Setup(x => x.RenderMergeTimeStats(reportData)).Verifiable();
-        statisticsPresenter.Setup(x => x.RenderTtfrStats(reportData)).Verifiable();
-        statisticsPresenter.Setup(x => x.RenderDeveloperStatsTable(reportData, parameters.FilterDate)).Verifiable();
+        var renderMergeTimeStatsCalls = 0;
+        var renderTtfrStatsCalls = 0;
+        var renderDeveloperStatsCalls = 0;
+        statisticsPresenter.Setup(x => x.RenderMergeTimeStats(reportData))
+            .Callback(() => renderMergeTimeStatsCalls++);
+        statisticsPresenter.Setup(x => x.RenderTtfrStats(reportData))
+            .Callback(() => renderTtfrStatsCalls++);
+        statisticsPresenter.Setup(x => x.RenderDeveloperStatsTable(reportData, parameters.FilterDate))
+            .Callback(() => renderDeveloperStatsCalls++);
 
         var sut = CreateSut(
             pullRequestReportPresenter: pullRequestReportPresenter.Object,
@@ -303,8 +324,10 @@ public sealed class SpectreReportPresenterTests
 
         // Assert
         reportData.Reports.Select(report => report.Id.Value).Should().Equal(1, 2);
-        pullRequestReportPresenter.VerifyAll();
-        statisticsPresenter.VerifyAll();
+        renderPullRequestCalls.Should().Be(1);
+        renderMergeTimeStatsCalls.Should().Be(1);
+        renderTtfrStatsCalls.Should().Be(1);
+        renderDeveloperStatsCalls.Should().Be(1);
     }
 
     private static SpectreReportPresenter CreateSut(
@@ -316,12 +339,12 @@ public sealed class SpectreReportPresenterTests
         IStatisticsPresenter? statisticsPresenter = null)
     {
         return new SpectreReportPresenter(
-            authPresenter ?? new Mock<IAuthPresenter>(MockBehavior.Loose).Object,
-            repositoryListPresenter ?? new Mock<IRepositoryListPresenter>(MockBehavior.Loose).Object,
-            repositoryAnalysisPresenter ?? new Mock<IRepositoryAnalysisPresenter>(MockBehavior.Loose).Object,
-            branchFilterPresenter ?? new Mock<IBranchFilterPresenter>(MockBehavior.Loose).Object,
-            pullRequestReportPresenter ?? new Mock<IPullRequestReportPresenter>(MockBehavior.Loose).Object,
-            statisticsPresenter ?? new Mock<IStatisticsPresenter>(MockBehavior.Loose).Object);
+            authPresenter ?? new Mock<IAuthPresenter>(MockBehavior.Strict).Object,
+            repositoryListPresenter ?? new Mock<IRepositoryListPresenter>(MockBehavior.Strict).Object,
+            repositoryAnalysisPresenter ?? new Mock<IRepositoryAnalysisPresenter>(MockBehavior.Strict).Object,
+            branchFilterPresenter ?? new Mock<IBranchFilterPresenter>(MockBehavior.Strict).Object,
+            pullRequestReportPresenter ?? new Mock<IPullRequestReportPresenter>(MockBehavior.Strict).Object,
+            statisticsPresenter ?? new Mock<IStatisticsPresenter>(MockBehavior.Strict).Object);
     }
 
     private static ReportParameters CreateReportParameters()

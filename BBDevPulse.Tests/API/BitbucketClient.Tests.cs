@@ -1,0 +1,720 @@
+using System.Text.Json;
+
+using FluentAssertions;
+
+using BBDevPulse.API;
+using BBDevPulse.Abstractions;
+using BBDevPulse.Configuration;
+using BBDevPulse.Models;
+using BBDevPulse.Transport;
+
+using Microsoft.Extensions.Options;
+
+using Moq;
+
+namespace BBDevPulse.Tests.API;
+
+public sealed class BitbucketClientTests
+{
+    private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
+
+    [Fact(DisplayName = "Constructor throws when options are null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenOptionsAreNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IOptions<BitbucketOptions> options = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            options,
+            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new PaginatorHelper(),
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when transport is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenTransportIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IBitbucketTransport transport = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            Options.Create(CreateOptions()),
+            transport,
+            new PaginatorHelper(),
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when paginator helper is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenPaginatorHelperIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IPaginatorHelper paginatorHelper = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            Options.Create(CreateOptions()),
+            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            paginatorHelper,
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when mapper is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenMapperIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IBitbucketMapper mapper = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            Options.Create(CreateOptions()),
+            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new PaginatorHelper(),
+            mapper);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetCurrentUserAsync maps authenticated user DTO")]
+    [Trait("Category", "Unit")]
+    public async Task GetCurrentUserAsyncWhenTransportReturnsDtoReturnsMappedModel()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var transportCalls = 0;
+        var mapCalls = 0;
+        var dto = new AuthUserDto
+        {
+            DisplayName = "Alice",
+            Username = "alice",
+            Uuid = "{alice-1}"
+        };
+        var expected = new AuthUser(
+            new DisplayName("Alice"),
+            new Username("alice"),
+            new UserUuid("{alice-1}"));
+
+        transport.Setup(x => x.GetAsync<AuthUserDto>(
+                It.Is<Uri>(u => u.ToString() == "user"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => transportCalls++)
+            .ReturnsAsync(dto);
+        mapper.Setup(x => x.Map(It.Is<AuthUserDto>(value => ReferenceEquals(value, dto))))
+            .Callback(() => mapCalls++)
+            .Returns(expected);
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        var result = await client.GetCurrentUserAsync(cancellationToken);
+
+        // Assert
+        result.Should().BeSameAs(expected);
+        transportCalls.Should().Be(1);
+        mapCalls.Should().Be(1);
+    }
+
+    [Fact(DisplayName = "GetRepositoriesAsync throws when workspace is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetRepositoriesAsyncWhenWorkspaceIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        Workspace workspace = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetRepositoriesAsync(workspace, null, cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetRepositoriesAsync reads all pages and maps repositories")]
+    [Trait("Category", "Unit")]
+    public async Task GetRepositoriesAsyncWhenPagesExistReturnsMappedRepositories()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var transportCalls = 0;
+        var mapCalls = 0;
+        var pages = new Dictionary<string, PaginatedResponse<RepositoryDto>>(StringComparer.Ordinal)
+        {
+            ["repositories/ws?pagelen=25"] = new PaginatedResponse<RepositoryDto>
+            {
+                Values =
+                [
+                    new RepositoryDto { Name = "Repo1", Slug = "repo-1" }
+                ],
+                Next = "repositories/ws?page=2"
+            },
+            ["repositories/ws?page=2"] = new PaginatedResponse<RepositoryDto>
+            {
+                Values =
+                [
+                    new RepositoryDto { Name = "Repo2", Slug = "repo-2" }
+                ],
+                Next = "   "
+            }
+        };
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => transportCalls++)
+            .ReturnsAsync((Uri uri, CancellationToken _) => pages[uri.ToString()]);
+
+        mapper.Setup(x => x.Map(It.IsAny<RepositoryDto>()))
+            .Callback(() => mapCalls++)
+            .Returns((RepositoryDto dto) => new Repository(new RepoName(dto.Name ?? string.Empty), new RepoSlug(dto.Slug ?? string.Empty)));
+
+        var client = CreateClient(transport.Object, mapper.Object);
+        var pageIndexes = new List<int>();
+
+        // Act
+        var result = await ReadAllAsync(client.GetRepositoriesAsync(
+            new Workspace("ws"),
+            page => pageIndexes.Add(page),
+            cancellationToken));
+
+        // Assert
+        result.Select(repo => repo.Slug.Value).Should().Equal("repo-1", "repo-2");
+        pageIndexes.Should().Equal(1, 2);
+        transportCalls.Should().Be(2);
+        mapCalls.Should().Be(2);
+    }
+
+    [Fact(DisplayName = "GetRepositoriesAsync checks cancellation while streaming results")]
+    [Trait("Category", "Unit")]
+    public async Task GetRepositoriesAsyncWhenCanceledDuringIterationThrowsOperationCanceledException()
+    {
+        // Arrange
+        using var cts = new CancellationTokenSource();
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cts.Token)))
+            .ReturnsAsync(new PaginatedResponse<RepositoryDto>
+            {
+                Values =
+                [
+                    new RepositoryDto { Name = "Repo1", Slug = "repo-1" },
+                    new RepositoryDto { Name = "Repo2", Slug = "repo-2" }
+                ],
+                Next = null
+            });
+        mapper.Setup(x => x.Map(It.IsAny<RepositoryDto>()))
+            .Returns((RepositoryDto dto) => new Repository(new RepoName(dto.Name ?? string.Empty), new RepoSlug(dto.Slug ?? string.Empty)));
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var repo in client.GetRepositoriesAsync(new Workspace("ws"), null, cts.Token))
+            {
+                if (repo.Slug.Value == "repo-1")
+                {
+                    cts.Cancel();
+                }
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact(DisplayName = "GetRepositoriesAsync treats null page values as empty")]
+    [Trait("Category", "Unit")]
+    public async Task GetRepositoriesAsyncWhenPageValuesAreNullReturnsEmptySequence()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var mapCalls = 0;
+        transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<RepositoryDto>
+            {
+                Values = null!,
+                Next = null
+            });
+        mapper.Setup(x => x.Map(It.IsAny<RepositoryDto>()))
+            .Callback(() => mapCalls++)
+            .Returns((RepositoryDto dto) => new Repository(new RepoName(dto.Name ?? string.Empty), new RepoSlug(dto.Slug ?? string.Empty)));
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetRepositoriesAsync(new Workspace("ws"), null, cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
+        mapCalls.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync throws when workspace is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenWorkspaceIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        Workspace workspace = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetPullRequestsAsync(
+                               workspace,
+                               new RepoSlug("repo"),
+                               _ => false,
+                               cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync throws when repository slug is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenRepositorySlugIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        RepoSlug repoSlug = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetPullRequestsAsync(
+                               new Workspace("ws"),
+                               repoSlug,
+                               _ => false,
+                               cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync throws when stop predicate is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenStopPredicateIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        Func<PullRequest, bool> shouldStop = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetPullRequestsAsync(
+                               new Workspace("ws"),
+                               new RepoSlug("repo"),
+                               shouldStop,
+                               cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync stops iteration when stop predicate returns true")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenStopPredicateReturnsTrueBreaksIteration()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values =
+                [
+                    new PullRequestDto { Id = 1, CreatedOn = new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero), State = "OPEN" },
+                    new PullRequestDto { Id = 2, CreatedOn = new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero), State = "OPEN" }
+                ],
+                Next = null
+            });
+
+        mapper.Setup(x => x.Map(It.IsAny<PullRequestDto>()))
+            .Returns((PullRequestDto dto) => new PullRequest(
+                new PullRequestId(dto.Id),
+                PullRequestState.Open,
+                closedOn: null,
+                createdOn: dto.CreatedOn,
+                updatedOn: null,
+                mergedOn: null,
+                author: null,
+                destination: null));
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            pullRequest => pullRequest.Id.Value == 2,
+            cancellationToken));
+
+        // Assert
+        result.Select(pr => pr.Id.Value).Should().Equal(1);
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync returns all pull requests when stop predicate never matches")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenStopPredicateNeverMatchesReturnsAllItems()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values =
+                [
+                    new PullRequestDto { Id = 1, CreatedOn = new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero), State = "OPEN" },
+                    new PullRequestDto { Id = 2, CreatedOn = new DateTimeOffset(2026, 2, 20, 1, 0, 0, TimeSpan.Zero), State = "OPEN" }
+                ],
+                Next = null
+            });
+
+        mapper.Setup(x => x.Map(It.IsAny<PullRequestDto>()))
+            .Returns((PullRequestDto dto) => new PullRequest(
+                new PullRequestId(dto.Id),
+                PullRequestState.Open,
+                closedOn: null,
+                createdOn: dto.CreatedOn,
+                updatedOn: null,
+                mergedOn: null,
+                author: null,
+                destination: null));
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            _ => false,
+            cancellationToken));
+
+        // Assert
+        result.Select(pr => pr.Id.Value).Should().Equal(1, 2);
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync treats null page values as empty")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenPageValuesAreNullReturnsEmptySequence()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var mapCalls = 0;
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values = null!,
+                Next = null
+            });
+        mapper.Setup(x => x.Map(It.IsAny<PullRequestDto>()))
+            .Callback(() => mapCalls++)
+            .Returns((PullRequestDto dto) => new PullRequest(
+                new PullRequestId(dto.Id),
+                PullRequestState.Open,
+                closedOn: null,
+                createdOn: dto.CreatedOn,
+                updatedOn: null,
+                mergedOn: null,
+                author: null,
+                destination: null));
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            _ => false,
+            cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
+        mapCalls.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "GetPullRequestActivityAsync throws when workspace is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestActivityAsyncWhenWorkspaceIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        Workspace workspace = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetPullRequestActivityAsync(
+                               workspace,
+                               new RepoSlug("repo"),
+                               new PullRequestId(1),
+                               _ => false,
+                               cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetPullRequestActivityAsync throws when repository slug is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestActivityAsyncWhenRepositorySlugIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        RepoSlug repoSlug = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetPullRequestActivityAsync(
+                               new Workspace("ws"),
+                               repoSlug,
+                               new PullRequestId(1),
+                               _ => false,
+                               cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetPullRequestActivityAsync throws when pull request id is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestActivityAsyncWhenPullRequestIdIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        PullRequestId pullRequestId = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetPullRequestActivityAsync(
+                               new Workspace("ws"),
+                               new RepoSlug("repo"),
+                               pullRequestId,
+                               _ => false,
+                               cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetPullRequestActivityAsync throws when stop predicate is null")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestActivityAsyncWhenStopPredicateIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        Func<PullRequestActivity, bool> shouldStop = null!;
+
+        // Act
+        Func<Task> act = async () =>
+        {
+            await foreach (var _ in client.GetPullRequestActivityAsync(
+                               new Workspace("ws"),
+                               new RepoSlug("repo"),
+                               new PullRequestId(1),
+                               shouldStop,
+                               cancellationToken))
+            {
+            }
+        };
+
+        // Assert
+        await act.Should().ThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "GetPullRequestActivityAsync stops iteration when stop predicate returns true")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestActivityAsyncWhenStopPredicateReturnsTrueBreaksIteration()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var firstActivity = ParseJson(/*lang=json,strict*/ """{"id":1}""");
+        var secondActivity = ParseJson(/*lang=json,strict*/ """{"id":2}""");
+        var firstModel = new PullRequestActivity(
+            new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero),
+            mergeDate: null,
+            actor: null,
+            comment: null,
+            approval: null);
+        var secondModel = new PullRequestActivity(
+            new DateTimeOffset(2026, 2, 20, 11, 0, 0, TimeSpan.Zero),
+            mergeDate: null,
+            actor: null,
+            comment: null,
+            approval: null);
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<JsonElement>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<JsonElement>
+            {
+                Values = [firstActivity, secondActivity],
+                Next = null
+            });
+
+        mapper.Setup(x => x.Map(It.Is<JsonElement>(e => e.GetProperty("id").GetInt32() == 1)))
+            .Returns(firstModel);
+        mapper.Setup(x => x.Map(It.Is<JsonElement>(e => e.GetProperty("id").GetInt32() == 2)))
+            .Returns(secondModel);
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestActivityAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            new PullRequestId(10),
+            activity => activity.ActivityDate == secondModel.ActivityDate,
+            cancellationToken));
+
+        // Assert
+        result.Should().ContainSingle();
+        result[0].ActivityDate.Should().Be(firstModel.ActivityDate);
+    }
+
+    [Fact(DisplayName = "GetPullRequestActivityAsync treats null page values as empty")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestActivityAsyncWhenPageValuesAreNullReturnsEmptySequence()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var mapCalls = 0;
+        transport.Setup(x => x.GetAsync<PaginatedResponse<JsonElement>>(
+                It.IsAny<Uri>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<JsonElement>
+            {
+                Values = null!,
+                Next = null
+            });
+        mapper.Setup(x => x.Map(It.IsAny<JsonElement>()))
+            .Callback(() => mapCalls++)
+            .Returns(new PullRequestActivity(
+                activityDate: null,
+                mergeDate: null,
+                actor: null,
+                comment: null,
+                approval: null));
+
+        var client = CreateClient(transport.Object, mapper.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestActivityAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            new PullRequestId(1),
+            _ => false,
+            cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
+        mapCalls.Should().Be(0);
+    }
+
+    private static BitbucketClient CreateClient(
+        IBitbucketTransport transport,
+        IBitbucketMapper mapper)
+    {
+        return new BitbucketClient(
+            Options.Create(CreateOptions()),
+            transport,
+            new PaginatorHelper(),
+            mapper);
+    }
+
+    private static BitbucketOptions CreateOptions()
+    {
+        return new BitbucketOptions
+        {
+            Days = 7,
+            Workspace = "ws",
+            PageLength = 25,
+            Username = "user",
+            AppPassword = "pass",
+            RepoNameFilter = string.Empty,
+            RepoNameList = [],
+            BranchNameList = [],
+            RepoSearchMode = RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
+            Pdf = new PdfOptions()
+        };
+    }
+
+    private static JsonElement ParseJson(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return document.RootElement.Clone();
+    }
+
+    private static async Task<List<T>> ReadAllAsync<T>(IAsyncEnumerable<T> source)
+    {
+        var result = new List<T>();
+        await foreach (var item in source)
+        {
+            result.Add(item);
+        }
+
+        return result;
+    }
+}

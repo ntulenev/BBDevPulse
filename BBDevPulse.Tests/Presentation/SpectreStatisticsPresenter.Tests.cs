@@ -79,11 +79,19 @@ public sealed class SpectreStatisticsPresenterTests
     {
         // Arrange
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50)).Returns(2.0);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75)).Returns(3.0);
+        var p50Calls = 0;
+        var p75Calls = 0;
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+            .Callback(() => p50Calls++)
+            .Returns(2.0);
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+            .Callback(() => p75Calls++)
+            .Returns(3.0);
 
         var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        var formatCalls = 0;
         dateDiffFormatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Callback(() => formatCalls++)
             .Returns("formatted");
 
         var presenter = new SpectreStatisticsPresenter(statisticsCalculator.Object, dateDiffFormatter.Object);
@@ -98,11 +106,9 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("Merge Time Stats");
         output.Should().Contain("Best Merge Time");
         output.Should().Contain("Longest Merge Time");
-        statisticsCalculator.Verify(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50), Times.Once);
-        statisticsCalculator.Verify(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75), Times.Once);
-        dateDiffFormatter.Verify(
-            x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()),
-            Times.Exactly(4));
+        p50Calls.Should().Be(1);
+        p75Calls.Should().Be(1);
+        formatCalls.Should().Be(4);
     }
 
     [Fact(DisplayName = "RenderTtfrStats throws when report data is null")]
@@ -143,11 +149,19 @@ public sealed class SpectreStatisticsPresenterTests
     {
         // Arrange
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50)).Returns(1.0);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75)).Returns(2.0);
+        var p50Calls = 0;
+        var p75Calls = 0;
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+            .Callback(() => p50Calls++)
+            .Returns(1.0);
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+            .Callback(() => p75Calls++)
+            .Returns(2.0);
 
         var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        var formatCalls = 0;
         dateDiffFormatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Callback(() => formatCalls++)
             .Returns("formatted");
 
         var presenter = new SpectreStatisticsPresenter(statisticsCalculator.Object, dateDiffFormatter.Object);
@@ -162,11 +176,9 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("TTFR Stats");
         output.Should().Contain("Best TTFR");
         output.Should().Contain("Longest TTFR");
-        statisticsCalculator.Verify(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50), Times.Once);
-        statisticsCalculator.Verify(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75), Times.Once);
-        dateDiffFormatter.Verify(
-            x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()),
-            Times.Exactly(4));
+        p50Calls.Should().Be(1);
+        p75Calls.Should().Be(1);
+        formatCalls.Should().Be(4);
     }
 
     [Fact(DisplayName = "RenderDeveloperStatsTable throws when report data is null")]
@@ -222,8 +234,8 @@ public sealed class SpectreStatisticsPresenterTests
 
     private static SpectreStatisticsPresenter CreatePresenter()
     {
-        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Loose).Object;
-        var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Loose).Object;
+        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict).Object;
+        var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object;
         return new SpectreStatisticsPresenter(statisticsCalculator, dateDiffFormatter);
     }
 

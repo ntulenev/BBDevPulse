@@ -47,7 +47,9 @@ public sealed class SpectrePullRequestReportPresenterTests
     {
         // Arrange
         var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        var formatCalls = 0;
         formatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Callback(() => formatCalls++)
             .Returns("formatted");
 
         var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
@@ -74,9 +76,58 @@ public sealed class SpectrePullRequestReportPresenterTests
         output.Should().Contain("Pull Requests");
         output.Should().Contain("11");
         output.Should().Contain("4");
-        formatter.Verify(
-            x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()),
-            Times.Exactly(2));
+        formatCalls.Should().Be(2);
+    }
+
+    [Fact(DisplayName = "RenderPullRequestTable renders fallback markers when merge and TTFR are missing")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestTableWhenOptionalDatesAreMissingRendersDashFallbacks()
+    {
+        // Arrange
+        var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        var formatCalls = 0;
+        formatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Callback(() => formatCalls++)
+            .Returns("formatted");
+
+        var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
+        var filterDate = new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateReportParameters(filterDate));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoA",
+            repositorySlug: "repoa",
+            author: "Alice",
+            targetBranch: "develop",
+            createdOn: filterDate.AddDays(-1),
+            lastActivity: filterDate.AddDays(1),
+            mergedOn: null,
+            rejectedOn: null,
+            state: PullRequestState.Open,
+            id: new PullRequestId(21),
+            comments: 1,
+            firstReactionOn: null));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoB",
+            repositorySlug: "repob",
+            author: "Bob",
+            targetBranch: "main",
+            createdOn: filterDate.AddDays(1),
+            lastActivity: filterDate.AddDays(2),
+            mergedOn: filterDate.AddDays(3),
+            rejectedOn: filterDate.AddDays(4),
+            state: PullRequestState.Declined,
+            id: new PullRequestId(22),
+            comments: 2,
+            firstReactionOn: null));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestTable(reportData, filterDate));
+
+        // Assert
+        output.Should().Contain("21");
+        output.Should().Contain("22");
+        output.Should().Contain("-");
+        formatCalls.Should().Be(1);
     }
 
     private static ReportParameters CreateReportParameters(DateTimeOffset filterDate)

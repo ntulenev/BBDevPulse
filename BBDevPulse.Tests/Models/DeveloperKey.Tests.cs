@@ -162,4 +162,49 @@ public sealed class DeveloperKeyTests
         // Assert
         result.Should().BeTrue();
     }
+
+    [Fact(DisplayName = "Equals object overload returns false for non-key object")]
+    [Trait("Category", "Unit")]
+    public void EqualsObjectWhenObjectIsNotDeveloperKeyReturnsFalse()
+    {
+        // Arrange
+        var key = new DeveloperKey(new UserUuid("{ABC-123}"));
+
+        // Act
+        var result = key.Equals(new object());
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "Default key hashes to zero and stringifies to empty string")]
+    [Trait("Category", "Unit")]
+    public void DefaultKeyWhenUsedReturnsZeroHashAndEmptyString()
+    {
+        // Arrange
+        var key = default(DeveloperKey);
+
+        // Act
+        var hashCode = key.GetHashCode();
+        var value = key.ToString();
+
+        // Assert
+        hashCode.Should().Be(0);
+        value.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "Default keys compare equal")]
+    [Trait("Category", "Unit")]
+    public void EqualsWhenBothKeysAreDefaultReturnsTrue()
+    {
+        // Arrange
+        var left = default(DeveloperKey);
+        var right = default(DeveloperKey);
+
+        // Act
+        var result = left.Equals(right);
+
+        // Assert
+        result.Should().BeTrue();
+    }
 }

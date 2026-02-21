@@ -8,6 +8,8 @@ namespace BBDevPulse.Tests.Presentation;
 
 public sealed class SpectreRepositoryAnalysisPresenterTests
 {
+    private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
+
     [Fact(DisplayName = "AnalyzeRepositoriesAsync throws when repositories list is null")]
     [Trait("Category", "Unit")]
     public async Task AnalyzeRepositoriesAsyncWhenRepositoriesAreNullThrowsArgumentNullException()
@@ -20,7 +22,7 @@ public sealed class SpectreRepositoryAnalysisPresenterTests
         Func<Task> act = async () => await presenter.AnalyzeRepositoriesAsync(
             repositories,
             (_, _) => Task.CompletedTask,
-            CancellationToken.None);
+            cancellationToken);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>();
@@ -38,7 +40,7 @@ public sealed class SpectreRepositoryAnalysisPresenterTests
         Func<Task> act = async () => await presenter.AnalyzeRepositoriesAsync(
             [CreateRepository("RepoA")],
             analyzeRepository,
-            CancellationToken.None);
+            cancellationToken);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>();
@@ -67,7 +69,7 @@ public sealed class SpectreRepositoryAnalysisPresenterTests
                     processedRepositoryNames.Add(repo.DisplayName);
                     return Task.CompletedTask;
                 },
-                CancellationToken.None);
+                cancellationToken);
         });
 
         // Assert

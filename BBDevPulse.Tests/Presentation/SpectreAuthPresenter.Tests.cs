@@ -8,6 +8,8 @@ namespace BBDevPulse.Tests.Presentation;
 
 public sealed class SpectreAuthPresenterTests
 {
+    private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
+
     [Fact(DisplayName = "AnnounceAuthAsync throws when fetch user callback is null")]
     [Trait("Category", "Unit")]
     public async Task AnnounceAuthAsyncWhenFetchUserIsNullThrowsArgumentNullException()
@@ -17,7 +19,7 @@ public sealed class SpectreAuthPresenterTests
         Func<CancellationToken, Task<AuthUser>> fetchUser = null!;
 
         // Act
-        Func<Task> act = async () => await presenter.AnnounceAuthAsync(fetchUser, CancellationToken.None);
+        Func<Task> act = async () => await presenter.AnnounceAuthAsync(fetchUser, cancellationToken);
 
         // Assert
         await act.Should().ThrowAsync<ArgumentNullException>();
@@ -36,7 +38,7 @@ public sealed class SpectreAuthPresenterTests
 
         // Act
         var output = await TestConsoleRunner.RunAsync(
-            async _ => await presenter.AnnounceAuthAsync(_ => Task.FromResult(user), CancellationToken.None));
+            async _ => await presenter.AnnounceAuthAsync(_ => Task.FromResult(user), cancellationToken));
 
         // Assert
         output.Should().Contain("Authenticating with Bitbucket...");
@@ -60,7 +62,7 @@ public sealed class SpectreAuthPresenterTests
             {
                 await presenter.AnnounceAuthAsync(
                     _ => Task.FromException<AuthUser>(new InvalidOperationException(errorMessage)),
-                    CancellationToken.None);
+                    cancellationToken);
             }
             catch (Exception ex)
             {
@@ -71,7 +73,7 @@ public sealed class SpectreAuthPresenterTests
         // Assert
         capturedException.Should().NotBeNull();
         capturedException.Should().BeOfType<InvalidOperationException>();
-        capturedException!.Message.Should().Be(errorMessage);
+        capturedException.Message.Should().Be(errorMessage);
         output.Should().Contain("Auth failed:");
         output.Should().Contain(errorMessage);
     }
