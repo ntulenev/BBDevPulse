@@ -70,4 +70,11 @@ All settings are under the `Bitbucket` object.
 ```
 ## Output
 
-<img src="Pulse.png" alt="BBDevPulse output">
+>For demonstration purposes, the program output shown in the screenshots uses synthetic data to avoid exposing information from real repositories and users.
+
+### Console
+<img src="Page1.png" alt="BBDevPulse output part 1">
+<img src="Page2.png" alt="BBDevPulse output part 2">
+
+### PDF
+<img src="Page3.png" alt="BBDevPulse output part 3">
