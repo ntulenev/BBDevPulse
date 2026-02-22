@@ -57,6 +57,7 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IDateDiffFormatter, DateDiffFormatter>();
         _ = services.AddSingleton<IPdfReportFileStore, PdfReportFileStore>();
         _ = services.AddSingleton<IPdfReportRenderer, QuestPdfReportRenderer>();
+        _ = services.AddSingleton<IPeopleCsvProvider, PeopleCsvProvider>();
         _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
         _ = services.AddSingleton<IPullRequestAnalyzer, PullRequestAnalyzer>();
         _ = services.AddSingleton<IReportRunner, ReportRunner>();

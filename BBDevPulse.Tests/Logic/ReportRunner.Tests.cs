@@ -28,6 +28,7 @@ public sealed class ReportRunnerTests
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -47,6 +48,7 @@ public sealed class ReportRunnerTests
             analyzer,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -66,6 +68,7 @@ public sealed class ReportRunnerTests
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             presenter,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -85,6 +88,27 @@ public sealed class ReportRunnerTests
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
             pdfReportRenderer,
+            new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            Options.Create(CreateOptions()));
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when people CSV provider is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenPeopleCsvProviderIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IPeopleCsvProvider peopleCsvProvider = null!;
+
+        // Act
+        Action act = () => _ = new ReportRunner(
+            new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
+            new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
+            new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            peopleCsvProvider,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -104,6 +128,7 @@ public sealed class ReportRunnerTests
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             options);
 
         // Assert
@@ -221,11 +246,16 @@ public sealed class ReportRunnerTests
         pdfRenderer.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
             .Callback(() => renderPdfCalls++);
 
+        var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayName())
+            .Returns(new Dictionary<DisplayName, PersonCsvRow>());
+
         var runner = new ReportRunner(
             client.Object,
             analyzer.Object,
             presenter.Object,
             pdfRenderer.Object,
+            peopleCsvProvider.Object,
             Options.Create(options));
 
         // Act
@@ -313,11 +343,16 @@ public sealed class ReportRunnerTests
         pdfRenderer.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
             .Callback(() => renderPdfCalls++);
 
+        var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayName())
+            .Returns(new Dictionary<DisplayName, PersonCsvRow>());
+
         var runner = new ReportRunner(
             client.Object,
             analyzer.Object,
             presenter.Object,
             pdfRenderer.Object,
+            peopleCsvProvider.Object,
             Options.Create(options));
 
         // Act
@@ -341,98 +376,87 @@ public sealed class ReportRunnerTests
     public async Task RunAsyncWhenPeopleCsvPathIsConfiguredEnrichesDeveloperStatsByExactName()
     {
         // Arrange
-        var csvPath = Path.GetTempFileName();
-        await File.WriteAllLinesAsync(
-            csvPath,
-            [
-                "Name;Grade;Department",
-                "Alice;Senior;Core Platform"
-            ],
-            cancellationToken);
+        var options = CreateOptions(repoNameList: ["RepoA"], peopleCsvPath: "people.csv");
+        var repository = new Repository(new RepoName("RepoA"), new RepoSlug("repo-a"));
+        ReportData? capturedReportData = null;
 
-        try
-        {
-            var options = CreateOptions(repoNameList: ["RepoA"], peopleCsvPath: csvPath);
-            var repository = new Repository(new RepoName("RepoA"), new RepoSlug("repo-a"));
-            ReportData? capturedReportData = null;
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetCurrentUserAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new AuthUser(new DisplayName("Tester"), new Username("tester"), new UserUuid("{tester-1}")));
+        client.Setup(x => x.GetRepositoriesAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<Action<int>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns((Workspace _, Action<int>? __, CancellationToken token) =>
+                ToAsyncEnumerable([repository], token));
 
-            var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
-            client.Setup(x => x.GetCurrentUserAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
-                .ReturnsAsync(new AuthUser(new DisplayName("Tester"), new Username("tester"), new UserUuid("{tester-1}")));
-            client.Setup(x => x.GetRepositoriesAsync(
-                    It.IsAny<Workspace>(),
-                    It.IsAny<Action<int>>(),
-                    It.Is<CancellationToken>(token => token == cancellationToken)))
-                .Returns((Workspace _, Action<int>? __, CancellationToken token) =>
-                    ToAsyncEnumerable([repository], token));
-
-            var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
-            analyzer.Setup(x => x.AnalyzeAsync(repository, It.IsAny<ReportData>(), It.Is<CancellationToken>(token => token == cancellationToken)))
-                .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
-                {
-                    _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")));
-                    _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{bob-1}"), new DisplayName("Bob")));
-                })
-                .Returns(Task.CompletedTask);
-
-            var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
-            presenter.Setup(x => x.AnnounceAuthAsync(
-                    It.IsAny<Func<CancellationToken, Task<AuthUser>>>(),
-                    It.Is<CancellationToken>(token => token == cancellationToken)))
-                .Returns(async (Func<CancellationToken, Task<AuthUser>> fetchUser, CancellationToken token) =>
-                {
-                    _ = await fetchUser(token);
-                });
-            presenter.Setup(x => x.FetchRepositoriesAsync(
-                    It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(),
-                    It.Is<CancellationToken>(token => token == cancellationToken)))
-                .Returns((Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>> fetch, CancellationToken token) =>
-                    ReadAllAsync(fetch(_ => { }, token)));
-            presenter.Setup(x => x.RenderRepositoryTable(It.IsAny<IReadOnlyCollection<Repository>>(), It.IsAny<ReportParameters>()));
-            presenter.Setup(x => x.RenderBranchFilterInfo(It.IsAny<ReportParameters>()));
-            presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                    It.IsAny<IReadOnlyList<Repository>>(),
-                    It.IsAny<Func<Repository, CancellationToken, Task>>(),
-                    It.Is<CancellationToken>(token => token == cancellationToken)))
-                .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
-                {
-                    foreach (var repo in repositories)
-                    {
-                        await analyze(repo, token);
-                    }
-                });
-            presenter.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
-                .Callback<ReportData>(reportData => capturedReportData = reportData);
-
-            var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
-            pdfRenderer.Setup(x => x.RenderReport(It.IsAny<ReportData>()));
-
-            var runner = new ReportRunner(
-                client.Object,
-                analyzer.Object,
-                presenter.Object,
-                pdfRenderer.Object,
-                Options.Create(options));
-
-            // Act
-            await runner.RunAsync(cancellationToken);
-
-            // Assert
-            capturedReportData.Should().NotBeNull();
-            var statsByName = capturedReportData!.DeveloperStats.Values
-                .ToDictionary(stat => stat.DisplayName.Value, StringComparer.Ordinal);
-            statsByName["Alice"].Grade.Should().Be("Senior");
-            statsByName["Alice"].Department.Should().Be("Core Platform");
-            statsByName["Bob"].Grade.Should().Be(DeveloperStats.NotAvailable);
-            statsByName["Bob"].Department.Should().Be(DeveloperStats.NotAvailable);
-        }
-        finally
-        {
-            if (File.Exists(csvPath))
+        var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
+        analyzer.Setup(x => x.AnalyzeAsync(repository, It.IsAny<ReportData>(), It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
             {
-                File.Delete(csvPath);
-            }
-        }
+                _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")));
+                _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{bob-1}"), new DisplayName("Bob")));
+            })
+            .Returns(Task.CompletedTask);
+
+        var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.AnnounceAuthAsync(
+                It.IsAny<Func<CancellationToken, Task<AuthUser>>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(async (Func<CancellationToken, Task<AuthUser>> fetchUser, CancellationToken token) =>
+            {
+                _ = await fetchUser(token);
+            });
+        presenter.Setup(x => x.FetchRepositoriesAsync(
+                It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns((Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>> fetch, CancellationToken token) =>
+                ReadAllAsync(fetch(_ => { }, token)));
+        presenter.Setup(x => x.RenderRepositoryTable(It.IsAny<IReadOnlyCollection<Repository>>(), It.IsAny<ReportParameters>()));
+        presenter.Setup(x => x.RenderBranchFilterInfo(It.IsAny<ReportParameters>()));
+        presenter.Setup(x => x.AnalyzeRepositoriesAsync(
+                It.IsAny<IReadOnlyList<Repository>>(),
+                It.IsAny<Func<Repository, CancellationToken, Task>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
+            {
+                foreach (var repo in repositories)
+                {
+                    await analyze(repo, token);
+                }
+            });
+        presenter.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
+            .Callback<ReportData>(reportData => capturedReportData = reportData);
+
+        var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
+        pdfRenderer.Setup(x => x.RenderReport(It.IsAny<ReportData>()));
+
+        var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayName())
+            .Returns(new Dictionary<DisplayName, PersonCsvRow>
+            {
+                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core Platform")
+            });
+
+        var runner = new ReportRunner(
+            client.Object,
+            analyzer.Object,
+            presenter.Object,
+            pdfRenderer.Object,
+            peopleCsvProvider.Object,
+            Options.Create(options));
+
+        // Act
+        await runner.RunAsync(cancellationToken);
+
+        // Assert
+        capturedReportData.Should().NotBeNull();
+        var statsByName = capturedReportData!.DeveloperStats.Values
+            .ToDictionary(stat => stat.DisplayName.Value, StringComparer.Ordinal);
+        statsByName["Alice"].Grade.Should().Be("Senior");
+        statsByName["Alice"].Department.Should().Be("Core Platform");
+        statsByName["Bob"].Grade.Should().Be(DeveloperStats.NotAvailable);
+        statsByName["Bob"].Department.Should().Be(DeveloperStats.NotAvailable);
     }
 
     private static BitbucketOptions CreateOptions(
