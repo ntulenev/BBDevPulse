@@ -308,6 +308,7 @@ public sealed class SpectreReportPresenterTests
         var renderMergeTimeStatsCalls = 0;
         var renderTtfrStatsCalls = 0;
         var renderCorrectionsStatsCalls = 0;
+        var renderWorstPullRequestsCalls = 0;
         var renderDeveloperStatsCalls = 0;
         statisticsPresenter.Setup(x => x.RenderMergeTimeStats(reportData))
             .Callback(() => renderMergeTimeStatsCalls++);
@@ -315,6 +316,8 @@ public sealed class SpectreReportPresenterTests
             .Callback(() => renderTtfrStatsCalls++);
         statisticsPresenter.Setup(x => x.RenderCorrectionsStats(reportData))
             .Callback(() => renderCorrectionsStatsCalls++);
+        statisticsPresenter.Setup(x => x.RenderWorstPullRequestsTable(reportData))
+            .Callback(() => renderWorstPullRequestsCalls++);
         statisticsPresenter.Setup(x => x.RenderDeveloperStatsTable(reportData, parameters.FilterDate))
             .Callback(() => renderDeveloperStatsCalls++);
 
@@ -331,6 +334,7 @@ public sealed class SpectreReportPresenterTests
         renderMergeTimeStatsCalls.Should().Be(1);
         renderTtfrStatsCalls.Should().Be(1);
         renderCorrectionsStatsCalls.Should().Be(1);
+        renderWorstPullRequestsCalls.Should().Be(1);
         renderDeveloperStatsCalls.Should().Be(1);
     }
 

@@ -320,6 +320,92 @@ public sealed class SpectreStatisticsPresenterTests
         p75Calls.Should().Be(1);
     }
 
+    [Fact(DisplayName = "RenderWorstPullRequestsTable throws when report data is null")]
+    [Trait("Category", "Unit")]
+    public void RenderWorstPullRequestsTableWhenReportDataIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        ReportData reportData = null!;
+
+        // Act
+        Action act = () => presenter.RenderWorstPullRequestsTable(reportData);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "RenderWorstPullRequestsTable writes no-data message when no PR entries exist")]
+    [Trait("Category", "Unit")]
+    public void RenderWorstPullRequestsTableWhenNoReportsExistWritesNoDataMessage()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        var reportData = CreateReportData();
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderWorstPullRequestsTable(reportData));
+
+        // Assert
+        output.Should().Contain("Worst PRs by Metric");
+        output.Should().Contain("No pull requests available to calculate worst metrics.");
+    }
+
+    [Fact(DisplayName = "RenderWorstPullRequestsTable chooses distinct PRs for each metric")]
+    [Trait("Category", "Unit")]
+    public void RenderWorstPullRequestsTableWhenSamePrLeadsMultipleMetricsUsesDistinctEntries()
+    {
+        // Arrange
+        var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        dateDiffFormatter
+            .Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Returns("formatted");
+
+        var presenter = new SpectreStatisticsPresenter(
+            new Mock<IStatisticsCalculator>(MockBehavior.Strict).Object,
+            dateDiffFormatter.Object);
+
+        var reportData = CreateReportData();
+        reportData.Reports.Add(CreateReport(
+            id: 1,
+            mergedOn: BaseDate.AddDays(10),
+            firstReactionOn: BaseDate.AddDays(9),
+            corrections: 10,
+            repository: "RepoA",
+            repositorySlug: "repoa",
+            author: "Alice"));
+        reportData.Reports.Add(CreateReport(
+            id: 2,
+            mergedOn: BaseDate.AddDays(8),
+            firstReactionOn: BaseDate.AddDays(1),
+            corrections: 1,
+            repository: "RepoB",
+            repositorySlug: "repob",
+            author: "Bob"));
+        reportData.Reports.Add(CreateReport(
+            id: 3,
+            mergedOn: BaseDate.AddDays(2),
+            firstReactionOn: BaseDate.AddDays(7),
+            corrections: 2,
+            repository: "RepoC",
+            repositorySlug: "repoc",
+            author: "Carol"));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderWorstPullRequestsTable(reportData));
+
+        // Assert
+        output.Should().Contain("Worst PRs by Metric");
+        output.Should().Contain("Longest Merge Time");
+        output.Should().Contain("Longest TTFR");
+        output.Should().Contain("Most Corrections");
+        output.Should().Contain("RepoA");
+        output.Should().Contain("RepoC");
+        output.Should().Contain("RepoB");
+        output.IndexOf("RepoA", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("RepoC", StringComparison.Ordinal));
+        output.IndexOf("RepoC", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("RepoB", StringComparison.Ordinal));
+    }
+
     [Fact(DisplayName = "RenderDeveloperStatsTable throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderDeveloperStatsTableWhenReportDataIsNullThrowsArgumentNullException()
@@ -398,12 +484,15 @@ public sealed class SpectreStatisticsPresenterTests
         int id,
         DateTimeOffset? mergedOn,
         DateTimeOffset? firstReactionOn,
-        int corrections = 0)
+        int corrections = 0,
+        string repository = "RepoA",
+        string repositorySlug = "repoa",
+        string author = "Alice")
     {
         return new PullRequestReport(
-            repository: "RepoA",
-            repositorySlug: "repoa",
-            author: "Alice",
+            repository: repository,
+            repositorySlug: repositorySlug,
+            author: author,
             targetBranch: "develop",
             createdOn: BaseDate,
             lastActivity: BaseDate.AddHours(1),

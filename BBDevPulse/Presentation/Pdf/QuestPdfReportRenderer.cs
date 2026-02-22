@@ -123,6 +123,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                             .ToList(),
                         "Min Corrections",
                         "Max Corrections");
+                    ComposeWorstPullRequestsSection(column, orderedReports, workspace, excludeWeekend, excludedDays);
                     ComposeDeveloperSection(column, reportData);
                 });
 
@@ -343,6 +344,74 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         });
     }
 
+    private void ComposeWorstPullRequestsSection(
+        ColumnDescriptor column,
+        List<PullRequestReport> reports,
+        string workspace,
+        bool excludeWeekend,
+        IReadOnlySet<DateOnly> excludedDays)
+    {
+        _ = column.Item().Text("Worst PRs by Metric").Bold().FontSize(12);
+        if (reports.Count == 0)
+        {
+            _ = column.Item().Text("No pull requests available to calculate worst metrics.");
+            return;
+        }
+
+        var selections = BuildWorstMetricSelections(reports, excludeWeekend, excludedDays);
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.ConstantColumn(130);
+                columns.RelativeColumn(2);
+                columns.ConstantColumn(45);
+                columns.RelativeColumn(1.5f);
+                columns.ConstantColumn(90);
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Metric");
+                _ = header.Cell().Element(HeaderCell).Text("Repository");
+                _ = header.Cell().Element(HeaderCell).Text("PR ID");
+                _ = header.Cell().Element(HeaderCell).Text("Author");
+                _ = header.Cell().Element(HeaderCell).Text("Value");
+            });
+
+            foreach (var selection in selections)
+            {
+                _ = table.Cell().Element(BodyCell).Text(selection.MetricName);
+
+                if (selection.Report is null || !selection.Value.HasValue)
+                {
+                    _ = table.Cell().Element(BodyCell).Text("-");
+                    _ = table.Cell().Element(BodyCell).Text("-");
+                    _ = table.Cell().Element(BodyCell).Text("-");
+                    _ = table.Cell().Element(BodyCell).Text("-");
+                    continue;
+                }
+
+                var report = selection.Report;
+                var repositoryUrl = BuildRepositoryUrl(workspace, report.RepositorySlug);
+                var pullRequestUrl = BuildPullRequestUrl(workspace, report.RepositorySlug, report.Id.Value);
+                table.Cell().Element(BodyCell).Hyperlink(repositoryUrl).Text(text =>
+                {
+                    text.Span(report.Repository).FontColor(Colors.Blue.Medium).Underline();
+                });
+                table.Cell().Element(BodyCell).Hyperlink(pullRequestUrl).Text(text =>
+                {
+                    text.Span(report.Id.Value.ToString(CultureInfo.InvariantCulture)).FontColor(Colors.Blue.Medium).Underline();
+                });
+                _ = table.Cell().Element(BodyCell).Text(report.Author);
+                _ = table.Cell().Element(BodyCell).Text(
+                    selection.IsDuration
+                        ? FormatDuration(selection.Value.Value)
+                        : selection.Value.Value.ToString("0.##", CultureInfo.InvariantCulture));
+            }
+        });
+    }
+
     private void ComposeCountSection(
         ColumnDescriptor column,
         string title,
@@ -389,6 +458,45 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         _ = table.Cell().Element(BodyCell).Text(metricValue);
     }
 
+    internal static IReadOnlyList<WorstMetricSelection> BuildWorstMetricSelections(
+        List<PullRequestReport> reports,
+        bool excludeWeekend,
+        IReadOnlySet<DateOnly> excludedDays)
+    {
+        var mergeCandidates = reports
+            .Where(static report => report.MergedOn.HasValue)
+            .Select(report => new MetricCandidate(
+                report,
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
+        var ttfrCandidates = reports
+            .Where(static report => report.FirstReactionOn.HasValue)
+            .Select(report => new MetricCandidate(
+                report,
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
+        var correctionCandidates = reports
+            .Select(static report => new MetricCandidate(report, report.Corrections))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
+        var usedPrKeys = new HashSet<string>(StringComparer.Ordinal);
+        var longestMerge = SelectDistinctWorst(mergeCandidates, usedPrKeys);
+        var longestTtfr = SelectDistinctWorst(ttfrCandidates, usedPrKeys);
+        var mostCorrections = SelectDistinctWorst(correctionCandidates, usedPrKeys);
+
+        return
+        [
+            CreateSelection("Longest Merge Time", longestMerge, isDuration: true),
+            CreateSelection("Longest TTFR", longestTtfr, isDuration: true),
+            CreateSelection("Most Corrections", mostCorrections, isDuration: false)
+        ];
+    }
+
     private string FormatDuration(double totalDays) =>
         _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(totalDays));
 
@@ -401,6 +509,35 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         var duration = WorkDurationCalculator.Calculate(start, end, excludeWeekend, excludedDays);
         return _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.Add(duration));
     }
+
+    private static MetricCandidate? SelectDistinctWorst(
+        IEnumerable<MetricCandidate> orderedCandidates,
+        HashSet<string> usedPrKeys)
+    {
+        foreach (var candidate in orderedCandidates)
+        {
+            var key = BuildPrKey(candidate.Report);
+            if (usedPrKeys.Add(key))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static WorstMetricSelection CreateSelection(
+        string metricName,
+        MetricCandidate? candidate,
+        bool isDuration)
+    {
+        return candidate is null
+            ? new WorstMetricSelection(metricName, null, null, isDuration)
+            : new WorstMetricSelection(metricName, candidate.Value.Report, candidate.Value.Value, isDuration);
+    }
+
+    private static string BuildPrKey(PullRequestReport report) =>
+        $"{report.RepositorySlug}:{report.Id.Value.ToString(CultureInfo.InvariantCulture)}";
 
     private static string BuildRepositoryUrl(string workspace, string repositorySlug) =>
         string.Format(
@@ -436,4 +573,12 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private readonly IStatisticsCalculator _statisticsCalculator;
     private readonly IPdfReportFileStore _pdfReportFileStore;
     private readonly PdfOptions _pdfOptions;
+
+    internal readonly record struct WorstMetricSelection(
+        string MetricName,
+        PullRequestReport? Report,
+        double? Value,
+        bool IsDuration);
+
+    private readonly record struct MetricCandidate(PullRequestReport Report, double Value);
 }

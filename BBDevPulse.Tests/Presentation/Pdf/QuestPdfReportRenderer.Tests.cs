@@ -224,6 +224,74 @@ public sealed class QuestPdfReportRendererTests
         saveCalls.Should().Be(1);
     }
 
+    [Fact(DisplayName = "BuildWorstMetricSelections chooses distinct pull requests across metrics")]
+    [Trait("Category", "Unit")]
+    public void BuildWorstMetricSelectionsWhenTopMetricsOverlapUsesDistinctPullRequests()
+    {
+        // Arrange
+        var filterDate = CreateParameters().FilterDate;
+        var reports = new List<PullRequestReport>
+        {
+            new(
+                repository: "Repo A",
+                repositorySlug: "repo-a",
+                author: "Alice",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(10),
+                mergedOn: filterDate.AddDays(10),
+                rejectedOn: null,
+                state: PullRequestState.Merged,
+                id: new PullRequestId(1),
+                comments: 1,
+                corrections: 10,
+                firstReactionOn: filterDate.AddDays(9)),
+            new(
+                repository: "Repo B",
+                repositorySlug: "repo-b",
+                author: "Bob",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(8),
+                mergedOn: filterDate.AddDays(8),
+                rejectedOn: null,
+                state: PullRequestState.Merged,
+                id: new PullRequestId(2),
+                comments: 1,
+                corrections: 3,
+                firstReactionOn: filterDate.AddDays(1)),
+            new(
+                repository: "Repo C",
+                repositorySlug: "repo-c",
+                author: "Carol",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(7),
+                mergedOn: filterDate.AddDays(2),
+                rejectedOn: null,
+                state: PullRequestState.Merged,
+                id: new PullRequestId(3),
+                comments: 1,
+                corrections: 2,
+                firstReactionOn: filterDate.AddDays(7))
+        };
+
+        // Act
+        var selections = QuestPdfReportRenderer.BuildWorstMetricSelections(
+            reports,
+            excludeWeekend: false,
+            excludedDays: new HashSet<DateOnly>());
+
+        // Assert
+        selections.Select(selection => selection.MetricName)
+            .Should()
+            .Equal("Longest Merge Time", "Longest TTFR", "Most Corrections");
+        selections[0].Report!.Id.Value.Should().Be(1);
+        selections[1].Report!.Id.Value.Should().Be(3);
+        selections[2].Report!.Id.Value.Should().Be(2);
+        selections.Select(selection => selection.Report!.Id.Value).Distinct().Should().HaveCount(3);
+    }
+
     private static BitbucketOptions CreateOptions(PdfOptions pdf)
     {
         return new BitbucketOptions

@@ -143,6 +143,77 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
+    public void RenderWorstPullRequestsTable(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+
+        if (reportData.Reports.Count == 0)
+        {
+            AnsiConsole.Write(new Rule("Worst PRs by Metric").RuleStyle("grey"));
+            AnsiConsole.MarkupLine("[yellow]No pull requests available to calculate worst metrics.[/]");
+            return;
+        }
+
+        var excludeWeekend = reportData.Parameters.ExcludeWeekend;
+        var excludedDays = reportData.Parameters.ExcludedDays;
+
+        var mergeCandidates = reportData.Reports
+            .Where(static report => report.MergedOn.HasValue)
+            .Select(report => new MetricCandidate(
+                report,
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
+        var ttfrCandidates = reportData.Reports
+            .Where(static report => report.FirstReactionOn.HasValue)
+            .Select(report => new MetricCandidate(
+                report,
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
+        var correctionCandidates = reportData.Reports
+            .Select(static report => new MetricCandidate(report, report.Corrections))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
+        var usedPrKeys = new HashSet<string>(StringComparer.Ordinal);
+        var longestMerge = SelectDistinctWorst(mergeCandidates, usedPrKeys);
+        var longestTtfr = SelectDistinctWorst(ttfrCandidates, usedPrKeys);
+        var mostCorrections = SelectDistinctWorst(correctionCandidates, usedPrKeys);
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Repository")
+            .AddColumn("PR ID")
+            .AddColumn("Author")
+            .AddColumn("Value");
+
+        AddWorstMetricRow(
+            table,
+            "Longest Merge Time",
+            longestMerge,
+            candidate => FormatDurationFromDays(candidate.Value));
+
+        AddWorstMetricRow(
+            table,
+            "Longest TTFR",
+            longestTtfr,
+            candidate => FormatDurationFromDays(candidate.Value));
+
+        AddWorstMetricRow(
+            table,
+            "Most Corrections",
+            mostCorrections,
+            candidate => candidate.Value.ToString("0.##", CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(new Rule("Worst PRs by Metric").RuleStyle("grey"));
+        AnsiConsole.Write(table);
+    }
+
+    /// <inheritdoc />
     public void RenderDeveloperStatsTable(
         ReportData reportData,
         DateTimeOffset filterDate)
@@ -178,4 +249,48 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         AnsiConsole.Write(new Rule($"Developer Stats (since {filterDate:yyyy-MM-dd})").RuleStyle("grey"));
         AnsiConsole.Write(table);
     }
+
+    private static MetricCandidate? SelectDistinctWorst(
+        IEnumerable<MetricCandidate> orderedCandidates,
+        HashSet<string> usedPrKeys)
+    {
+        foreach (var candidate in orderedCandidates)
+        {
+            var key = BuildPrKey(candidate.Report);
+            if (usedPrKeys.Add(key))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static void AddWorstMetricRow(
+        Table table,
+        string metricName,
+        MetricCandidate? candidate,
+        Func<MetricCandidate, string> formatValue)
+    {
+        if (candidate is null)
+        {
+            _ = table.AddRow(metricName, "-", "-", "-", "-");
+            return;
+        }
+
+        _ = table.AddRow(
+            metricName,
+            candidate.Value.Report.Repository,
+            candidate.Value.Report.Id.Value.ToString(CultureInfo.InvariantCulture),
+            candidate.Value.Report.Author,
+            formatValue(candidate.Value));
+    }
+
+    private string FormatDurationFromDays(double days) =>
+        _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(days));
+
+    private static string BuildPrKey(PullRequestReport report) =>
+        $"{report.RepositorySlug}:{report.Id.Value.ToString(CultureInfo.InvariantCulture)}";
+
+    private readonly record struct MetricCandidate(PullRequestReport Report, double Value);
 }
