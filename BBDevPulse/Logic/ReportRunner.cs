@@ -37,6 +37,9 @@ internal sealed class ReportRunner : IReportRunner
         _presenter = presenter;
         _pdfReportRenderer = pdfReportRenderer;
         _parameters = options.Value.CreateReportParameters();
+        _peopleCsvPath = string.IsNullOrWhiteSpace(options.Value.PeopleCsvPath)
+            ? null
+            : options.Value.PeopleCsvPath.Trim();
     }
 
     /// <inheritdoc />
@@ -79,8 +82,71 @@ internal sealed class ReportRunner : IReportRunner
                 reportData,
                 token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
+        EnrichDeveloperStatsFromPeopleCsv(reportData);
         _presenter.RenderReport(reportData);
         _pdfReportRenderer.RenderReport(reportData);
+    }
+
+    private void EnrichDeveloperStatsFromPeopleCsv(ReportData reportData)
+    {
+        if (string.IsNullOrWhiteSpace(_peopleCsvPath) || reportData.DeveloperStats.Count == 0)
+        {
+            return;
+        }
+
+        var peopleByName = LoadPeopleFromCsv(_peopleCsvPath);
+        foreach (var stat in reportData.DeveloperStats.Values)
+        {
+            if (peopleByName.TryGetValue(stat.DisplayName.Value, out var person))
+            {
+                stat.Grade = person.Grade;
+                stat.Department = person.Department;
+            }
+        }
+    }
+
+    private static Dictionary<string, PersonCsvRow> LoadPeopleFromCsv(string peopleCsvPath)
+    {
+        if (!File.Exists(peopleCsvPath))
+        {
+            throw new FileNotFoundException($"People CSV file '{peopleCsvPath}' was not found.", peopleCsvPath);
+        }
+
+        var peopleByName = new Dictionary<string, PersonCsvRow>(StringComparer.Ordinal);
+        var lineNumber = 0;
+        foreach (var line in File.ReadLines(peopleCsvPath))
+        {
+            lineNumber++;
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                continue;
+            }
+
+            var trimmedLine = line.Trim();
+            if (lineNumber == 1 && trimmedLine.Equals("Name;Grade;Department", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var parts = trimmedLine.Split(';');
+            if (parts.Length != 3)
+            {
+                throw new FormatException(
+                    $"Invalid people CSV format at line {lineNumber}. Expected 'Name;Grade;Department'.");
+            }
+
+            var name = parts[0].Trim();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                continue;
+            }
+
+            var grade = string.IsNullOrWhiteSpace(parts[1]) ? DeveloperStats.NotAvailable : parts[1].Trim();
+            var department = string.IsNullOrWhiteSpace(parts[2]) ? DeveloperStats.NotAvailable : parts[2].Trim();
+            peopleByName[name] = new PersonCsvRow(grade, department);
+        }
+
+        return peopleByName;
     }
 
     private readonly IBitbucketClient _client;
@@ -88,4 +154,7 @@ internal sealed class ReportRunner : IReportRunner
     private readonly IReportPresenter _presenter;
     private readonly IPdfReportRenderer _pdfReportRenderer;
     private readonly ReportParameters _parameters;
+    private readonly string? _peopleCsvPath;
+
+    private readonly record struct PersonCsvRow(string Grade, string Department);
 }

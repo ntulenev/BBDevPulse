@@ -87,6 +87,11 @@ public sealed class BitbucketOptions
     public IReadOnlyList<string>? ExcludedDays { get; init; }
 
     /// <summary>
+    /// Optional path to a CSV file with people metadata (Name;Grade;Department).
+    /// </summary>
+    public string? PeopleCsvPath { get; init; }
+
+    /// <summary>
     /// PDF report output options.
     /// </summary>
     public PdfOptions Pdf { get; init; } = new();

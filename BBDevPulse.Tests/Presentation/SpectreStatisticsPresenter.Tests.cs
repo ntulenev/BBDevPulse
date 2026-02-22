@@ -441,6 +441,8 @@ public sealed class SpectreStatisticsPresenterTests
         reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
             new DeveloperStats(new DisplayName("Alice"))
             {
+                Grade = "Senior",
+                Department = "Platform",
                 PrsOpenedSince = 2,
                 PrsMergedAfter = 3,
                 CommentsAfter = 4,
@@ -454,6 +456,9 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("Developer Stats (since 2026-02-20)");
         output.Should().Contain("Alice");
         output.Should().Contain("Bob");
+        output.Should().Contain("Grade");
+        output.Should().Contain("Senior");
+        output.Should().Contain(DeveloperStats.NotAvailable);
         output.IndexOf("Alice", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("Bob", StringComparison.Ordinal));
     }
 

@@ -223,6 +223,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .Border(TableBorder.Rounded)
             .AddColumn("#")
             .AddColumn("Developer")
+            .AddColumn("Grade")
+            .AddColumn("Department")
             .AddColumn("PRs Opened")
             .AddColumn("PRs Merged")
             .AddColumn("Comments")
@@ -237,6 +239,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             _ = table.AddRow(
                 index.ToString(CultureInfo.InvariantCulture),
                 stat.DisplayName.Value,
+                stat.Grade,
+                stat.Department,
                 stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture),
                 stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture),
                 stat.CommentsAfter.ToString(CultureInfo.InvariantCulture),

@@ -18,7 +18,7 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - Repositories included in analysis
    - Pull request report
    - Merge-time statistics (best/median/75p/longest)
-   - Developer statistics (PRs opened, merged, comments, approvals)
+   - Developer statistics (grade, department, PRs opened, merged, comments, approvals, corrections)
 9. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
 
 ## appsettings.json parameters
@@ -41,6 +41,8 @@ All settings are under the `Bitbucket` object.
 - `ExcludeWeekend` (`bool`): Excludes Saturdays and Sundays from time-based metrics (TTFR, time-to-merge, open PR age).
 - `ExcludedDays` (`string[]`): Optional explicit holidays/non-working days excluded from time-based metrics.
   Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
+- `PeopleCsvPath` (`string`): Optional path to a CSV file with developer metadata in format `Name;Grade;Department`.
+  Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
@@ -65,6 +67,7 @@ All settings are under the `Bitbucket` object.
       "01.01.2026",
       "2026-01-02"
     ],
+    "PeopleCsvPath": "people.csv",
     "RepoNameFilter": "ABC.",
     "RepoNameList": [
       "Service.A",
@@ -79,6 +82,13 @@ All settings are under the `Bitbucket` object.
     }
   }
 }
+```
+
+Example `people.csv`:
+```text
+Name;Grade;Department
+Alice Doe;Senior;Platform
+Bob Smith;Middle;Import
 ```
 ## Output
 

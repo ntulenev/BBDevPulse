@@ -310,7 +310,9 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             table.ColumnsDefinition(columns =>
             {
                 columns.ConstantColumn(20);
-                columns.RelativeColumn(2);
+                columns.RelativeColumn(1.8f);
+                columns.RelativeColumn(1);
+                columns.RelativeColumn(1.2f);
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(45);
@@ -322,6 +324,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             {
                 _ = header.Cell().Element(HeaderCell).Text("#");
                 _ = header.Cell().Element(HeaderCell).Text("Developer");
+                _ = header.Cell().Element(HeaderCell).Text("Grade");
+                _ = header.Cell().Element(HeaderCell).Text("Department");
                 _ = header.Cell().Element(HeaderCell).Text("PRs Opened");
                 _ = header.Cell().Element(HeaderCell).Text("PRs Merged");
                 _ = header.Cell().Element(HeaderCell).Text("Comments");
@@ -334,6 +338,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             {
                 _ = table.Cell().Element(BodyCell).Text(index.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.DisplayName.Value);
+                _ = table.Cell().Element(BodyCell).Text(stat.Grade);
+                _ = table.Cell().Element(BodyCell).Text(stat.Department);
                 _ = table.Cell().Element(BodyCell).Text(stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));

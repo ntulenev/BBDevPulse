@@ -107,6 +107,7 @@ public sealed class BitbucketOptionsTests
             PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026"],
+            PeopleCsvPath = "people.csv",
             Pdf = pdf
         };
 
@@ -125,6 +126,7 @@ public sealed class BitbucketOptionsTests
         var prTimeFilterMode = options.PrTimeFilterMode;
         var excludeWeekend = options.ExcludeWeekend;
         var excludedDays = options.ExcludedDays;
+        var peopleCsvPath = options.PeopleCsvPath;
         var pdfOptions = options.Pdf;
 
         // Assert
@@ -142,6 +144,7 @@ public sealed class BitbucketOptionsTests
         prTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
         excludeWeekend.Should().BeTrue();
         excludedDays.Should().Equal("03.02.2026");
+        peopleCsvPath.Should().Be("people.csv");
         pdfOptions.Should().BeSameAs(pdf);
     }
 
