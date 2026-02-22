@@ -100,3 +100,4 @@ Bob Smith;Middle;Import
 
 ### PDF
 <img src="Page3.png" alt="BBDevPulse output part 3">
+<img src="Page4.png" alt="BBDevPulse output part 4">
