@@ -1,8 +1,10 @@
 using FluentAssertions;
 
+using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 using BBDevPulse.Presentation;
 using BBDevPulse.Tests.TestInfrastructure;
+using Microsoft.Extensions.Options;
 
 namespace BBDevPulse.Tests.Presentation;
 
@@ -10,12 +12,26 @@ public sealed class SpectreRepositoryAnalysisPresenterTests
 {
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
+    [Fact(DisplayName = "Constructor throws when options are null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenOptionsAreNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IOptions<BitbucketOptions> options = null!;
+
+        // Act
+        Action act = () => _ = new SpectreRepositoryAnalysisPresenter(options);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
     [Fact(DisplayName = "AnalyzeRepositoriesAsync throws when repositories list is null")]
     [Trait("Category", "Unit")]
     public async Task AnalyzeRepositoriesAsyncWhenRepositoriesAreNullThrowsArgumentNullException()
     {
         // Arrange
-        var presenter = new SpectreRepositoryAnalysisPresenter();
+        var presenter = CreatePresenter();
         IReadOnlyList<Repository> repositories = null!;
 
         // Act
@@ -33,7 +49,7 @@ public sealed class SpectreRepositoryAnalysisPresenterTests
     public async Task AnalyzeRepositoriesAsyncWhenAnalyzeRepositoryIsNullThrowsArgumentNullException()
     {
         // Arrange
-        var presenter = new SpectreRepositoryAnalysisPresenter();
+        var presenter = CreatePresenter();
         Func<Repository, CancellationToken, Task> analyzeRepository = null!;
 
         // Act
@@ -51,7 +67,7 @@ public sealed class SpectreRepositoryAnalysisPresenterTests
     public async Task AnalyzeRepositoriesAsyncWhenRepositoriesAreProvidedInvokesCallbackForEachRepository()
     {
         // Arrange
-        var presenter = new SpectreRepositoryAnalysisPresenter();
+        var presenter = CreatePresenter();
         var repositories = new List<Repository>
         {
             CreateRepository("RepoA"),
@@ -82,4 +98,25 @@ public sealed class SpectreRepositoryAnalysisPresenterTests
             new RepoName(name),
             new RepoSlug(name.ToLowerInvariant()));
     }
+
+    private static SpectreRepositoryAnalysisPresenter CreatePresenter(int repositoryConcurrency = 1) =>
+        new(CreateOptions(repositoryConcurrency));
+
+    private static IOptions<BitbucketOptions> CreateOptions(int repositoryConcurrency = 1) =>
+        Options.Create(new BitbucketOptions
+        {
+            Days = 7,
+            Workspace = "workspace",
+            PageLength = 50,
+            PullRequestConcurrency = 1,
+            RepositoryConcurrency = repositoryConcurrency,
+            Username = "user",
+            AppPassword = "pass",
+            RepoNameFilter = string.Empty,
+            RepoNameList = [],
+            BranchNameList = [],
+            RepoSearchMode = RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
+            Pdf = new PdfOptions()
+        });
 }

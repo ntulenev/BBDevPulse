@@ -5,7 +5,7 @@ namespace BBDevPulse.Configuration;
 /// <summary>
 /// Raw PDF report options bound from configuration.
 /// </summary>
-internal sealed class PdfOptions
+public sealed class PdfOptions
 {
     private const string DEFAULT_OUTPUT_PATH = "bbdevpulse-report.pdf";
 

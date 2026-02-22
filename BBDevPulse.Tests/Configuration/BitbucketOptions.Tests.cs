@@ -17,6 +17,8 @@ public sealed class BitbucketOptionsTests
             Days = 10,
             Workspace = "workspace",
             PageLength = 25,
+            PullRequestConcurrency = 3,
+            RepositoryConcurrency = 2,
             Username = "user",
             AppPassword = "pass",
             RepoNameFilter = "pulse",
@@ -59,6 +61,8 @@ public sealed class BitbucketOptionsTests
             Days = 1,
             Workspace = "workspace",
             PageLength = 10,
+            PullRequestConcurrency = 2,
+            RepositoryConcurrency = 2,
             Username = "user",
             AppPassword = "pass",
             RepoNameFilter = string.Empty,
@@ -92,6 +96,8 @@ public sealed class BitbucketOptionsTests
             Days = 5,
             Workspace = "workspace",
             PageLength = 50,
+            PullRequestConcurrency = 5,
+            RepositoryConcurrency = 4,
             Username = "username",
             AppPassword = "password",
             RepoNameFilter = "filter",
@@ -108,6 +114,8 @@ public sealed class BitbucketOptionsTests
         var days = options.Days;
         var workspace = options.Workspace;
         var pageLength = options.PageLength;
+        var pullRequestConcurrency = options.PullRequestConcurrency;
+        var repositoryConcurrency = options.RepositoryConcurrency;
         var username = options.Username;
         var appPassword = options.AppPassword;
         var repoNameFilter = options.RepoNameFilter;
@@ -123,6 +131,8 @@ public sealed class BitbucketOptionsTests
         days.Should().Be(5);
         workspace.Should().Be("workspace");
         pageLength.Should().Be(50);
+        pullRequestConcurrency.Should().Be(5);
+        repositoryConcurrency.Should().Be(4);
         username.Should().Be("username");
         appPassword.Should().Be("password");
         repoNameFilter.Should().Be("filter");
@@ -145,6 +155,8 @@ public sealed class BitbucketOptionsTests
             Days = 5,
             Workspace = "workspace",
             PageLength = 50,
+            PullRequestConcurrency = 1,
+            RepositoryConcurrency = 1,
             Username = "username",
             AppPassword = "password",
             RepoNameFilter = "filter",

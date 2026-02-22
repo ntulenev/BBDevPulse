@@ -7,7 +7,7 @@ namespace BBDevPulse.Configuration;
 /// <summary>
 /// Bitbucket configuration settings bound from appsettings.json.
 /// </summary>
-internal sealed class BitbucketOptions
+public sealed class BitbucketOptions
 {
     /// <summary>
     /// Configuration section name.
@@ -30,6 +30,16 @@ internal sealed class BitbucketOptions
     /// Page size for Bitbucket API requests.
     /// </summary>
     public required int PageLength { get; init; }
+
+    /// <summary>
+    /// Maximum number of pull requests to analyze concurrently per repository.
+    /// </summary>
+    public int PullRequestConcurrency { get; init; } = 1;
+
+    /// <summary>
+    /// Maximum number of repositories to analyze concurrently.
+    /// </summary>
+    public int RepositoryConcurrency { get; init; } = 1;
 
     /// <summary>
     /// Bitbucket username.

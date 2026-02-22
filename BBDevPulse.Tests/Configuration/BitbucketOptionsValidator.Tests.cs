@@ -49,6 +49,8 @@ public sealed class BitbucketOptionsValidatorTests
             Days = 0,
             Workspace = " ",
             PageLength = 0,
+            PullRequestConcurrency = 0,
+            RepositoryConcurrency = 0,
             Username = "",
             AppPassword = " ",
             RepoNameFilter = string.Empty,
@@ -66,6 +68,8 @@ public sealed class BitbucketOptionsValidatorTests
         result.Failed.Should().BeTrue();
         result.Failures.Should().Contain("Bitbucket:Days must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:PageLength must be greater than 0.");
+        result.Failures.Should().Contain("Bitbucket:PullRequestConcurrency must be greater than 0.");
+        result.Failures.Should().Contain("Bitbucket:RepositoryConcurrency must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:Workspace is required.");
         result.Failures.Should().Contain("Bitbucket:Username is required.");
         result.Failures.Should().Contain("Bitbucket:AppPassword is required.");
@@ -78,6 +82,8 @@ public sealed class BitbucketOptionsValidatorTests
             Days = 7,
             Workspace = "workspace",
             PageLength = 25,
+            PullRequestConcurrency = 2,
+            RepositoryConcurrency = 2,
             Username = "user",
             AppPassword = "pass",
             RepoNameFilter = string.Empty,

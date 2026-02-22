@@ -27,6 +27,8 @@ All settings are under the `Bitbucket` object.
 - `Days` (`int`): Number of days to look back from now. Used to build `filterDate = UtcNow - Days`.
 - `Workspace` (`string`): Bitbucket workspace slug/name to scan repositories from.
 - `PageLength` (`int`): API page size for repository/PR/activity requests.
+- `PullRequestConcurrency` (`int`): Maximum number of pull requests analyzed in parallel per repository.
+- `RepositoryConcurrency` (`int`): Maximum number of repositories analyzed in parallel.
 - `Username` (`string`): Bitbucket account username/email used for authentication.
 - `AppPassword` (`string`): Bitbucket app password used for authentication.
 - `RepoSearchMode` (`string` enum):
@@ -52,6 +54,8 @@ All settings are under the `Bitbucket` object.
     "Days": 30,
     "Workspace": "your-workspace",
     "PageLength": 50,
+    "PullRequestConcurrency": 4,
+    "RepositoryConcurrency": 4,
     "Username": "your-email@company.com",
     "AppPassword": "your-app-password",
     "RepoSearchMode": "FilterFromTheList",

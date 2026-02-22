@@ -1,9 +1,11 @@
 using FluentAssertions;
 
 using BBDevPulse.Abstractions;
+using BBDevPulse.Configuration;
 using BBDevPulse.Logic;
 using BBDevPulse.Models;
 
+using Microsoft.Extensions.Options;
 using Moq;
 
 using System.Reflection;
@@ -21,9 +23,10 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         IBitbucketClient client = null!;
+        var options = CreateBitbucketOptions();
 
         // Act
-        Action act = () => _ = new PullRequestAnalyzer(client, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        Action act = () => _ = new PullRequestAnalyzer(client, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object, options);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -35,9 +38,26 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         IActivityAnalyzer activityAnalyzer = null!;
+        var options = CreateBitbucketOptions();
 
         // Act
-        Action act = () => _ = new PullRequestAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, activityAnalyzer);
+        Action act = () => _ = new PullRequestAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, activityAnalyzer, options);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when options are null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenOptionsAreNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict).Object;
+        var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object;
+        IOptions<BitbucketOptions> options = null!;
+
+        // Act
+        Action act = () => _ = new PullRequestAnalyzer(client, activityAnalyzer, options);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -48,7 +68,7 @@ public sealed class PullRequestAnalyzerTests
     public async Task AnalyzeAsyncWhenRepositoryIsNullThrowsArgumentNullException()
     {
         // Arrange
-        var analyzer = new PullRequestAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        var analyzer = CreateAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
         Repository repository = null!;
         var reportData = new ReportData(CreateParameters(DateTimeOffset.UtcNow));
 
@@ -64,7 +84,7 @@ public sealed class PullRequestAnalyzerTests
     public async Task AnalyzeAsyncWhenReportDataIsNullThrowsArgumentNullException()
     {
         // Arrange
-        var analyzer = new PullRequestAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        var analyzer = CreateAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         ReportData reportData = null!;
 
@@ -111,7 +131,7 @@ public sealed class PullRequestAnalyzerTests
             .Callback(() => activityFetchCalls++)
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
 
-        var analyzer = new PullRequestAnalyzer(client.Object, activityAnalyzer.Object);
+        var analyzer = CreateAnalyzer(client.Object, activityAnalyzer.Object);
 
         // Act
         await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -161,7 +181,7 @@ public sealed class PullRequestAnalyzerTests
                 It.IsAny<DateTimeOffset>()))
             .Callback(() => analyzeCalls++);
 
-        var analyzer = new PullRequestAnalyzer(client.Object, activityAnalyzer.Object);
+        var analyzer = CreateAnalyzer(client.Object, activityAnalyzer.Object);
 
         // Act
         await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -271,7 +291,7 @@ public sealed class PullRequestAnalyzerTests
                 analysis.ApprovalCounts["missing-approval-participant"] = 7;
             });
 
-        var analyzer = new PullRequestAnalyzer(client.Object, activityAnalyzer.Object);
+        var analyzer = CreateAnalyzer(client.Object, activityAnalyzer.Object);
 
         // Act
         await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -343,7 +363,7 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
 
-        var analyzer = new PullRequestAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
 
         // Act
         await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -393,7 +413,7 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
 
-        var analyzer = new PullRequestAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
 
         // Act
         await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -464,7 +484,7 @@ public sealed class PullRequestAnalyzerTests
                 analysis.MergedOnFromActivity = null;
             });
 
-        var analyzer = new PullRequestAnalyzer(client.Object, activityAnalyzer.Object);
+        var analyzer = CreateAnalyzer(client.Object, activityAnalyzer.Object);
 
         // Act
         await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -510,5 +530,36 @@ public sealed class PullRequestAnalyzerTests
             BindingFlags.Instance | BindingFlags.NonPublic)!;
         field.SetValue(repoName, value);
         return repoName;
+    }
+
+    private static PullRequestAnalyzer CreateAnalyzer(
+        IBitbucketClient client,
+        IActivityAnalyzer activityAnalyzer,
+        int pullRequestConcurrency = 1)
+    {
+        return new PullRequestAnalyzer(
+            client,
+            activityAnalyzer,
+            CreateBitbucketOptions(pullRequestConcurrency));
+    }
+
+    private static IOptions<BitbucketOptions> CreateBitbucketOptions(int pullRequestConcurrency = 1)
+    {
+        return Options.Create(new BitbucketOptions
+        {
+            Days = 7,
+            Workspace = "workspace",
+            PageLength = 50,
+            PullRequestConcurrency = pullRequestConcurrency,
+            RepositoryConcurrency = 1,
+            Username = "user",
+            AppPassword = "pass",
+            RepoNameFilter = string.Empty,
+            RepoNameList = [],
+            BranchNameList = [],
+            RepoSearchMode = RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
+            Pdf = new PdfOptions()
+        });
     }
 }

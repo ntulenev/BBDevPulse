@@ -1,5 +1,8 @@
 using BBDevPulse.Abstractions;
+using BBDevPulse.Configuration;
 using BBDevPulse.Models;
+
+using Microsoft.Extensions.Options;
 
 namespace BBDevPulse.Logic;
 
@@ -13,12 +16,20 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
     /// </summary>
     /// <param name="client">Bitbucket API client.</param>
     /// <param name="activityAnalyzer">Activity analyzer.</param>
-    public PullRequestAnalyzer(IBitbucketClient client, IActivityAnalyzer activityAnalyzer)
+    /// <param name="options">Bitbucket options.</param>
+    public PullRequestAnalyzer(
+        IBitbucketClient client,
+        IActivityAnalyzer activityAnalyzer,
+        IOptions<BitbucketOptions> options)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(activityAnalyzer);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var maxConcurrentPullRequests = options.Value.PullRequestConcurrency;
         _client = client;
         _activityAnalyzer = activityAnalyzer;
+        _maxConcurrentPullRequests = maxConcurrentPullRequests;
     }
 
     /// <inheritdoc />
@@ -36,6 +47,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var prTimeFilterMode = parameters.PrTimeFilterMode;
         var branchNameList = parameters.BranchNameList;
 
+        using var semaphore = new SemaphoreSlim(_maxConcurrentPullRequests, _maxConcurrentPullRequests);
+        var analysisTasks = new List<Task>();
+
         await foreach (var pr in _client.GetPullRequestsAsync(
                            workspace,
                            repo.Slug,
@@ -47,49 +61,92 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 continue;
             }
 
-            var authorIdentity = pr.Author?.ToDeveloperIdentity();
-            var analysis = new ActivityAnalysisState(
-                pr.CreatedOn,
-                authorIdentity,
-                pr.ShouldCalculateTtfr(filterDate));
+            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            analysisTasks.Add(AnalyzePullRequestWithSemaphoreAsync(
+                repo,
+                reportData,
+                pr,
+                semaphore,
+                cancellationToken));
+        }
 
-            await foreach (var activity in _client.GetPullRequestActivityAsync(
-                               workspace,
-                               repo.Slug,
-                               pr.Id,
-                               pullRequestActivity => pullRequestActivity.IsBefore(filterDate),
-                               cancellationToken).ConfigureAwait(false))
-            {
-                _activityAnalyzer.Analyze(analysis, activity, filterDate);
-            }
+        await Task.WhenAll(analysisTasks).ConfigureAwait(false);
+    }
 
-            var matchesFilter = pr.CreatedOn >= filterDate || analysis.LastActivity >= filterDate;
-            if (!matchesFilter)
-            {
-                continue;
-            }
+    private async Task AnalyzePullRequestWithSemaphoreAsync(
+        Repository repo,
+        ReportData reportData,
+        PullRequest pr,
+        SemaphoreSlim semaphore,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await AnalyzePullRequestAsync(repo, reportData, pr, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _ = semaphore.Release();
+        }
+    }
 
+    private async Task AnalyzePullRequestAsync(
+        Repository repo,
+        ReportData reportData,
+        PullRequest pr,
+        CancellationToken cancellationToken)
+    {
+        var parameters = reportData.Parameters;
+        var filterDate = parameters.FilterDate;
+        var workspace = parameters.Workspace;
+
+        var authorIdentity = pr.Author?.ToDeveloperIdentity();
+        var analysis = new ActivityAnalysisState(
+            pr.CreatedOn,
+            authorIdentity,
+            pr.ShouldCalculateTtfr(filterDate));
+
+        await foreach (var activity in _client.GetPullRequestActivityAsync(
+                           workspace,
+                           repo.Slug,
+                           pr.Id,
+                           pullRequestActivity => pullRequestActivity.IsBefore(filterDate),
+                           cancellationToken).ConfigureAwait(false))
+        {
+            _activityAnalyzer.Analyze(analysis, activity, filterDate);
+        }
+
+        var matchesFilter = pr.CreatedOn >= filterDate || analysis.LastActivity >= filterDate;
+        if (!matchesFilter)
+        {
+            return;
+        }
+
+        if (authorIdentity.HasValue)
+        {
+            analysis.Participants[authorIdentity.Value.ToKey()] = authorIdentity.Value;
+        }
+
+        var mergedOnResolved = analysis.MergedOnFromActivity ?? pr.MergedOn;
+        var corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, cancellationToken)
+            .ConfigureAwait(false);
+
+        lock (reportData)
+        {
             if (authorIdentity.HasValue)
             {
-                analysis.Participants[authorIdentity.Value.ToKey()] = authorIdentity.Value;
-            }
-
-            var mergedOnResolved = analysis.MergedOnFromActivity ?? pr.MergedOn;
-            var corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, cancellationToken)
-                .ConfigureAwait(false);
-            if (authorIdentity.HasValue)
-            {
+                var authorStats = reportData.GetOrAddDeveloper(authorIdentity.Value);
                 if (pr.CreatedOn >= filterDate)
                 {
-                    reportData.GetOrAddDeveloper(authorIdentity.Value).PrsOpenedSince++;
+                    authorStats.PrsOpenedSince++;
                 }
 
                 if (mergedOnResolved.HasValue && mergedOnResolved.Value >= filterDate)
                 {
-                    reportData.GetOrAddDeveloper(authorIdentity.Value).PrsMergedAfter++;
+                    authorStats.PrsMergedAfter++;
                 }
 
-                reportData.GetOrAddDeveloper(authorIdentity.Value).Corrections += corrections;
+                authorStats.Corrections += corrections;
             }
 
             foreach (var entry in analysis.CommentCounts)
@@ -121,8 +178,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 pr.Id,
                 analysis.TotalComments,
                 corrections,
-                analysis.FirstReactionOn
-            ));
+                analysis.FirstReactionOn));
         }
     }
 
@@ -154,5 +210,5 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
     private readonly IBitbucketClient _client;
     private readonly IActivityAnalyzer _activityAnalyzer;
-
+    private readonly int _maxConcurrentPullRequests;
 }

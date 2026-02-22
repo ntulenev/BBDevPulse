@@ -28,6 +28,16 @@ internal sealed class BitbucketOptionsValidator : IValidateOptions<BitbucketOpti
             errors.Add("Bitbucket:PageLength must be greater than 0.");
         }
 
+        if (options.PullRequestConcurrency <= 0)
+        {
+            errors.Add("Bitbucket:PullRequestConcurrency must be greater than 0.");
+        }
+
+        if (options.RepositoryConcurrency <= 0)
+        {
+            errors.Add("Bitbucket:RepositoryConcurrency must be greater than 0.");
+        }
+
         if (string.IsNullOrWhiteSpace(options.Workspace))
         {
             errors.Add("Bitbucket:Workspace is required.");
