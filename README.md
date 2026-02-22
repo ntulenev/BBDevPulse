@@ -36,6 +36,7 @@ All settings are under the `Bitbucket` object.
   - `LastKnownUpdateAndCreated` (default behavior): stop PR paging when both
     `lastKnownUpdate` and `createdOn` are older than `filterDate`.
   - `CreatedOnOnly`: stop PR paging when `createdOn` is older than `filterDate`.
+- `ExcludeWeekend` (`bool`): Excludes Saturdays and Sundays from time-based metrics (TTFR, time-to-merge, open PR age).
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
@@ -53,6 +54,7 @@ All settings are under the `Bitbucket` object.
     "AppPassword": "your-app-password",
     "RepoSearchMode": "FilterFromTheList",
     "PrTimeFilterMode": "LastKnownUpdateAndCreated",
+    "ExcludeWeekend": false,
     "RepoNameFilter": "ABC.",
     "RepoNameList": [
       "Service.A",

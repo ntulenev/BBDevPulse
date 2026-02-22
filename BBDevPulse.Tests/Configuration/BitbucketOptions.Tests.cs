@@ -24,6 +24,7 @@ public sealed class BitbucketOptionsTests
             BranchNameList = ["main", "", "develop", " "],
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            ExcludeWeekend = true,
             Pdf = new PdfOptions { Enabled = false, OutputPath = "report.pdf" }
         };
         var expectedLowerBound = DateTimeOffset.UtcNow.AddDays(-10).AddSeconds(-2);
@@ -41,6 +42,7 @@ public sealed class BitbucketOptionsTests
         parameters.BranchNameList.Select(name => name.Value).Should().Equal("main", "develop");
         parameters.RepoSearchMode.Should().Be(RepoSearchMode.FilterFromTheList);
         parameters.PrTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
+        parameters.ExcludeWeekend.Should().BeTrue();
     }
 
     [Fact(DisplayName = "CreateReportParameters treats null repo and branch lists as empty")]
@@ -93,6 +95,7 @@ public sealed class BitbucketOptionsTests
             BranchNameList = ["main"],
             RepoSearchMode = RepoSearchMode.SearchByFilter,
             PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            ExcludeWeekend = true,
             Pdf = pdf
         };
 
@@ -107,6 +110,7 @@ public sealed class BitbucketOptionsTests
         var branchNameList = options.BranchNameList;
         var repoSearchMode = options.RepoSearchMode;
         var prTimeFilterMode = options.PrTimeFilterMode;
+        var excludeWeekend = options.ExcludeWeekend;
         var pdfOptions = options.Pdf;
 
         // Assert
@@ -120,6 +124,7 @@ public sealed class BitbucketOptionsTests
         branchNameList.Should().Equal("main");
         repoSearchMode.Should().Be(RepoSearchMode.SearchByFilter);
         prTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
+        excludeWeekend.Should().BeTrue();
         pdfOptions.Should().BeSameAs(pdf);
     }
 }

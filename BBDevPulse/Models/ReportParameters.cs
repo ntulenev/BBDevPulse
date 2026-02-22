@@ -18,6 +18,7 @@ public sealed class ReportParameters
     /// <param name="repoSearchMode">Repository search mode.</param>
     /// <param name="prTimeFilterMode">Pull request time filter mode.</param>
     /// <param name="branchNameList">Target branch filter list.</param>
+    /// <param name="excludeWeekend">Whether to exclude weekends in duration calculations.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -25,7 +26,8 @@ public sealed class ReportParameters
         IReadOnlyList<RepoName> repoNameList,
         RepoSearchMode repoSearchMode,
         PrTimeFilterMode prTimeFilterMode,
-        IReadOnlyList<BranchName> branchNameList)
+        IReadOnlyList<BranchName> branchNameList,
+        bool excludeWeekend = false)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -39,6 +41,7 @@ public sealed class ReportParameters
         RepoSearchMode = repoSearchMode;
         PrTimeFilterMode = prTimeFilterMode;
         BranchNameList = branchNameList;
+        ExcludeWeekend = excludeWeekend;
     }
 
     /// <summary>
@@ -75,4 +78,9 @@ public sealed class ReportParameters
     /// Gets the target branch filter list.
     /// </summary>
     public IReadOnlyList<BranchName> BranchNameList { get; }
+
+    /// <summary>
+    /// Gets whether to exclude weekends in duration calculations.
+    /// </summary>
+    public bool ExcludeWeekend { get; }
 }

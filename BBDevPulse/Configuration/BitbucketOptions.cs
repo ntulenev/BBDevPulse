@@ -66,6 +66,11 @@ internal sealed class BitbucketOptions
     public required Models.PrTimeFilterMode PrTimeFilterMode { get; init; }
 
     /// <summary>
+    /// Whether to exclude weekends from duration-based metrics.
+    /// </summary>
+    public bool ExcludeWeekend { get; init; }
+
+    /// <summary>
     /// PDF report output options.
     /// </summary>
     public PdfOptions Pdf { get; init; } = new();
@@ -94,6 +99,7 @@ internal sealed class BitbucketOptions
             repoNameList,
             RepoSearchMode,
             PrTimeFilterMode,
-            branchNameList);
+            branchNameList,
+            ExcludeWeekend);
     }
 }

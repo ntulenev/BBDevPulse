@@ -1,6 +1,7 @@
 using System.Globalization;
 
 using BBDevPulse.Abstractions;
+using BBDevPulse.Math;
 using BBDevPulse.Models;
 
 using Spectre.Console;
@@ -34,9 +35,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     public void RenderMergeTimeStats(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
+        var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var mergeDays = reportData.Reports
             .Where(r => r.MergedOn.HasValue)
-            .Select(r => (r.MergedOn!.Value - r.CreatedOn).TotalDays)
+            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.MergedOn!.Value, excludeWeekend).TotalDays)
             .OrderBy(days => days)
             .ToList();
 
@@ -70,9 +72,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     public void RenderTtfrStats(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
+        var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var ttfrDays = reportData.Reports
             .Where(r => r.FirstReactionOn.HasValue)
-            .Select(r => (r.FirstReactionOn!.Value - r.CreatedOn).TotalDays)
+            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.FirstReactionOn!.Value, excludeWeekend).TotalDays)
             .OrderBy(days => days)
             .ToList();
 

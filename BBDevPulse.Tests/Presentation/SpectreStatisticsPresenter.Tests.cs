@@ -111,6 +111,52 @@ public sealed class SpectreStatisticsPresenterTests
         formatCalls.Should().Be(4);
     }
 
+    [Fact(DisplayName = "RenderMergeTimeStats excludes weekends from merge durations when configured")]
+    [Trait("Category", "Unit")]
+    public void RenderMergeTimeStatsWhenExcludeWeekendEnabledUsesWorkingDurationDays()
+    {
+        // Arrange
+        IReadOnlyList<double>? capturedValues = null;
+        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
+        statisticsCalculator
+            .Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+            .Callback<IReadOnlyList<double>, int>((values, _) => capturedValues = values)
+            .Returns(1.0);
+        statisticsCalculator
+            .Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+            .Returns(1.0);
+
+        var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        dateDiffFormatter
+            .Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Returns("formatted");
+
+        var presenter = new SpectreStatisticsPresenter(statisticsCalculator.Object, dateDiffFormatter.Object);
+        var reportData = CreateReportData(excludeWeekend: true);
+        var created = new DateTimeOffset(2026, 2, 20, 12, 0, 0, TimeSpan.Zero); // Friday
+        var merged = new DateTimeOffset(2026, 2, 23, 12, 0, 0, TimeSpan.Zero); // Monday
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoA",
+            repositorySlug: "repoa",
+            author: "Alice",
+            targetBranch: "develop",
+            createdOn: created,
+            lastActivity: merged,
+            mergedOn: merged,
+            rejectedOn: null,
+            state: PullRequestState.Merged,
+            id: new PullRequestId(5),
+            comments: 0,
+            firstReactionOn: null));
+
+        // Act
+        _ = TestConsoleRunner.Run(_ => presenter.RenderMergeTimeStats(reportData));
+
+        // Assert
+        capturedValues.Should().NotBeNull();
+        capturedValues!.Single().Should().Be(1.0);
+    }
+
     [Fact(DisplayName = "RenderTtfrStats throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderTtfrStatsWhenReportDataIsNullThrowsArgumentNullException()
@@ -239,7 +285,7 @@ public sealed class SpectreStatisticsPresenterTests
         return new SpectreStatisticsPresenter(statisticsCalculator, dateDiffFormatter);
     }
 
-    private static ReportData CreateReportData()
+    private static ReportData CreateReportData(bool excludeWeekend = false)
     {
         return new ReportData(new ReportParameters(
             BaseDate,
@@ -248,7 +294,8 @@ public sealed class SpectreStatisticsPresenterTests
             [],
             RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode.CreatedOnOnly,
-            []));
+            [],
+            excludeWeekend));
     }
 
     private static PullRequestReport CreateReport(int id, DateTimeOffset? mergedOn, DateTimeOffset? firstReactionOn)

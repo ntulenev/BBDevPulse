@@ -109,7 +109,8 @@ public sealed class ReportParametersTests
             repoNameList,
             RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode.LastKnownUpdateAndCreated,
-            branchNameList);
+            branchNameList,
+            excludeWeekend: true);
 
         // Assert
         parameters.FilterDate.Should().Be(filterDate);
@@ -119,6 +120,7 @@ public sealed class ReportParametersTests
         parameters.RepoSearchMode.Should().Be(RepoSearchMode.FilterFromTheList);
         parameters.PrTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
         parameters.BranchNameList.Should().BeSameAs(branchNameList);
+        parameters.ExcludeWeekend.Should().BeTrue();
     }
 
 }
