@@ -60,6 +60,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         var outputPath = _pdfOptions.ResolveOutputPath();
         var filterDate = reportData.Parameters.FilterDate;
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
+        var excludedDays = reportData.Parameters.ExcludedDays;
         var workspace = reportData.Parameters.Workspace.Value;
 
         QuestPDF.Settings.License = QLicenseType.Community;
@@ -92,13 +93,13 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 page.Content().PaddingTop(8).Column(column =>
                 {
                     column.Spacing(8);
-                    ComposePullRequestSection(column, orderedReports, filterDate, workspace, excludeWeekend);
+                    ComposePullRequestSection(column, orderedReports, filterDate, workspace, excludeWeekend, excludedDays);
                     ComposeDurationSection(
                         column,
                         "Merge Time Stats",
                         orderedReports
                             .Where(static report => report.MergedOn.HasValue)
-                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend).TotalDays)
+                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays)
                             .OrderBy(static days => days)
                             .ToList(),
                         "Best Merge Time",
@@ -108,7 +109,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         "TTFR Stats",
                         orderedReports
                             .Where(static report => report.FirstReactionOn.HasValue)
-                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend).TotalDays)
+                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
                             .OrderBy(static days => days)
                             .ToList(),
                         "Best TTFR",
@@ -136,7 +137,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         List<PullRequestReport> reports,
         DateTimeOffset filterDate,
         string workspace,
-        bool excludeWeekend)
+        bool excludeWeekend,
+        IReadOnlySet<DateOnly> excludedDays)
     {
         _ = column.Item().Text("Pull Requests").Bold().FontSize(12);
         if (reports.Count == 0)
@@ -187,15 +189,15 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 var repositoryUrl = BuildRepositoryUrl(workspace, report.RepositorySlug);
                 var pullRequestUrl = BuildPullRequestUrl(workspace, report.RepositorySlug, report.Id.Value);
                 var timeToMerge = report.MergedOn.HasValue
-                    ? FormatDuration(report.CreatedOn, report.MergedOn.Value, excludeWeekend)
+                    ? FormatDuration(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays)
                     : "-";
                 var prAge = report.State == PullRequestState.Open
-                    ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend)
+                    ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend, excludedDays)
                         .TotalDays
                         .ToString("0.0", CultureInfo.InvariantCulture)
                     : "-";
                 var ttfr = report.FirstReactionOn.HasValue
-                    ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend)
+                    ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
                     : "-";
                 var created = report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 if (report.CreatedOn < filterDate)
@@ -335,9 +337,13 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private string FormatDuration(double totalDays) =>
         _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(totalDays));
 
-    private string FormatDuration(DateTimeOffset start, DateTimeOffset end, bool excludeWeekend)
+    private string FormatDuration(
+        DateTimeOffset start,
+        DateTimeOffset end,
+        bool excludeWeekend,
+        IReadOnlySet<DateOnly> excludedDays)
     {
-        var duration = WorkDurationCalculator.Calculate(start, end, excludeWeekend);
+        var duration = WorkDurationCalculator.Calculate(start, end, excludeWeekend, excludedDays);
         return _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.Add(duration));
     }
 

@@ -63,4 +63,36 @@ public sealed class WorkDurationCalculatorTests
         // Assert
         duration.Should().Be(TimeSpan.Zero);
     }
+
+    [Fact(DisplayName = "Calculate skips configured excluded days when provided")]
+    [Trait("Category", "Unit")]
+    public void CalculateWhenExcludedDaysProvidedSkipsThoseDays()
+    {
+        // Arrange
+        var start = new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero); // Monday
+        var end = new DateTimeOffset(2026, 2, 4, 10, 0, 0, TimeSpan.Zero); // Wednesday
+        IReadOnlySet<DateOnly> excludedDays = new HashSet<DateOnly> { new(2026, 2, 3) }; // Tuesday
+
+        // Act
+        var duration = BBDevPulse.Math.WorkDurationCalculator.Calculate(start, end, excludeWeekend: false, excludedDays);
+
+        // Assert
+        duration.Should().Be(TimeSpan.FromDays(1));
+    }
+
+    [Fact(DisplayName = "Calculate skips both weekends and excluded days when both are configured")]
+    [Trait("Category", "Unit")]
+    public void CalculateWhenWeekendAndExcludedDaysConfiguredSkipsBoth()
+    {
+        // Arrange
+        var start = new DateTimeOffset(2026, 2, 6, 10, 0, 0, TimeSpan.Zero); // Friday
+        var end = new DateTimeOffset(2026, 2, 10, 10, 0, 0, TimeSpan.Zero); // Tuesday
+        IReadOnlySet<DateOnly> excludedDays = new HashSet<DateOnly> { new(2026, 2, 9) }; // Monday
+
+        // Act
+        var duration = BBDevPulse.Math.WorkDurationCalculator.Calculate(start, end, excludeWeekend: true, excludedDays);
+
+        // Assert
+        duration.Should().Be(TimeSpan.FromHours(24));
+    }
 }

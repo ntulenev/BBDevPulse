@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq;
 
 namespace BBDevPulse.Configuration;
@@ -71,6 +72,11 @@ internal sealed class BitbucketOptions
     public bool ExcludeWeekend { get; init; }
 
     /// <summary>
+    /// Optional list of excluded days in dd.MM.yyyy or yyyy-MM-dd format.
+    /// </summary>
+    public IReadOnlyList<string>? ExcludedDays { get; init; }
+
+    /// <summary>
     /// PDF report output options.
     /// </summary>
     public PdfOptions Pdf { get; init; } = new();
@@ -91,6 +97,12 @@ internal sealed class BitbucketOptions
             .Where(entry => !string.IsNullOrWhiteSpace(entry))
             .Select(entry => new Models.BranchName(entry))
             .ToList();
+        DateOnly[] excludedDays = ExcludedDays is null
+            ? []
+            : [.. ExcludedDays
+                .Where(static day => !string.IsNullOrWhiteSpace(day))
+                .Select(static day => ParseExcludedDay(day.Trim()))
+                .Distinct()];
 
         return new Models.ReportParameters(
             filterDate,
@@ -100,6 +112,22 @@ internal sealed class BitbucketOptions
             RepoSearchMode,
             PrTimeFilterMode,
             branchNameList,
-            ExcludeWeekend);
+            ExcludeWeekend,
+            excludedDays);
+    }
+
+    private static DateOnly ParseExcludedDay(string value)
+    {
+        if (DateOnly.TryParseExact(value, "dd.MM.yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+        {
+            return day;
+        }
+
+        if (DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out day))
+        {
+            return day;
+        }
+
+        throw new FormatException($"Invalid excluded day '{value}'. Expected dd.MM.yyyy or yyyy-MM-dd.");
     }
 }

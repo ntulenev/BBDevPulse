@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 
 namespace BBDevPulse.Models;
@@ -19,6 +20,7 @@ public sealed class ReportParameters
     /// <param name="prTimeFilterMode">Pull request time filter mode.</param>
     /// <param name="branchNameList">Target branch filter list.</param>
     /// <param name="excludeWeekend">Whether to exclude weekends in duration calculations.</param>
+    /// <param name="excludedDays">Optional list of excluded days.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -27,7 +29,8 @@ public sealed class ReportParameters
         RepoSearchMode repoSearchMode,
         PrTimeFilterMode prTimeFilterMode,
         IReadOnlyList<BranchName> branchNameList,
-        bool excludeWeekend = false)
+        bool excludeWeekend = false,
+        IReadOnlyList<DateOnly>? excludedDays = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -42,6 +45,9 @@ public sealed class ReportParameters
         PrTimeFilterMode = prTimeFilterMode;
         BranchNameList = branchNameList;
         ExcludeWeekend = excludeWeekend;
+        ExcludedDays = excludedDays is null
+            ? new HashSet<DateOnly>().ToFrozenSet()
+            : new HashSet<DateOnly>(excludedDays).ToFrozenSet();
     }
 
     /// <summary>
@@ -83,4 +89,9 @@ public sealed class ReportParameters
     /// Gets whether to exclude weekends in duration calculations.
     /// </summary>
     public bool ExcludeWeekend { get; }
+
+    /// <summary>
+    /// Gets optional list of excluded days.
+    /// </summary>
+    public IReadOnlySet<DateOnly> ExcludedDays { get; }
 }

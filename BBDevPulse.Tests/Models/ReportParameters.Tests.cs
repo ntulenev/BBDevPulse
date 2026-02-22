@@ -100,6 +100,7 @@ public sealed class ReportParametersTests
         var repoNameFilter = new RepoNameFilter("pulse");
         IReadOnlyList<RepoName> repoNameList = [new RepoName("Repo1")];
         IReadOnlyList<BranchName> branchNameList = [new BranchName("develop")];
+        IReadOnlyList<DateOnly> excludedDays = [new DateOnly(2026, 2, 22)];
 
         // Act
         var parameters = new ReportParameters(
@@ -110,7 +111,8 @@ public sealed class ReportParametersTests
             RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode.LastKnownUpdateAndCreated,
             branchNameList,
-            excludeWeekend: true);
+            excludeWeekend: true,
+            excludedDays: excludedDays);
 
         // Assert
         parameters.FilterDate.Should().Be(filterDate);
@@ -121,6 +123,7 @@ public sealed class ReportParametersTests
         parameters.PrTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
         parameters.BranchNameList.Should().BeSameAs(branchNameList);
         parameters.ExcludeWeekend.Should().BeTrue();
+        parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 22));
     }
 
 }

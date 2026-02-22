@@ -37,6 +37,8 @@ All settings are under the `Bitbucket` object.
     `lastKnownUpdate` and `createdOn` are older than `filterDate`.
   - `CreatedOnOnly`: stop PR paging when `createdOn` is older than `filterDate`.
 - `ExcludeWeekend` (`bool`): Excludes Saturdays and Sundays from time-based metrics (TTFR, time-to-merge, open PR age).
+- `ExcludedDays` (`string[]`): Optional explicit holidays/non-working days excluded from time-based metrics.
+  Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
@@ -55,6 +57,10 @@ All settings are under the `Bitbucket` object.
     "RepoSearchMode": "FilterFromTheList",
     "PrTimeFilterMode": "LastKnownUpdateAndCreated",
     "ExcludeWeekend": false,
+    "ExcludedDays": [
+      "01.01.2026",
+      "2026-01-02"
+    ],
     "RepoNameFilter": "ABC.",
     "RepoNameList": [
       "Service.A",

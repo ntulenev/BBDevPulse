@@ -166,7 +166,49 @@ public sealed class SpectrePullRequestReportPresenterTests
         formattedDurations.Should().OnlyContain(days => days == 1.0);
     }
 
-    private static ReportParameters CreateReportParameters(DateTimeOffset filterDate, bool excludeWeekend = false)
+    [Fact(DisplayName = "RenderPullRequestTable excludes configured days from TTFR and merge time")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestTableWhenExcludedDaysConfiguredSkipsThoseDays()
+    {
+        // Arrange
+        var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        List<double> formattedDurations = [];
+        formatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Callback<DateTimeOffset, DateTimeOffset>((start, end) => formattedDurations.Add((end - start).TotalDays))
+            .Returns("formatted");
+        var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
+        var monday = new DateTimeOffset(2026, 2, 2, 10, 0, 0, TimeSpan.Zero);
+        var wednesday = new DateTimeOffset(2026, 2, 4, 10, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateReportParameters(
+            monday.AddDays(-1),
+            excludeWeekend: false,
+            excludedDays: [new DateOnly(2026, 2, 3)]));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoA",
+            repositorySlug: "repoa",
+            author: "Alice",
+            targetBranch: "develop",
+            createdOn: monday,
+            lastActivity: wednesday,
+            mergedOn: wednesday,
+            rejectedOn: null,
+            state: PullRequestState.Merged,
+            id: new PullRequestId(41),
+            comments: 1,
+            firstReactionOn: wednesday));
+
+        // Act
+        _ = TestConsoleRunner.Run(_ => presenter.RenderPullRequestTable(reportData, monday.AddDays(-2)));
+
+        // Assert
+        formattedDurations.Should().HaveCount(2);
+        formattedDurations.Should().OnlyContain(days => days == 1.0);
+    }
+
+    private static ReportParameters CreateReportParameters(
+        DateTimeOffset filterDate,
+        bool excludeWeekend = false,
+        IReadOnlyList<DateOnly>? excludedDays = null)
     {
         return new ReportParameters(
             filterDate,
@@ -176,6 +218,7 @@ public sealed class SpectrePullRequestReportPresenterTests
             RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode.CreatedOnOnly,
             [],
-            excludeWeekend);
+            excludeWeekend,
+            excludedDays);
     }
 }

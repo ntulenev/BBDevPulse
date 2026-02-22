@@ -36,9 +36,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     {
         ArgumentNullException.ThrowIfNull(reportData);
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
+        var excludedDays = reportData.Parameters.ExcludedDays;
         var mergeDays = reportData.Reports
             .Where(r => r.MergedOn.HasValue)
-            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.MergedOn!.Value, excludeWeekend).TotalDays)
+            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays)
             .OrderBy(days => days)
             .ToList();
 
@@ -73,9 +74,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     {
         ArgumentNullException.ThrowIfNull(reportData);
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
+        var excludedDays = reportData.Parameters.ExcludedDays;
         var ttfrDays = reportData.Reports
             .Where(r => r.FirstReactionOn.HasValue)
-            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.FirstReactionOn!.Value, excludeWeekend).TotalDays)
+            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
             .OrderBy(days => days)
             .ToList();
 
