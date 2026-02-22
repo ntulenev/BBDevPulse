@@ -88,6 +88,7 @@ public sealed class SpectreReportPresenter : IReportPresenter
         _pullRequestReportPresenter.RenderPullRequestTable(reportData, filterDate);
         _statisticsPresenter.RenderMergeTimeStats(reportData);
         _statisticsPresenter.RenderTtfrStats(reportData);
+        _statisticsPresenter.RenderCorrectionsStats(reportData);
         _statisticsPresenter.RenderDeveloperStatsTable(reportData, filterDate);
     }
 

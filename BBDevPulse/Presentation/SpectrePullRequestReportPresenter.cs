@@ -47,6 +47,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
             .AddColumn("PR Age (days)")
             .AddColumn("Time to Merge")
             .AddColumn("Comments")
+            .AddColumn("Corrections")
             .AddColumn("PR ID");
 
         var index = 1;
@@ -79,6 +80,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
                 prAge,
                 timeToMerge,
                 report.Comments.ToString(CultureInfo.InvariantCulture),
+                report.Corrections.ToString(CultureInfo.InvariantCulture),
                 report.Id.Value.ToString(CultureInfo.InvariantCulture)
         );
 

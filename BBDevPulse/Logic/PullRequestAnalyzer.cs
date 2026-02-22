@@ -75,6 +75,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             }
 
             var mergedOnResolved = analysis.MergedOnFromActivity ?? pr.MergedOn;
+            var corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, cancellationToken)
+                .ConfigureAwait(false);
             if (authorIdentity.HasValue)
             {
                 if (pr.CreatedOn >= filterDate)
@@ -86,6 +88,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 {
                     reportData.GetOrAddDeveloper(authorIdentity.Value).PrsMergedAfter++;
                 }
+
+                reportData.GetOrAddDeveloper(authorIdentity.Value).Corrections += corrections;
             }
 
             foreach (var entry in analysis.CommentCounts)
@@ -116,9 +120,36 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 pr.State,
                 pr.Id,
                 analysis.TotalComments,
+                corrections,
                 analysis.FirstReactionOn
             ));
         }
+    }
+
+    private async Task<int> CountCorrectionsAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        DateTimeOffset createdOn,
+        CancellationToken cancellationToken)
+    {
+        var corrections = 0;
+        await foreach (var commitDate in _client.GetPullRequestCommitDatesAsync(
+                           workspace,
+                           repoSlug,
+                           pullRequestId,
+                           cancellationToken).ConfigureAwait(false))
+        {
+            if (commitDate > createdOn)
+            {
+                corrections++;
+                continue;
+            }
+
+            break;
+        }
+
+        return corrections;
     }
 
     private readonly IBitbucketClient _client;

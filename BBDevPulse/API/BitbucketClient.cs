@@ -165,6 +165,42 @@ internal sealed class BitbucketClient : IBitbucketClient
 
     }
 
+    /// <inheritdoc />
+    public async IAsyncEnumerable<DateTimeOffset> GetPullRequestCommitDatesAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(repoSlug);
+        ArgumentNullException.ThrowIfNull(pullRequestId);
+        var firstPage = new Uri(
+            $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}/commits" +
+            $"?pagelen={_options.PageLength}&sort=-date",
+            UriKind.Relative);
+
+        await foreach (var commit in _paginatorHelper.ReadAllAsync(
+            firstPage,
+            async (uri, ct) =>
+            {
+                var page = await GetAsync<PaginatedResponse<PullRequestCommitDto>>(uri, ct)
+                    .ConfigureAwait(false);
+                return new PaginatedResult<PullRequestCommitDto>(
+                    page.Values ?? [],
+                    GetNextUri(page.Next));
+            },
+            null,
+            cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (commit.Date.HasValue)
+            {
+                yield return commit.Date.Value;
+            }
+        }
+    }
+
     private Task<T> GetAsync<T>(Uri url, CancellationToken cancellationToken) =>
         _transport.GetAsync<T>(url, cancellationToken);
 

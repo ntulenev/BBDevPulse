@@ -39,4 +39,9 @@ public sealed class DeveloperStats
     /// Approvals added after the filter date.
     /// </summary>
     public int ApprovalsAfter { get; set; }
+
+    /// <summary>
+    /// Corrections count across pull requests opened by the developer.
+    /// </summary>
+    public int Corrections { get; set; }
 }

@@ -142,6 +142,20 @@ public sealed class TransportDtosTests
         dto.Destination!.Branch!.Name.Should().Be("develop");
     }
 
+    [Fact(DisplayName = "PullRequestCommitDto deserializes commit date")]
+    [Trait("Category", "Unit")]
+    public void PullRequestCommitDtoWhenDeserializedMapsDate()
+    {
+        // Arrange
+        var json = """{"date":"2026-02-20T10:00:00Z"}""";
+
+        // Act
+        var dto = JsonSerializer.Deserialize<PullRequestCommitDto>(json)!;
+
+        // Assert
+        dto.Date.Should().Be(new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero));
+    }
+
     [Fact(DisplayName = "PaginatedResponse defaults values to empty list and supports next link")]
     [Trait("Category", "Unit")]
     public void PaginatedResponseWhenConstructedHasExpectedDefaultsAndSetters()

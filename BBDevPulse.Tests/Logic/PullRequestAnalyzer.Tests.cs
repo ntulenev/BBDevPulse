@@ -240,6 +240,16 @@ public sealed class PullRequestAnalyzerTests
                     approval: null));
                 return ToAsyncEnumerable([activity]);
             });
+        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([
+                filterDate.AddDays(6),
+                filterDate.AddDays(2),
+                filterDate.AddDays(1)
+            ]));
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         activityAnalyzer.Setup(x => x.Analyze(
@@ -277,12 +287,14 @@ public sealed class PullRequestAnalyzerTests
         report.MergedOn.Should().Be(filterDate.AddDays(5));
         report.RejectedOn.Should().Be(filterDate.AddDays(3));
         report.Comments.Should().Be(6);
+        report.Corrections.Should().Be(2);
         report.FirstReactionOn.Should().Be(filterDate.AddHours(3));
 
         var authorKey = new DeveloperKey(new UserUuid("{alice-1}"));
         reportData.DeveloperStats.Should().ContainKey(authorKey);
         reportData.DeveloperStats[authorKey].PrsOpenedSince.Should().Be(1);
         reportData.DeveloperStats[authorKey].PrsMergedAfter.Should().Be(1);
+        reportData.DeveloperStats[authorKey].Corrections.Should().Be(2);
 
         var reviewerKeyForStats = new DeveloperKey(new UserUuid("{reviewer-1}"));
         reportData.DeveloperStats.Should().ContainKey(reviewerKeyForStats);
@@ -324,6 +336,12 @@ public sealed class PullRequestAnalyzerTests
                 It.IsAny<Func<PullRequestActivity, bool>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
+        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
 
         var analyzer = new PullRequestAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
 
@@ -368,6 +386,12 @@ public sealed class PullRequestAnalyzerTests
                 It.IsAny<Func<PullRequestActivity, bool>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
+        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
 
         var analyzer = new PullRequestAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
 
@@ -418,6 +442,16 @@ public sealed class PullRequestAnalyzerTests
                 It.IsAny<Func<PullRequestActivity, bool>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([activity]));
+        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([
+                filterDate.AddDays(2),
+                filterDate.AddDays(1),
+                filterDate.AddDays(-11)
+            ]));
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         activityAnalyzer.Setup(x => x.Analyze(
@@ -437,8 +471,12 @@ public sealed class PullRequestAnalyzerTests
 
         // Assert
         reportData.Reports.Should().ContainSingle();
+        reportData.Reports[0].Corrections.Should().Be(2);
         var authorKey = new DeveloperKey(new UserUuid("{author-1}"));
-        reportData.DeveloperStats.Should().NotContainKey(authorKey);
+        reportData.DeveloperStats.Should().ContainKey(authorKey);
+        reportData.DeveloperStats[authorKey].PrsOpenedSince.Should().Be(0);
+        reportData.DeveloperStats[authorKey].PrsMergedAfter.Should().Be(0);
+        reportData.DeveloperStats[authorKey].Corrections.Should().Be(2);
     }
 
     private static ReportParameters CreateParameters(

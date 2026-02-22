@@ -103,6 +103,7 @@ public sealed class PullRequestReportTests
             state: PullRequestState.Merged,
             id: id,
             comments: 7,
+            corrections: 3,
             firstReactionOn: firstReactionOn);
 
         // Assert
@@ -117,6 +118,7 @@ public sealed class PullRequestReportTests
         report.State.Should().Be(PullRequestState.Merged);
         report.Id.Should().Be(id);
         report.Comments.Should().Be(7);
+        report.Corrections.Should().Be(3);
         report.FirstReactionOn.Should().Be(firstReactionOn);
     }
 

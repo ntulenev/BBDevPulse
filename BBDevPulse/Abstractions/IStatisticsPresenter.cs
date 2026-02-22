@@ -20,6 +20,12 @@ public interface IStatisticsPresenter
     void RenderTtfrStats(ReportData reportData);
 
     /// <summary>
+    /// Renders corrections statistics.
+    /// </summary>
+    /// <param name="reportData">Report data.</param>
+    void RenderCorrectionsStats(ReportData reportData);
+
+    /// <summary>
     /// Renders per-developer statistics.
     /// </summary>
     /// <param name="reportData">Report data.</param>

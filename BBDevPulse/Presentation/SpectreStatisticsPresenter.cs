@@ -108,6 +108,41 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
+    public void RenderCorrectionsStats(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+        var corrections = reportData.Reports
+            .Select(r => (double)r.Corrections)
+            .OrderBy(value => value)
+            .ToList();
+
+        if (corrections.Count == 0)
+        {
+            AnsiConsole.Write(new Rule("Corrections Stats").RuleStyle("grey"));
+            AnsiConsole.MarkupLine("[yellow]No corrections data available in the report.[/]");
+            return;
+        }
+
+        var min = corrections.First();
+        var max = corrections.Last();
+        var median = _statisticsCalculator.Percentile(corrections, 50);
+        var p75 = _statisticsCalculator.Percentile(corrections, 75);
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Count");
+
+        _ = table.AddRow("Min Corrections", min.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Max Corrections", max.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(new Rule("Corrections Stats").RuleStyle("grey"));
+        AnsiConsole.Write(table);
+    }
+
+    /// <inheritdoc />
     public void RenderDeveloperStatsTable(
         ReportData reportData,
         DateTimeOffset filterDate)
@@ -120,7 +155,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .AddColumn("PRs Opened")
             .AddColumn("PRs Merged")
             .AddColumn("Comments")
-            .AddColumn("Approvals");
+            .AddColumn("Approvals")
+            .AddColumn("Corrections");
 
         var index = 1;
         foreach (var stat in reportData.DeveloperStats.Values
@@ -133,7 +169,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
                 stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture),
                 stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture),
                 stat.CommentsAfter.ToString(CultureInfo.InvariantCulture),
-                stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture)
+                stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture),
+                stat.Corrections.ToString(CultureInfo.InvariantCulture)
             );
             index++;
         }

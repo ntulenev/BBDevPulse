@@ -19,6 +19,7 @@ public sealed class PullRequestReport
     /// <param name="state">Pull request state.</param>
     /// <param name="id">Pull request identifier.</param>
     /// <param name="comments">Total comment count.</param>
+    /// <param name="corrections">Total corrections count.</param>
     /// <param name="firstReactionOn">First non-author reaction timestamp, when available.</param>
     public PullRequestReport(
         string repository,
@@ -32,7 +33,8 @@ public sealed class PullRequestReport
         PullRequestState state,
         PullRequestId id,
         int comments,
-        DateTimeOffset? firstReactionOn)
+        int corrections = 0,
+        DateTimeOffset? firstReactionOn = null)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(repositorySlug);
@@ -50,6 +52,7 @@ public sealed class PullRequestReport
         State = state;
         Id = id;
         Comments = comments;
+        Corrections = corrections;
         FirstReactionOn = firstReactionOn;
     }
 
@@ -107,6 +110,11 @@ public sealed class PullRequestReport
     /// Total comment count.
     /// </summary>
     public int Comments { get; }
+
+    /// <summary>
+    /// Total corrections count.
+    /// </summary>
+    public int Corrections { get; }
 
     /// <summary>
     /// First non-author reaction timestamp, when available.

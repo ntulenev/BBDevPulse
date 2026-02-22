@@ -307,11 +307,14 @@ public sealed class SpectreReportPresenterTests
         var statisticsPresenter = new Mock<IStatisticsPresenter>(MockBehavior.Strict);
         var renderMergeTimeStatsCalls = 0;
         var renderTtfrStatsCalls = 0;
+        var renderCorrectionsStatsCalls = 0;
         var renderDeveloperStatsCalls = 0;
         statisticsPresenter.Setup(x => x.RenderMergeTimeStats(reportData))
             .Callback(() => renderMergeTimeStatsCalls++);
         statisticsPresenter.Setup(x => x.RenderTtfrStats(reportData))
             .Callback(() => renderTtfrStatsCalls++);
+        statisticsPresenter.Setup(x => x.RenderCorrectionsStats(reportData))
+            .Callback(() => renderCorrectionsStatsCalls++);
         statisticsPresenter.Setup(x => x.RenderDeveloperStatsTable(reportData, parameters.FilterDate))
             .Callback(() => renderDeveloperStatsCalls++);
 
@@ -327,6 +330,7 @@ public sealed class SpectreReportPresenterTests
         renderPullRequestCalls.Should().Be(1);
         renderMergeTimeStatsCalls.Should().Be(1);
         renderTtfrStatsCalls.Should().Be(1);
+        renderCorrectionsStatsCalls.Should().Be(1);
         renderDeveloperStatsCalls.Should().Be(1);
     }
 

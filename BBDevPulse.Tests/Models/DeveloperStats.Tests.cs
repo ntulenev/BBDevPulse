@@ -36,6 +36,7 @@ public sealed class DeveloperStatsTests
         stats.PrsMergedAfter.Should().Be(0);
         stats.CommentsAfter.Should().Be(0);
         stats.ApprovalsAfter.Should().Be(0);
+        stats.Corrections.Should().Be(0);
     }
 
     [Fact(DisplayName = "Properties can be updated")]
@@ -51,6 +52,7 @@ public sealed class DeveloperStatsTests
         stats.PrsMergedAfter = 2;
         stats.CommentsAfter = 3;
         stats.ApprovalsAfter = 4;
+        stats.Corrections = 5;
 
         // Assert
         stats.DisplayName.Value.Should().Be("Alice Updated");
@@ -58,5 +60,6 @@ public sealed class DeveloperStatsTests
         stats.PrsMergedAfter.Should().Be(2);
         stats.CommentsAfter.Should().Be(3);
         stats.ApprovalsAfter.Should().Be(4);
+        stats.Corrections.Should().Be(5);
     }
 }

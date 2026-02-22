@@ -273,6 +273,53 @@ public sealed class SpectreStatisticsPresenterTests
         formatCalls.Should().Be(4);
     }
 
+    [Fact(DisplayName = "RenderCorrectionsStats throws when report data is null")]
+    [Trait("Category", "Unit")]
+    public void RenderCorrectionsStatsWhenReportDataIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        ReportData reportData = null!;
+
+        // Act
+        Action act = () => presenter.RenderCorrectionsStats(reportData);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "RenderCorrectionsStats calculates percentiles and renders correction metrics")]
+    [Trait("Category", "Unit")]
+    public void RenderCorrectionsStatsWhenDataExistsCalculatesAndRendersMetrics()
+    {
+        // Arrange
+        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
+        var p50Calls = 0;
+        var p75Calls = 0;
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+            .Callback(() => p50Calls++)
+            .Returns(1.0);
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+            .Callback(() => p75Calls++)
+            .Returns(2.0);
+        var presenter = new SpectreStatisticsPresenter(
+            statisticsCalculator.Object,
+            new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
+        var reportData = CreateReportData();
+        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null, corrections: 0));
+        reportData.Reports.Add(CreateReport(2, mergedOn: null, firstReactionOn: null, corrections: 3));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderCorrectionsStats(reportData));
+
+        // Assert
+        output.Should().Contain("Corrections Stats");
+        output.Should().Contain("Min Corrections");
+        output.Should().Contain("Max Corrections");
+        p50Calls.Should().Be(1);
+        p75Calls.Should().Be(1);
+    }
+
     [Fact(DisplayName = "RenderDeveloperStatsTable throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderDeveloperStatsTableWhenReportDataIsNullThrowsArgumentNullException()
@@ -347,7 +394,11 @@ public sealed class SpectreStatisticsPresenterTests
             excludedDays));
     }
 
-    private static PullRequestReport CreateReport(int id, DateTimeOffset? mergedOn, DateTimeOffset? firstReactionOn)
+    private static PullRequestReport CreateReport(
+        int id,
+        DateTimeOffset? mergedOn,
+        DateTimeOffset? firstReactionOn,
+        int corrections = 0)
     {
         return new PullRequestReport(
             repository: "RepoA",
@@ -361,6 +412,7 @@ public sealed class SpectreStatisticsPresenterTests
             state: PullRequestState.Open,
             id: new PullRequestId(id),
             comments: 0,
+            corrections: corrections,
             firstReactionOn: firstReactionOn);
     }
 

@@ -114,6 +114,15 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                             .ToList(),
                         "Best TTFR",
                         "Longest TTFR");
+                    ComposeCountSection(
+                        column,
+                        "Corrections Stats",
+                        orderedReports
+                            .Select(static report => (double)report.Corrections)
+                            .OrderBy(static value => value)
+                            .ToList(),
+                        "Min Corrections",
+                        "Max Corrections");
                     ComposeDeveloperSection(column, reportData);
                 });
 
@@ -163,6 +172,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 columns.ConstantColumn(50);
                 columns.ConstantColumn(58);
                 columns.ConstantColumn(45);
+                columns.ConstantColumn(50);
                 columns.ConstantColumn(35);
             });
 
@@ -180,6 +190,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = header.Cell().Element(HeaderCell).Text("PR Age");
                 _ = header.Cell().Element(HeaderCell).Text("Time to Merge");
                 _ = header.Cell().Element(HeaderCell).Text("Comments");
+                _ = header.Cell().Element(HeaderCell).Text("Corrections");
                 _ = header.Cell().Element(HeaderCell).Text("PR ID");
             });
 
@@ -220,6 +231,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(prAge);
                 _ = table.Cell().Element(BodyCell).Text(timeToMerge);
                 _ = table.Cell().Element(BodyCell).Text(report.Comments.ToString(CultureInfo.InvariantCulture));
+                _ = table.Cell().Element(BodyCell).Text(report.Corrections.ToString(CultureInfo.InvariantCulture));
                 table.Cell().Element(BodyCell).Hyperlink(pullRequestUrl).Text(text =>
                 {
                     text.Span(report.Id.Value.ToString(CultureInfo.InvariantCulture)).FontColor(Colors.Blue.Medium).Underline();
@@ -302,6 +314,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(45);
+                columns.ConstantColumn(45);
             });
 
             table.Header(header =>
@@ -312,6 +325,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = header.Cell().Element(HeaderCell).Text("PRs Merged");
                 _ = header.Cell().Element(HeaderCell).Text("Comments");
                 _ = header.Cell().Element(HeaderCell).Text("Approvals");
+                _ = header.Cell().Element(HeaderCell).Text("Corrections");
             });
 
             var index = 1;
@@ -323,8 +337,49 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
+                _ = table.Cell().Element(BodyCell).Text(stat.Corrections.ToString(CultureInfo.InvariantCulture));
                 index++;
             }
+        });
+    }
+
+    private void ComposeCountSection(
+        ColumnDescriptor column,
+        string title,
+        List<double> orderedValues,
+        string minLabel,
+        string maxLabel)
+    {
+        _ = column.Item().Text(title).Bold().FontSize(12);
+        if (orderedValues.Count == 0)
+        {
+            _ = column.Item().Text("No data available in the report.");
+            return;
+        }
+
+        var min = orderedValues[0];
+        var max = orderedValues[^1];
+        var median = _statisticsCalculator.Percentile(orderedValues, 50);
+        var p75 = _statisticsCalculator.Percentile(orderedValues, 75);
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Metric");
+                _ = header.Cell().Element(HeaderCell).Text("Count");
+            });
+
+            AddMetricRow(table, minLabel, min.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, maxLabel, max.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
         });
     }
 
