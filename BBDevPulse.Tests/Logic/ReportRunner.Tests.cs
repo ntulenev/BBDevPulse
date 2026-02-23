@@ -161,8 +161,8 @@ public sealed class ReportRunnerTests
             .Callback(() => authRequests++)
             .ReturnsAsync(new AuthUser(new DisplayName("Tester"), new Username("tester"), new UserUuid("{tester-1}")));
         client.Setup(x => x.GetRepositoriesAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<Action<int>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "workspace"),
+                It.Is<Action<int>>(onPage => onPage != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => repositoryRequests++)
             .Returns((Workspace workspace, Action<int>? onPage, CancellationToken token) =>
@@ -173,7 +173,10 @@ public sealed class ReportRunnerTests
             });
 
         var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
-        analyzer.Setup(x => x.AnalyzeAsync(repoA, It.IsAny<ReportData>(), It.Is<CancellationToken>(token => token == cancellationToken)))
+        analyzer.Setup(x => x.AnalyzeAsync(
+                repoA,
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback<Repository, ReportData, CancellationToken>((repository, reportData, _) =>
             {
                 analyzedRepositories.Add(repository);
@@ -195,7 +198,7 @@ public sealed class ReportRunnerTests
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.AnnounceAuthAsync(
-                It.IsAny<Func<CancellationToken, Task<AuthUser>>>(),
+                It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => announceAuthCalls++)
             .Returns(async (Func<CancellationToken, Task<AuthUser>> fetchUser, CancellationToken token) =>
@@ -203,7 +206,7 @@ public sealed class ReportRunnerTests
                 _ = await fetchUser(token);
             });
         presenter.Setup(x => x.FetchRepositoriesAsync(
-                It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(),
+                It.Is<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(fetch => fetch != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => fetchRepositoriesCalls++)
             .Returns(async (Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>> fetch, CancellationToken token) =>
@@ -218,18 +221,24 @@ public sealed class ReportRunnerTests
                 return result;
             });
         presenter.Setup(x => x.RenderRepositoryTable(
-                It.IsAny<IReadOnlyCollection<Repository>>(),
-                It.IsAny<ReportParameters>()))
+                It.Is<IReadOnlyCollection<Repository>>(repositories =>
+                    repositories.Count == 1 &&
+                    repositories.Single().Slug.Value == "repo-a"),
+                It.Is<ReportParameters>(parameters =>
+                    parameters.Workspace.Value == "workspace")))
             .Callback<IReadOnlyCollection<Repository>, ReportParameters>((repositories, _) =>
             {
                 renderRepositoryTableCalls++;
                 renderedRepositories.AddRange(repositories);
             });
-        presenter.Setup(x => x.RenderBranchFilterInfo(It.IsAny<ReportParameters>()))
+        presenter.Setup(x => x.RenderBranchFilterInfo(
+                It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")))
             .Callback(() => renderBranchFilterInfoCalls++);
         presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                It.IsAny<IReadOnlyList<Repository>>(),
-                It.IsAny<Func<Repository, CancellationToken, Task>>(),
+                It.Is<IReadOnlyList<Repository>>(repositories =>
+                    repositories.Count == 1 &&
+                    repositories.Single().Slug.Value == "repo-a"),
+                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => analyzeRepositoriesCalls++)
             .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
@@ -239,12 +248,13 @@ public sealed class ReportRunnerTests
                     await analyze(repository, token);
                 }
             });
-        presenter.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
+        presenter.Setup(x => x.RenderReport(
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
 
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
         pdfRenderer.Setup(x => x.RenderReportAsync(
-                It.IsAny<ReportData>(),
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => renderPdfCalls++)
             .Returns(Task.CompletedTask);
@@ -302,21 +312,24 @@ public sealed class ReportRunnerTests
             .Callback(() => authRequests++)
             .ReturnsAsync(new AuthUser(new DisplayName("Tester"), new Username("tester"), new UserUuid("{tester-1}")));
         client.Setup(x => x.GetRepositoriesAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<Action<int>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "workspace"),
+                It.Is<Action<int>>(onPage => onPage != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => repositoryRequests++)
             .Returns((Workspace _, Action<int>? __, CancellationToken token) =>
                 ToAsyncEnumerable([repository], token));
 
         var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
-        analyzer.Setup(x => x.AnalyzeAsync(It.IsAny<Repository>(), It.IsAny<ReportData>(), It.Is<CancellationToken>(token => token == cancellationToken)))
+        analyzer.Setup(x => x.AnalyzeAsync(
+                It.Is<Repository>(value => value.Slug.Value == "repo-a"),
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => analyzedAnyRepository = true)
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.AnnounceAuthAsync(
-                It.IsAny<Func<CancellationToken, Task<AuthUser>>>(),
+                It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => announceAuthCalls++)
             .Returns(async (Func<CancellationToken, Task<AuthUser>> fetchUser, CancellationToken token) =>
@@ -324,27 +337,31 @@ public sealed class ReportRunnerTests
                 _ = await fetchUser(token);
             });
         presenter.Setup(x => x.FetchRepositoriesAsync(
-                It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(),
+                It.Is<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(fetch => fetch != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => fetchRepositoriesCalls++)
             .Returns((Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>> fetch, CancellationToken token) =>
                 ReadAllAsync(fetch(_ => { }, token)));
-        presenter.Setup(x => x.RenderRepositoryTable(It.IsAny<IReadOnlyCollection<Repository>>(), It.IsAny<ReportParameters>()))
+        presenter.Setup(x => x.RenderRepositoryTable(
+                It.Is<IReadOnlyCollection<Repository>>(repositories => repositories.Count == 0),
+                It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")))
             .Callback(() => renderRepositoryTableCalls++);
-        presenter.Setup(x => x.RenderBranchFilterInfo(It.IsAny<ReportParameters>()))
+        presenter.Setup(x => x.RenderBranchFilterInfo(
+                It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")))
             .Callback(() => renderBranchFilterInfoCalls++);
         presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                It.IsAny<IReadOnlyList<Repository>>(),
-                It.IsAny<Func<Repository, CancellationToken, Task>>(),
+                It.Is<IReadOnlyList<Repository>>(repositories => repositories.Count == 0),
+                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => analyzeRepositoriesCalls++)
             .Returns(Task.CompletedTask);
-        presenter.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
+        presenter.Setup(x => x.RenderReport(
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
 
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
         pdfRenderer.Setup(x => x.RenderReportAsync(
-                It.IsAny<ReportData>(),
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => renderPdfCalls++)
             .Returns(Task.CompletedTask);
@@ -390,14 +407,17 @@ public sealed class ReportRunnerTests
         client.Setup(x => x.GetCurrentUserAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new AuthUser(new DisplayName("Tester"), new Username("tester"), new UserUuid("{tester-1}")));
         client.Setup(x => x.GetRepositoriesAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<Action<int>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "workspace"),
+                It.Is<Action<int>>(onPage => onPage != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns((Workspace _, Action<int>? __, CancellationToken token) =>
                 ToAsyncEnumerable([repository], token));
 
         var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
-        analyzer.Setup(x => x.AnalyzeAsync(repository, It.IsAny<ReportData>(), It.Is<CancellationToken>(token => token == cancellationToken)))
+        analyzer.Setup(x => x.AnalyzeAsync(
+                repository,
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
             {
                 _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")));
@@ -407,22 +427,29 @@ public sealed class ReportRunnerTests
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.AnnounceAuthAsync(
-                It.IsAny<Func<CancellationToken, Task<AuthUser>>>(),
+                It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(async (Func<CancellationToken, Task<AuthUser>> fetchUser, CancellationToken token) =>
             {
                 _ = await fetchUser(token);
             });
         presenter.Setup(x => x.FetchRepositoriesAsync(
-                It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(),
+                It.Is<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(fetch => fetch != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns((Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>> fetch, CancellationToken token) =>
                 ReadAllAsync(fetch(_ => { }, token)));
-        presenter.Setup(x => x.RenderRepositoryTable(It.IsAny<IReadOnlyCollection<Repository>>(), It.IsAny<ReportParameters>()));
-        presenter.Setup(x => x.RenderBranchFilterInfo(It.IsAny<ReportParameters>()));
+        presenter.Setup(x => x.RenderRepositoryTable(
+            It.Is<IReadOnlyCollection<Repository>>(repositories =>
+                repositories.Count == 1 &&
+                repositories.Single().Slug.Value == "repo-a"),
+            It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
+        presenter.Setup(x => x.RenderBranchFilterInfo(
+            It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
         presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                It.IsAny<IReadOnlyList<Repository>>(),
-                It.IsAny<Func<Repository, CancellationToken, Task>>(),
+                It.Is<IReadOnlyList<Repository>>(repositories =>
+                    repositories.Count == 1 &&
+                    repositories.Single().Slug.Value == "repo-a"),
+                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
             {
@@ -431,12 +458,13 @@ public sealed class ReportRunnerTests
                     await analyze(repo, token);
                 }
             });
-        presenter.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
+        presenter.Setup(x => x.RenderReport(
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback<ReportData>(reportData => capturedReportData = reportData);
 
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
         pdfRenderer.Setup(x => x.RenderReportAsync(
-                It.IsAny<ReportData>(),
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(Task.CompletedTask);
 
@@ -464,8 +492,8 @@ public sealed class ReportRunnerTests
             .ToDictionary(stat => stat.DisplayName.Value, StringComparer.Ordinal);
         statsByName["Alice"].Grade.Should().Be("Senior");
         statsByName["Alice"].Department.Should().Be("Core Platform");
-        statsByName["Bob"].Grade.Should().Be(DeveloperStats.NotAvailable);
-        statsByName["Bob"].Department.Should().Be(DeveloperStats.NotAvailable);
+        statsByName["Bob"].Grade.Should().Be(DeveloperStats.NOT_AVAILABLE);
+        statsByName["Bob"].Department.Should().Be(DeveloperStats.NOT_AVAILABLE);
     }
 
     private static BitbucketOptions CreateOptions(
@@ -512,3 +540,4 @@ public sealed class ReportRunnerTests
         return result;
     }
 }
+

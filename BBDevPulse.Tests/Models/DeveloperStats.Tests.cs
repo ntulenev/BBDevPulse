@@ -37,8 +37,8 @@ public sealed class DeveloperStatsTests
         stats.CommentsAfter.Should().Be(0);
         stats.ApprovalsAfter.Should().Be(0);
         stats.Corrections.Should().Be(0);
-        stats.Grade.Should().Be(DeveloperStats.NotAvailable);
-        stats.Department.Should().Be(DeveloperStats.NotAvailable);
+        stats.Grade.Should().Be(DeveloperStats.NOT_AVAILABLE);
+        stats.Department.Should().Be(DeveloperStats.NOT_AVAILABLE);
     }
 
     [Fact(DisplayName = "Properties can be updated")]

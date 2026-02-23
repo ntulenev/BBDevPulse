@@ -118,16 +118,16 @@ public sealed class PullRequestAnalyzerTests
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         var activityFetchCalls = 0;
         client.Setup(x => x.GetPullRequestsAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<Func<PullRequest, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([pullRequest]));
         client.Setup(x => x.GetPullRequestActivityAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
-                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 1),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => activityFetchCalls++)
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
@@ -165,22 +165,22 @@ public sealed class PullRequestAnalyzerTests
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         var analyzeCalls = 0;
         client.Setup(x => x.GetPullRequestsAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<Func<PullRequest, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([pullRequest]));
         client.Setup(x => x.GetPullRequestActivityAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
-                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 1),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
         activityAnalyzer.Setup(x => x.Analyze(
-                It.IsAny<ActivityAnalysisState>(),
-                It.IsAny<PullRequestActivity>(),
-                It.IsAny<DateTimeOffset>()))
+                It.Is<ActivityAnalysisState>(analysis => analysis != null),
+                It.Is<PullRequestActivity>(activity => activity != null),
+                It.Is<DateTimeOffset>(date => date == filterDate)))
             .Callback(() => analyzeCalls++);
 
         var analyzer = CreateAnalyzer(client.Object, activityAnalyzer.Object);
@@ -227,9 +227,9 @@ public sealed class PullRequestAnalyzerTests
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
         SetupPullRequestSize(client, new PullRequestSizeSummary(FilesChanged: 7, LinesAdded: 120, LinesRemoved: 30));
         client.Setup(x => x.GetPullRequestsAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
+                It.Is<Func<PullRequest, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns((Workspace _, RepoSlug _, Func<PullRequest, bool> shouldStop, CancellationToken _) =>
             {
@@ -247,10 +247,10 @@ public sealed class PullRequestAnalyzerTests
                 return ToAsyncEnumerable([pullRequest]);
             });
         client.Setup(x => x.GetPullRequestActivityAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
-                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 42),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns((Workspace _, RepoSlug _, PullRequestId _, Func<PullRequestActivity, bool> shouldStop, CancellationToken _) =>
             {
@@ -264,9 +264,9 @@ public sealed class PullRequestAnalyzerTests
                 return ToAsyncEnumerable([activity]);
             });
         client.Setup(x => x.GetPullRequestCommitDatesAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 42),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
                 filterDate.AddDays(6),
@@ -276,7 +276,10 @@ public sealed class PullRequestAnalyzerTests
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         activityAnalyzer.Setup(x => x.Analyze(
-                It.IsAny<ActivityAnalysisState>(),
+                It.Is<ActivityAnalysisState>(analysis =>
+                    analysis.CreatedOn == pullRequest.CreatedOn &&
+                    analysis.AuthorIdentity.HasValue &&
+                    analysis.AuthorIdentity.Value.DisplayName.Value == "Alice"),
                 activity,
                 filterDate))
             .Callback<ActivityAnalysisState, PullRequestActivity, DateTimeOffset>((analysis, _, _) =>
@@ -353,22 +356,22 @@ public sealed class PullRequestAnalyzerTests
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
         SetupPullRequestSize(client);
         client.Setup(x => x.GetPullRequestsAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<Func<PullRequest, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([pullRequest]));
         client.Setup(x => x.GetPullRequestActivityAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
-                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 3),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
         client.Setup(x => x.GetPullRequestCommitDatesAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 3),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
 
@@ -404,22 +407,22 @@ public sealed class PullRequestAnalyzerTests
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
         SetupPullRequestSize(client);
         client.Setup(x => x.GetPullRequestsAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
+                It.Is<Func<PullRequest, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([pullRequest]));
         client.Setup(x => x.GetPullRequestActivityAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
-                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 4),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
         client.Setup(x => x.GetPullRequestCommitDatesAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 4),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
 
@@ -461,22 +464,22 @@ public sealed class PullRequestAnalyzerTests
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
         SetupPullRequestSize(client);
         client.Setup(x => x.GetPullRequestsAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<Func<PullRequest, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([pullRequest]));
         client.Setup(x => x.GetPullRequestActivityAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
-                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 5),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([activity]));
         client.Setup(x => x.GetPullRequestCommitDatesAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 5),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
                 filterDate.AddDays(2),
@@ -486,7 +489,7 @@ public sealed class PullRequestAnalyzerTests
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         activityAnalyzer.Setup(x => x.Analyze(
-                It.IsAny<ActivityAnalysisState>(),
+                It.Is<ActivityAnalysisState>(analysis => analysis.CreatedOn == pullRequest.CreatedOn),
                 activity,
                 filterDate))
             .Callback<ActivityAnalysisState, PullRequestActivity, DateTimeOffset>((analysis, _, _) =>
@@ -548,9 +551,9 @@ public sealed class PullRequestAnalyzerTests
         PullRequestSizeSummary? sizeSummary = null)
     {
         client.Setup(x => x.GetPullRequestSizeAsync(
-                It.IsAny<Workspace>(),
-                It.IsAny<RepoSlug>(),
-                It.IsAny<PullRequestId>(),
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => !string.IsNullOrWhiteSpace(repoSlug.Value)),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value > 0),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(sizeSummary ?? PullRequestSizeSummary.Empty);
     }
@@ -586,3 +589,4 @@ public sealed class PullRequestAnalyzerTests
         });
     }
 }
+

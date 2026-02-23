@@ -81,16 +81,16 @@ public sealed class SpectreStatisticsPresenterTests
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         var p50Calls = 0;
         var p75Calls = 0;
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
             .Callback(() => p50Calls++)
             .Returns(2.0);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
             .Callback(() => p75Calls++)
             .Returns(3.0);
 
         var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         var formatCalls = 0;
-        dateDiffFormatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+        dateDiffFormatter.Setup(x => x.Format(It.Is<DateTimeOffset>(start => IsMinValueStart(start)), It.Is<DateTimeOffset>(end => IsNonNegativeDurationEnd(end))))
             .Callback(() => formatCalls++)
             .Returns("formatted");
 
@@ -119,16 +119,16 @@ public sealed class SpectreStatisticsPresenterTests
         IReadOnlyList<double>? capturedValues = null;
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         statisticsCalculator
-            .Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
             .Callback<IReadOnlyList<double>, int>((values, _) => capturedValues = values)
             .Returns(1.0);
         statisticsCalculator
-            .Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
             .Returns(1.0);
 
         var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         dateDiffFormatter
-            .Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Setup(x => x.Format(It.Is<DateTimeOffset>(start => IsMinValueStart(start)), It.Is<DateTimeOffset>(end => IsNonNegativeDurationEnd(end))))
             .Returns("formatted");
 
         var presenter = new SpectreStatisticsPresenter(statisticsCalculator.Object, dateDiffFormatter.Object);
@@ -165,16 +165,16 @@ public sealed class SpectreStatisticsPresenterTests
         IReadOnlyList<double>? capturedValues = null;
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         statisticsCalculator
-            .Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
             .Callback<IReadOnlyList<double>, int>((values, _) => capturedValues = values)
             .Returns(1.0);
         statisticsCalculator
-            .Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
             .Returns(1.0);
 
         var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         dateDiffFormatter
-            .Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Setup(x => x.Format(It.Is<DateTimeOffset>(start => IsMinValueStart(start)), It.Is<DateTimeOffset>(end => IsNonNegativeDurationEnd(end))))
             .Returns("formatted");
 
         var presenter = new SpectreStatisticsPresenter(statisticsCalculator.Object, dateDiffFormatter.Object);
@@ -243,16 +243,16 @@ public sealed class SpectreStatisticsPresenterTests
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         var p50Calls = 0;
         var p75Calls = 0;
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
             .Callback(() => p50Calls++)
             .Returns(1.0);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
             .Callback(() => p75Calls++)
             .Returns(2.0);
 
         var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         var formatCalls = 0;
-        dateDiffFormatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+        dateDiffFormatter.Setup(x => x.Format(It.Is<DateTimeOffset>(start => IsMinValueStart(start)), It.Is<DateTimeOffset>(end => IsNonNegativeDurationEnd(end))))
             .Callback(() => formatCalls++)
             .Returns("formatted");
 
@@ -296,10 +296,10 @@ public sealed class SpectreStatisticsPresenterTests
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         var p50Calls = 0;
         var p75Calls = 0;
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
             .Callback(() => p50Calls++)
             .Returns(1.0);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
             .Callback(() => p75Calls++)
             .Returns(2.0);
         var presenter = new SpectreStatisticsPresenter(
@@ -360,10 +360,10 @@ public sealed class SpectreStatisticsPresenterTests
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         var p50Calls = 0;
         var p75Calls = 0;
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
             .Callback(() => p50Calls++)
             .Returns(150.0);
-        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
             .Callback(() => p75Calls++)
             .Returns(190.0);
 
@@ -436,7 +436,7 @@ public sealed class SpectreStatisticsPresenterTests
         // Arrange
         var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         dateDiffFormatter
-            .Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+            .Setup(x => x.Format(It.Is<DateTimeOffset>(start => IsMinValueStart(start)), It.Is<DateTimeOffset>(end => IsNonNegativeDurationEnd(end))))
             .Returns("formatted");
 
         var presenter = new SpectreStatisticsPresenter(
@@ -559,7 +559,7 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("Bob");
         output.Should().Contain("Grade");
         output.Should().Contain("Senior");
-        output.Should().Contain(DeveloperStats.NotAvailable);
+        output.Should().Contain(DeveloperStats.NOT_AVAILABLE);
         output.IndexOf("Alice", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("Bob", StringComparison.Ordinal));
     }
 
@@ -617,5 +617,16 @@ public sealed class SpectreStatisticsPresenterTests
             linesRemoved: linesRemoved);
     }
 
+    private static bool IsOrderedNonEmpty(IReadOnlyList<double> values) =>
+        values.Count > 0 && values.SequenceEqual(values.OrderBy(static value => value));
+
+    private static bool IsMinValueStart(DateTimeOffset start) =>
+        start == DateTimeOffset.MinValue;
+
+    private static bool IsNonNegativeDurationEnd(DateTimeOffset end) =>
+        end >= DateTimeOffset.MinValue;
+
     private static readonly DateTimeOffset BaseDate = new(2026, 2, 20, 10, 0, 0, TimeSpan.Zero);
 }
+
+

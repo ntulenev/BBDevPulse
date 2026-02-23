@@ -83,8 +83,8 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
                 continue;
             }
 
-            var grade = string.IsNullOrWhiteSpace(parts[1]) ? DeveloperStats.NotAvailable : parts[1].Trim();
-            var department = string.IsNullOrWhiteSpace(parts[2]) ? DeveloperStats.NotAvailable : parts[2].Trim();
+            var grade = string.IsNullOrWhiteSpace(parts[1]) ? DeveloperStats.NOT_AVAILABLE : parts[1].Trim();
+            var department = string.IsNullOrWhiteSpace(parts[2]) ? DeveloperStats.NOT_AVAILABLE : parts[2].Trim();
             peopleByName[new DisplayName(name)] = new PersonCsvRow(grade, department);
         }
 

@@ -48,7 +48,9 @@ public sealed class SpectrePullRequestReportPresenterTests
         // Arrange
         var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         var formatCalls = 0;
-        formatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+        formatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
             .Callback(() => formatCalls++)
             .Returns("formatted");
 
@@ -89,7 +91,9 @@ public sealed class SpectrePullRequestReportPresenterTests
         // Arrange
         var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         var formatCalls = 0;
-        formatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+        formatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
             .Callback(() => formatCalls++)
             .Returns("formatted");
 
@@ -140,7 +144,9 @@ public sealed class SpectrePullRequestReportPresenterTests
         // Arrange
         var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         List<double> formattedDurations = [];
-        formatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+        formatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
             .Callback<DateTimeOffset, DateTimeOffset>((start, end) => formattedDurations.Add((end - start).TotalDays))
             .Returns("formatted");
         var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
@@ -176,7 +182,9 @@ public sealed class SpectrePullRequestReportPresenterTests
         // Arrange
         var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         List<double> formattedDurations = [];
-        formatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+        formatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
             .Callback<DateTimeOffset, DateTimeOffset>((start, end) => formattedDurations.Add((end - start).TotalDays))
             .Returns("formatted");
         var presenter = new SpectrePullRequestReportPresenter(formatter.Object);

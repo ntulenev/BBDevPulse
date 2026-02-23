@@ -180,12 +180,14 @@ public sealed class BitbucketClientTests
         };
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => pages.ContainsKey(uri.ToString())),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => transportCalls++)
             .ReturnsAsync((Uri uri, CancellationToken _) => pages[uri.ToString()]);
 
-        mapper.Setup(x => x.Map(It.IsAny<RepositoryDto>()))
+        mapper.Setup(x => x.Map(It.Is<RepositoryDto>(dto =>
+                dto.Name != null &&
+                (dto.Slug == "repo-1" || dto.Slug == "repo-2"))))
             .Callback(() => mapCalls++)
             .Returns((RepositoryDto dto) => new Repository(new RepoName(dto.Name ?? string.Empty), new RepoSlug(dto.Slug ?? string.Empty)));
 
@@ -214,7 +216,7 @@ public sealed class BitbucketClientTests
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
         transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws?pagelen=25"),
                 It.Is<CancellationToken>(token => token == cts.Token)))
             .ReturnsAsync(new PaginatedResponse<RepositoryDto>
             {
@@ -225,7 +227,9 @@ public sealed class BitbucketClientTests
                 ],
                 Next = null
             });
-        mapper.Setup(x => x.Map(It.IsAny<RepositoryDto>()))
+        mapper.Setup(x => x.Map(It.Is<RepositoryDto>(dto =>
+                dto.Name != null &&
+                (dto.Slug == "repo-1" || dto.Slug == "repo-2"))))
             .Returns((RepositoryDto dto) => new Repository(new RepoName(dto.Name ?? string.Empty), new RepoSlug(dto.Slug ?? string.Empty)));
 
         var client = CreateClient(transport.Object, mapper.Object);
@@ -255,14 +259,16 @@ public sealed class BitbucketClientTests
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
         var mapCalls = 0;
         transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws?pagelen=25"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<RepositoryDto>
             {
                 Values = null!,
                 Next = null
             });
-        mapper.Setup(x => x.Map(It.IsAny<RepositoryDto>()))
+        mapper.Setup(x => x.Map(It.Is<RepositoryDto>(dto =>
+                !string.IsNullOrWhiteSpace(dto.Name) &&
+                !string.IsNullOrWhiteSpace(dto.Slug))))
             .Callback(() => mapCalls++)
             .Returns((RepositoryDto dto) => new Repository(new RepoName(dto.Name ?? string.Empty), new RepoSlug(dto.Slug ?? string.Empty)));
 
@@ -357,7 +363,8 @@ public sealed class BitbucketClientTests
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() ==
+                    "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestDto>
             {
@@ -369,7 +376,9 @@ public sealed class BitbucketClientTests
                 Next = null
             });
 
-        mapper.Setup(x => x.Map(It.IsAny<PullRequestDto>()))
+        mapper.Setup(x => x.Map(It.Is<PullRequestDto>(dto =>
+                (dto.Id == 1 || dto.Id == 2) &&
+                string.Equals(dto.State, "OPEN", StringComparison.Ordinal))))
             .Returns((PullRequestDto dto) => new PullRequest(
                 new PullRequestId(dto.Id),
                 PullRequestState.Open,
@@ -402,7 +411,8 @@ public sealed class BitbucketClientTests
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() ==
+                    "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestDto>
             {
@@ -414,7 +424,9 @@ public sealed class BitbucketClientTests
                 Next = null
             });
 
-        mapper.Setup(x => x.Map(It.IsAny<PullRequestDto>()))
+        mapper.Setup(x => x.Map(It.Is<PullRequestDto>(dto =>
+                (dto.Id == 1 || dto.Id == 2) &&
+                string.Equals(dto.State, "OPEN", StringComparison.Ordinal))))
             .Returns((PullRequestDto dto) => new PullRequest(
                 new PullRequestId(dto.Id),
                 PullRequestState.Open,
@@ -448,14 +460,15 @@ public sealed class BitbucketClientTests
         var mapCalls = 0;
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() ==
+                    "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestDto>
             {
                 Values = null!,
                 Next = null
             });
-        mapper.Setup(x => x.Map(It.IsAny<PullRequestDto>()))
+        mapper.Setup(x => x.Map(It.Is<PullRequestDto>(dto => dto.Id > 0)))
             .Callback(() => mapCalls++)
             .Returns((PullRequestDto dto) => new PullRequest(
                 new PullRequestId(dto.Id),
@@ -604,7 +617,7 @@ public sealed class BitbucketClientTests
             approval: null);
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<JsonElement>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws/repo/pullrequests/10/activity?pagelen=25&sort=-created_on"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<JsonElement>
             {
@@ -641,14 +654,14 @@ public sealed class BitbucketClientTests
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
         var mapCalls = 0;
         transport.Setup(x => x.GetAsync<PaginatedResponse<JsonElement>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws/repo/pullrequests/1/activity?pagelen=25&sort=-created_on"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<JsonElement>
             {
                 Values = null!,
                 Next = null
             });
-        mapper.Setup(x => x.Map(It.IsAny<JsonElement>()))
+        mapper.Setup(x => x.Map(It.Is<JsonElement>(element => element.ValueKind == JsonValueKind.Object)))
             .Callback(() => mapCalls++)
             .Returns(new PullRequestActivity(
                 activityDate: null,
@@ -727,7 +740,7 @@ public sealed class BitbucketClientTests
         // Arrange
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestCommitDto>>(
-                It.IsAny<Uri>(),
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws/repo/pullrequests/7/commits?pagelen=25&sort=-date"),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestCommitDto>
             {
@@ -890,3 +903,4 @@ public sealed class BitbucketClientTests
         return result;
     }
 }
+

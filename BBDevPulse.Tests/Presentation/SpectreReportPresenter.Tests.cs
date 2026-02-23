@@ -140,7 +140,7 @@ public sealed class SpectreReportPresenterTests
         var authPresenter = new Mock<IAuthPresenter>(MockBehavior.Strict);
         var announceCalls = 0;
         authPresenter.Setup(x => x.AnnounceAuthAsync(
-                It.IsAny<Func<CancellationToken, Task<AuthUser>>>(),
+                It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => announceCalls++)
             .Returns(Task.CompletedTask);
@@ -164,7 +164,7 @@ public sealed class SpectreReportPresenterTests
         var repositoryListPresenter = new Mock<IRepositoryListPresenter>(MockBehavior.Strict);
         var fetchCalls = 0;
         repositoryListPresenter.Setup(x => x.FetchRepositoriesAsync(
-                It.IsAny<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(),
+                It.Is<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(fetch => fetch != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => fetchCalls++)
             .ReturnsAsync(expected);
@@ -188,7 +188,7 @@ public sealed class SpectreReportPresenterTests
         var analyzeCalls = 0;
         repositoryAnalysisPresenter.Setup(x => x.AnalyzeRepositoriesAsync(
                 repositories,
-                It.IsAny<Func<Repository, CancellationToken, Task>>(),
+                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => analyzeCalls++)
             .Returns(Task.CompletedTask);
@@ -399,3 +399,4 @@ public sealed class SpectreReportPresenterTests
         return new Repository(new RepoName(name), new RepoSlug(slug));
     }
 }
+

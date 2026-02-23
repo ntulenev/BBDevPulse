@@ -114,9 +114,9 @@ public sealed class QuestPdfReportRendererTests
         var fileStore = new Mock<IPdfReportFileStore>(MockBehavior.Strict);
         var saveCalls = 0;
         fileStore.Setup(x => x.SaveAsync(
-                It.IsAny<string>(),
-                It.IsAny<QuestPDF.Infrastructure.IDocument>(),
-                It.IsAny<CancellationToken>()))
+                It.Is<string>(path => !string.IsNullOrWhiteSpace(path)),
+                It.Is<QuestPDF.Infrastructure.IDocument>(document => document != null),
+                It.Is<CancellationToken>(token => token == default)))
             .Callback(() => saveCalls++)
             .Returns(Task.CompletedTask);
         var renderer = new QuestPdfReportRenderer(
@@ -143,9 +143,11 @@ public sealed class QuestPdfReportRendererTests
         var options = CreateOptions(pdf: null!);
         var fileStore = new Mock<IPdfReportFileStore>(MockBehavior.Strict);
         fileStore.Setup(x => x.SaveAsync(
-                It.IsAny<string>(),
-                It.IsAny<QuestPDF.Infrastructure.IDocument>(),
-                It.IsAny<CancellationToken>()))
+                It.Is<string>(path =>
+                    Path.GetFileName(path).StartsWith("bbdevpulse-report_", StringComparison.OrdinalIgnoreCase) &&
+                    path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)),
+                It.Is<QuestPDF.Infrastructure.IDocument>(document => document != null),
+                It.Is<CancellationToken>(token => token == default)))
             .Callback<string, QuestPDF.Infrastructure.IDocument, CancellationToken>((outputPath, document, cancellationToken) =>
             {
                 saveCalls++;
@@ -184,16 +186,22 @@ public sealed class QuestPdfReportRendererTests
         };
         var dateFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
         var formatCalls = 0;
-        dateFormatter.Setup(x => x.Format(It.IsAny<DateTimeOffset>(), It.IsAny<DateTimeOffset>()))
+        dateFormatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
             .Callback(() => formatCalls++)
             .Returns("formatted");
 
         var statistics = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         var percentileCalls = 0;
-        statistics.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+        statistics.Setup(x => x.Percentile(
+                It.Is<IReadOnlyList<double>>(values => values.Count > 0 && values.SequenceEqual(values.OrderBy(v => v))),
+                50))
             .Callback(() => percentileCalls++)
             .Returns(1.0);
-        statistics.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+        statistics.Setup(x => x.Percentile(
+                It.Is<IReadOnlyList<double>>(values => values.Count > 0 && values.SequenceEqual(values.OrderBy(v => v))),
+                75))
             .Callback(() => percentileCalls++)
             .Returns(2.0);
 
@@ -201,9 +209,11 @@ public sealed class QuestPdfReportRendererTests
         var saveCalls = 0;
         var fileStore = new Mock<IPdfReportFileStore>(MockBehavior.Strict);
         fileStore.Setup(x => x.SaveAsync(
-                It.IsAny<string>(),
-                It.IsAny<QuestPDF.Infrastructure.IDocument>(),
-                It.IsAny<CancellationToken>()))
+                It.Is<string>(path =>
+                    Path.GetFileName(path).StartsWith("bbdevpulse-output_", StringComparison.OrdinalIgnoreCase) &&
+                    path.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)),
+                It.Is<QuestPDF.Infrastructure.IDocument>(document => document != null),
+                It.Is<CancellationToken>(token => token == default)))
             .Callback<string, QuestPDF.Infrastructure.IDocument, CancellationToken>((path, document, cancellationToken) =>
             {
                 saveCalls++;
@@ -401,3 +411,4 @@ public sealed class QuestPdfReportRendererTests
         return reportData;
     }
 }
+

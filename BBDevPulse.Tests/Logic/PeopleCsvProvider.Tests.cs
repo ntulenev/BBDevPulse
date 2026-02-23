@@ -82,8 +82,8 @@ public sealed class PeopleCsvProviderTests
             alice.Grade.Should().Be("Lead");
             alice.Department.Should().Be("Core");
             result.TryGetValue(new DisplayName("Bob"), out var bob).Should().BeTrue();
-            bob.Grade.Should().Be(DeveloperStats.NotAvailable);
-            bob.Department.Should().Be(DeveloperStats.NotAvailable);
+            bob.Grade.Should().Be(DeveloperStats.NOT_AVAILABLE);
+            bob.Department.Should().Be(DeveloperStats.NOT_AVAILABLE);
         }
         finally
         {

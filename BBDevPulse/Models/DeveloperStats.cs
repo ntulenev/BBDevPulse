@@ -8,7 +8,9 @@ public sealed class DeveloperStats
     /// <summary>
     /// Default value for missing developer enrichment fields.
     /// </summary>
-    public const string NotAvailable = "N/A";
+#pragma warning disable CA1707 // Identifiers should not contain underscores
+    public const string NOT_AVAILABLE = "N/A";
+#pragma warning restore CA1707 // Identifiers should not contain underscores
 
     /// <summary>
     /// Initializes a new instance of the <see cref="DeveloperStats"/> class.
@@ -28,12 +30,12 @@ public sealed class DeveloperStats
     /// <summary>
     /// Developer grade from CSV enrichment.
     /// </summary>
-    public string Grade { get; set; } = NotAvailable;
+    public string Grade { get; set; } = NOT_AVAILABLE;
 
     /// <summary>
     /// Developer department from CSV enrichment.
     /// </summary>
-    public string Department { get; set; } = NotAvailable;
+    public string Department { get; set; } = NOT_AVAILABLE;
 
     /// <summary>
     /// Pull requests opened since the filter date.
