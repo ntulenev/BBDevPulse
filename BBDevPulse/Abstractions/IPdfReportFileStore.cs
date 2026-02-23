@@ -12,5 +12,6 @@ public interface IPdfReportFileStore
     /// </summary>
     /// <param name="outputPath">Resolved output path.</param>
     /// <param name="document">QuestPDF document.</param>
-    void Save(string outputPath, IDocument document);
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task SaveAsync(string outputPath, IDocument document, CancellationToken cancellationToken = default);
 }

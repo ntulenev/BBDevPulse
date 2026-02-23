@@ -12,7 +12,7 @@ public sealed class PdfReportFileStoreTests
 {
     [Fact(DisplayName = "Save throws when output path is null")]
     [Trait("Category", "Unit")]
-    public void SaveWhenOutputPathIsNullThrowsArgumentException()
+    public async Task SaveAsyncWhenOutputPathIsNullThrowsArgumentException()
     {
         // Arrange
         var store = new PdfReportFileStore();
@@ -20,45 +20,45 @@ public sealed class PdfReportFileStoreTests
         var document = CreateDocument();
 
         // Act
-        Action act = () => store.Save(outputPath, document);
+        Func<Task> act = () => store.SaveAsync(outputPath, document);
 
         // Assert
-        act.Should().Throw<ArgumentException>();
+        await act.Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact(DisplayName = "Save throws when output path is whitespace")]
     [Trait("Category", "Unit")]
-    public void SaveWhenOutputPathIsWhitespaceThrowsArgumentException()
+    public async Task SaveAsyncWhenOutputPathIsWhitespaceThrowsArgumentException()
     {
         // Arrange
         var store = new PdfReportFileStore();
         var document = CreateDocument();
 
         // Act
-        Action act = () => store.Save("   ", document);
+        Func<Task> act = () => store.SaveAsync("   ", document);
 
         // Assert
-        act.Should().Throw<ArgumentException>();
+        await act.Should().ThrowAsync<ArgumentException>();
     }
 
     [Fact(DisplayName = "Save throws when document is null")]
     [Trait("Category", "Unit")]
-    public void SaveWhenDocumentIsNullThrowsArgumentNullException()
+    public async Task SaveAsyncWhenDocumentIsNullThrowsArgumentNullException()
     {
         // Arrange
         var store = new PdfReportFileStore();
         IDocument document = null!;
 
         // Act
-        Action act = () => store.Save("report.pdf", document);
+        Func<Task> act = () => store.SaveAsync("report.pdf", document);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>();
+        await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact(DisplayName = "Save creates target directory and writes PDF file")]
     [Trait("Category", "Integration")]
-    public void SaveWhenArgumentsAreValidCreatesDirectoryAndWritesFile()
+    public async Task SaveAsyncWhenArgumentsAreValidCreatesDirectoryAndWritesFile()
     {
         // Arrange
         QuestPDF.Settings.License = LicenseType.Community;
@@ -70,7 +70,7 @@ public sealed class PdfReportFileStoreTests
         try
         {
             // Act
-            store.Save(outputPath, document);
+            await store.SaveAsync(outputPath, document);
 
             // Assert
             File.Exists(outputPath).Should().BeTrue();

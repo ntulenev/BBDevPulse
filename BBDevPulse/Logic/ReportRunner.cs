@@ -85,10 +85,11 @@ internal sealed class ReportRunner : IReportRunner
         }, cancellationToken).ConfigureAwait(false);
         if (reportData.DeveloperStats.Count > 0)
         {
-            EnrichDeveloperStatsFromPeopleCsv(reportData, _peopleCsvProvider.GetPeopleByDisplayName());
+            var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
+            EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
         }
         _presenter.RenderReport(reportData);
-        _pdfReportRenderer.RenderReport(reportData);
+        await _pdfReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
     }
 
     private static void EnrichDeveloperStatsFromPeopleCsv(

@@ -11,7 +11,7 @@ namespace BBDevPulse.Presentation.Pdf;
 public sealed class PdfReportFileStore : IPdfReportFileStore
 {
     /// <inheritdoc />
-    public void Save(string outputPath, IDocument document)
+    public Task SaveAsync(string outputPath, IDocument document, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
         ArgumentNullException.ThrowIfNull(document);
@@ -23,6 +23,6 @@ public sealed class PdfReportFileStore : IPdfReportFileStore
         }
 
         var pdfContent = document.GeneratePdf();
-        File.WriteAllBytes(outputPath, pdfContent);
+        return File.WriteAllBytesAsync(outputPath, pdfContent, cancellationToken);
     }
 }

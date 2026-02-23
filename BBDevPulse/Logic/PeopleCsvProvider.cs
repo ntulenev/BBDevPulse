@@ -25,7 +25,7 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
     }
 
     /// <inheritdoc />
-    public Dictionary<DisplayName, PersonCsvRow> GetPeopleByDisplayName()
+    public async Task<Dictionary<DisplayName, PersonCsvRow>> GetPeopleByDisplayNameAsync(CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_peopleCsvPath))
         {
@@ -41,8 +41,23 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
 
         var peopleByName = new Dictionary<DisplayName, PersonCsvRow>(DisplayNameValueComparer.Instance);
         var lineNumber = 0;
-        foreach (var line in File.ReadLines(_peopleCsvPath))
+        await using var stream = new FileStream(
+            _peopleCsvPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            bufferSize: 4096,
+            options: FileOptions.Asynchronous);
+        using var reader = new StreamReader(stream);
+        while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
+            if (line is null)
+            {
+                break;
+            }
+
             lineNumber++;
             if (string.IsNullOrWhiteSpace(line))
             {

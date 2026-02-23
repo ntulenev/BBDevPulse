@@ -89,7 +89,7 @@ public sealed class QuestPdfReportRendererTests
 
     [Fact(DisplayName = "RenderReport throws when report data is null")]
     [Trait("Category", "Unit")]
-    public void RenderReportWhenReportDataIsNullThrowsArgumentNullException()
+    public async Task RenderReportAsyncWhenReportDataIsNullThrowsArgumentNullException()
     {
         // Arrange
         var renderer = new QuestPdfReportRenderer(
@@ -100,23 +100,25 @@ public sealed class QuestPdfReportRendererTests
         ReportData reportData = null!;
 
         // Act
-        Action act = () => renderer.RenderReport(reportData);
+        Func<Task> act = () => renderer.RenderReportAsync(reportData);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>();
+        await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
     [Fact(DisplayName = "RenderReport returns without saving when PDF generation is disabled")]
     [Trait("Category", "Unit")]
-    public void RenderReportWhenPdfIsDisabledDoesNotPersistDocument()
+    public async Task RenderReportAsyncWhenPdfIsDisabledDoesNotPersistDocument()
     {
         // Arrange
         var fileStore = new Mock<IPdfReportFileStore>(MockBehavior.Strict);
         var saveCalls = 0;
-        fileStore.Setup(x => x.Save(
+        fileStore.Setup(x => x.SaveAsync(
                 It.IsAny<string>(),
-                It.IsAny<QuestPDF.Infrastructure.IDocument>()))
-            .Callback(() => saveCalls++);
+                It.IsAny<QuestPDF.Infrastructure.IDocument>(),
+                It.IsAny<CancellationToken>()))
+            .Callback(() => saveCalls++)
+            .Returns(Task.CompletedTask);
         var renderer = new QuestPdfReportRenderer(
             Options.Create(CreateOptions(new PdfOptions { Enabled = false })),
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object,
@@ -125,7 +127,7 @@ public sealed class QuestPdfReportRendererTests
         var reportData = new ReportData(CreateParameters());
 
         // Act
-        renderer.RenderReport(reportData);
+        await renderer.RenderReportAsync(reportData);
 
         // Assert
         saveCalls.Should().Be(0);
@@ -133,22 +135,25 @@ public sealed class QuestPdfReportRendererTests
 
     [Fact(DisplayName = "RenderReport saves PDF with empty report data and no configured PDF options")]
     [Trait("Category", "Unit")]
-    public void RenderReportWhenNoReportItemsStillSavesDocument()
+    public async Task RenderReportAsyncWhenNoReportItemsStillSavesDocument()
     {
         // Arrange
         string? savedPath = null;
         var saveCalls = 0;
         var options = CreateOptions(pdf: null!);
         var fileStore = new Mock<IPdfReportFileStore>(MockBehavior.Strict);
-        fileStore.Setup(x => x.Save(
+        fileStore.Setup(x => x.SaveAsync(
                 It.IsAny<string>(),
-                It.IsAny<QuestPDF.Infrastructure.IDocument>()))
-            .Callback<string, QuestPDF.Infrastructure.IDocument>((outputPath, document) =>
+                It.IsAny<QuestPDF.Infrastructure.IDocument>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, QuestPDF.Infrastructure.IDocument, CancellationToken>((outputPath, document, cancellationToken) =>
             {
                 saveCalls++;
                 savedPath = outputPath;
+                _ = cancellationToken;
                 _ = document.GeneratePdf();
-            });
+            })
+            .Returns(Task.CompletedTask);
 
         var renderer = new QuestPdfReportRenderer(
             Options.Create(options),
@@ -158,7 +163,7 @@ public sealed class QuestPdfReportRendererTests
         var reportData = new ReportData(CreateParameters());
 
         // Act
-        renderer.RenderReport(reportData);
+        await renderer.RenderReportAsync(reportData);
 
         // Assert
         savedPath.Should().NotBeNullOrWhiteSpace();
@@ -168,7 +173,7 @@ public sealed class QuestPdfReportRendererTests
 
     [Fact(DisplayName = "RenderReport saves populated report and uses formatter/statistics collaborators")]
     [Trait("Category", "Unit")]
-    public void RenderReportWhenDataExistsBuildsAllSectionsAndPersistsPdf()
+    public async Task RenderReportAsyncWhenDataExistsBuildsAllSectionsAndPersistsPdf()
     {
         // Arrange
         var outputPath = Path.Combine(Path.GetTempPath(), "bbdevpulse-output.pdf");
@@ -195,15 +200,18 @@ public sealed class QuestPdfReportRendererTests
         string? savedPath = null;
         var saveCalls = 0;
         var fileStore = new Mock<IPdfReportFileStore>(MockBehavior.Strict);
-        fileStore.Setup(x => x.Save(
+        fileStore.Setup(x => x.SaveAsync(
                 It.IsAny<string>(),
-                It.IsAny<QuestPDF.Infrastructure.IDocument>()))
-            .Callback<string, QuestPDF.Infrastructure.IDocument>((path, document) =>
+                It.IsAny<QuestPDF.Infrastructure.IDocument>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, QuestPDF.Infrastructure.IDocument, CancellationToken>((path, document, cancellationToken) =>
             {
                 saveCalls++;
                 savedPath = path;
+                _ = cancellationToken;
                 _ = document.GeneratePdf();
-            });
+            })
+            .Returns(Task.CompletedTask);
 
         var renderer = new QuestPdfReportRenderer(
             Options.Create(CreateOptions(pdfOptions)),
@@ -213,7 +221,7 @@ public sealed class QuestPdfReportRendererTests
         var reportData = CreatePopulatedReportData();
 
         // Act
-        renderer.RenderReport(reportData);
+        await renderer.RenderReportAsync(reportData);
 
         // Assert
         savedPath.Should().NotBeNullOrWhiteSpace();

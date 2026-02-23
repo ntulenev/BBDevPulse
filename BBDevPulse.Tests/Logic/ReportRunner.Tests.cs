@@ -243,12 +243,15 @@ public sealed class ReportRunnerTests
             .Callback(() => renderReportCalls++);
 
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
-        pdfRenderer.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
-            .Callback(() => renderPdfCalls++);
+        pdfRenderer.Setup(x => x.RenderReportAsync(
+                It.IsAny<ReportData>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => renderPdfCalls++)
+            .Returns(Task.CompletedTask);
 
         var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
-        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayName())
-            .Returns(new Dictionary<DisplayName, PersonCsvRow>());
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>());
 
         var runner = new ReportRunner(
             client.Object,
@@ -340,12 +343,15 @@ public sealed class ReportRunnerTests
             .Callback(() => renderReportCalls++);
 
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
-        pdfRenderer.Setup(x => x.RenderReport(It.IsAny<ReportData>()))
-            .Callback(() => renderPdfCalls++);
+        pdfRenderer.Setup(x => x.RenderReportAsync(
+                It.IsAny<ReportData>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => renderPdfCalls++)
+            .Returns(Task.CompletedTask);
 
         var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
-        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayName())
-            .Returns(new Dictionary<DisplayName, PersonCsvRow>());
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>());
 
         var runner = new ReportRunner(
             client.Object,
@@ -429,11 +435,14 @@ public sealed class ReportRunnerTests
             .Callback<ReportData>(reportData => capturedReportData = reportData);
 
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
-        pdfRenderer.Setup(x => x.RenderReport(It.IsAny<ReportData>()));
+        pdfRenderer.Setup(x => x.RenderReportAsync(
+                It.IsAny<ReportData>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(Task.CompletedTask);
 
         var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
-        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayName())
-            .Returns(new Dictionary<DisplayName, PersonCsvRow>
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>
             {
                 [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core Platform")
             });

@@ -10,6 +10,7 @@ public interface IPeopleCsvProvider
     /// <summary>
     /// Gets people metadata keyed by developer display name.
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Dictionary with metadata by display name.</returns>
-    Dictionary<DisplayName, PersonCsvRow> GetPeopleByDisplayName();
+    Task<Dictionary<DisplayName, PersonCsvRow>> GetPeopleByDisplayNameAsync(CancellationToken cancellationToken = default);
 }

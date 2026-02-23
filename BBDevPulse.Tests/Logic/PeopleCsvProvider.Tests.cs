@@ -26,13 +26,13 @@ public sealed class PeopleCsvProviderTests
 
     [Fact(DisplayName = "GetPeopleByDisplayName returns empty dictionary when PeopleCsvPath is not configured")]
     [Trait("Category", "Unit")]
-    public void GetPeopleByDisplayNameWhenPathIsNotConfiguredReturnsEmptyDictionary()
+    public async Task GetPeopleByDisplayNameAsyncWhenPathIsNotConfiguredReturnsEmptyDictionary()
     {
         // Arrange
         var sut = new PeopleCsvProvider(Options.Create(CreateOptions(peopleCsvPath: null)));
 
         // Act
-        var result = sut.GetPeopleByDisplayName();
+        var result = await sut.GetPeopleByDisplayNameAsync();
 
         // Assert
         result.Should().BeEmpty();
@@ -40,23 +40,23 @@ public sealed class PeopleCsvProviderTests
 
     [Fact(DisplayName = "GetPeopleByDisplayName throws when configured CSV file does not exist")]
     [Trait("Category", "Unit")]
-    public void GetPeopleByDisplayNameWhenFileDoesNotExistThrowsFileNotFoundException()
+    public async Task GetPeopleByDisplayNameAsyncWhenFileDoesNotExistThrowsFileNotFoundException()
     {
         // Arrange
         var missingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "people.csv");
         var sut = new PeopleCsvProvider(Options.Create(CreateOptions(peopleCsvPath: missingPath)));
 
         // Act
-        Action act = () => _ = sut.GetPeopleByDisplayName();
+        Func<Task> act = () => sut.GetPeopleByDisplayNameAsync();
 
         // Assert
-        act.Should().Throw<FileNotFoundException>()
+        (await act.Should().ThrowAsync<FileNotFoundException>())
             .WithMessage($"People CSV file '{missingPath}' was not found.");
     }
 
     [Fact(DisplayName = "GetPeopleByDisplayName parses CSV rows and matches keys by display name value")]
     [Trait("Category", "Unit")]
-    public void GetPeopleByDisplayNameWhenCsvIsValidParsesRowsAndSupportsDisplayNameKeyLookup()
+    public async Task GetPeopleByDisplayNameAsyncWhenCsvIsValidParsesRowsAndSupportsDisplayNameKeyLookup()
     {
         // Arrange
         var csvPath = Path.GetTempFileName();
@@ -74,7 +74,7 @@ public sealed class PeopleCsvProviderTests
             var sut = new PeopleCsvProvider(Options.Create(CreateOptions(peopleCsvPath: csvPath)));
 
             // Act
-            var result = sut.GetPeopleByDisplayName();
+            var result = await sut.GetPeopleByDisplayNameAsync();
 
             // Assert
             result.Should().HaveCount(2);
@@ -96,7 +96,7 @@ public sealed class PeopleCsvProviderTests
 
     [Fact(DisplayName = "GetPeopleByDisplayName throws when CSV has invalid structure")]
     [Trait("Category", "Unit")]
-    public void GetPeopleByDisplayNameWhenCsvStructureInvalidThrowsFormatException()
+    public async Task GetPeopleByDisplayNameAsyncWhenCsvStructureInvalidThrowsFormatException()
     {
         // Arrange
         var csvPath = Path.GetTempFileName();
@@ -112,10 +112,10 @@ public sealed class PeopleCsvProviderTests
             var sut = new PeopleCsvProvider(Options.Create(CreateOptions(peopleCsvPath: csvPath)));
 
             // Act
-            Action act = () => _ = sut.GetPeopleByDisplayName();
+            Func<Task> act = () => sut.GetPeopleByDisplayNameAsync();
 
             // Assert
-            act.Should().Throw<FormatException>()
+            (await act.Should().ThrowAsync<FormatException>())
                 .WithMessage("Invalid people CSV format at line 2. Expected 'Name;Grade;Department'.");
         }
         finally

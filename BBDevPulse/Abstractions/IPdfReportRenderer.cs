@@ -11,5 +11,6 @@ public interface IPdfReportRenderer
     /// Renders and saves PDF report.
     /// </summary>
     /// <param name="reportData">Aggregated report data.</param>
-    void RenderReport(ReportData reportData);
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task RenderReportAsync(ReportData reportData, CancellationToken cancellationToken = default);
 }

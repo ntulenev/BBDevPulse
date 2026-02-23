@@ -45,7 +45,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     }
 
     /// <inheritdoc />
-    public void RenderReport(ReportData reportData)
+    public async Task RenderReportAsync(ReportData reportData, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(reportData);
 
@@ -147,7 +147,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             });
         });
 
-        _pdfReportFileStore.Save(outputPath, document);
+        await _pdfReportFileStore.SaveAsync(outputPath, document, cancellationToken).ConfigureAwait(false);
 
         Console.WriteLine($"PDF report saved to: {outputPath}");
     }
