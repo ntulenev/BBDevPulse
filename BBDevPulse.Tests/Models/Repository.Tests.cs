@@ -105,10 +105,10 @@ public sealed class RepositoryTests
     public void MatchesFilterWhenListModeAndSlugMatchesIgnoringCaseReturnsTrue()
     {
         // Arrange
-        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
+        var repository = new Repository(new RepoName("RepositoryName"), new RepoSlug("bbdevpulse-slug"));
         var parameters = CreateReportParameters(
             repoSearchMode: RepoSearchMode.FilterFromTheList,
-            repoNameList: [new RepoName("BBDEVPULSE")]);
+            repoNameList: [new RepoName("BBDEVPULSE-SLUG")]);
 
         // Act
         var result = repository.MatchesFilter(parameters);
@@ -122,7 +122,7 @@ public sealed class RepositoryTests
     public void MatchesFilterWhenListModeAndNameMatchesIgnoringCaseReturnsTrue()
     {
         // Arrange
-        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
+        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("repository-slug"));
         var parameters = CreateReportParameters(
             repoSearchMode: RepoSearchMode.FilterFromTheList,
             repoNameList: [new RepoName("bbdevpulse")]);
@@ -151,31 +151,31 @@ public sealed class RepositoryTests
         result.Should().BeFalse();
     }
 
-    [Fact(DisplayName = "MatchesFilter throws in search-by-filter mode")]
+    [Fact(DisplayName = "MatchesFilter in search-by-filter mode returns true when filter is blank")]
     [Trait("Category", "Unit")]
-    public void MatchesFilterWhenSearchByFilterModeThrowsNotImplementedException()
+    public void MatchesFilterWhenSearchByFilterModeAndFilterIsBlankReturnsTrue()
     {
         // Arrange
         var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
         var parameters = CreateReportParameters(
             repoSearchMode: RepoSearchMode.SearchByFilter,
-            repoNameFilter: "pulse");
+            repoNameFilter: " ");
 
         // Act
-        Action act = () => _ = repository.MatchesFilter(parameters);
+        var result = repository.MatchesFilter(parameters);
 
         // Assert
-        act.Should().Throw<NotImplementedException>();
+        result.Should().BeTrue();
     }
 
-    [Fact(DisplayName = "MatchesFilter in fallback mode applies contains match by name or slug")]
+    [Fact(DisplayName = "MatchesFilter in search-by-filter mode matches repository name by contains (case-insensitive)")]
     [Trait("Category", "Unit")]
-    public void MatchesFilterWhenSearchModeIsUnknownAppliesContainsFilter()
+    public void MatchesFilterWhenSearchByFilterModeAndNameContainsFilterReturnsTrue()
     {
         // Arrange
-        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
+        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("repository-slug"));
         var parameters = CreateReportParameters(
-            repoSearchMode: (RepoSearchMode)999,
+            repoSearchMode: RepoSearchMode.SearchByFilter,
             repoNameFilter: "pulse");
 
         // Act
@@ -185,14 +185,31 @@ public sealed class RepositoryTests
         result.Should().BeTrue();
     }
 
-    [Fact(DisplayName = "MatchesFilter in fallback mode returns false when filter does not match name or slug")]
+    [Fact(DisplayName = "MatchesFilter in search-by-filter mode matches repository slug by contains (case-insensitive)")]
     [Trait("Category", "Unit")]
-    public void MatchesFilterWhenSearchModeIsUnknownAndFilterDoesNotMatchReturnsFalse()
+    public void MatchesFilterWhenSearchByFilterModeAndSlugContainsFilterReturnsTrue()
+    {
+        // Arrange
+        var repository = new Repository(new RepoName("Repository"), new RepoSlug("bbdevpulse-slug"));
+        var parameters = CreateReportParameters(
+            repoSearchMode: RepoSearchMode.SearchByFilter,
+            repoNameFilter: "PULSE");
+
+        // Act
+        var result = repository.MatchesFilter(parameters);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "MatchesFilter in search-by-filter mode returns false when filter does not match name or slug")]
+    [Trait("Category", "Unit")]
+    public void MatchesFilterWhenSearchByFilterModeAndFilterDoesNotMatchReturnsFalse()
     {
         // Arrange
         var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
         var parameters = CreateReportParameters(
-            repoSearchMode: (RepoSearchMode)999,
+            repoSearchMode: RepoSearchMode.SearchByFilter,
             repoNameFilter: "other");
 
         // Act
@@ -202,21 +219,21 @@ public sealed class RepositoryTests
         result.Should().BeFalse();
     }
 
-    [Fact(DisplayName = "MatchesFilter in fallback mode returns true when filter is blank")]
+    [Fact(DisplayName = "MatchesFilter throws when search mode is unknown")]
     [Trait("Category", "Unit")]
-    public void MatchesFilterWhenSearchModeIsUnknownAndFilterIsBlankReturnsTrue()
+    public void MatchesFilterWhenSearchModeIsUnknownThrowsNotImplementedException()
     {
         // Arrange
         var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
         var parameters = CreateReportParameters(
             repoSearchMode: (RepoSearchMode)999,
-            repoNameFilter: " ");
+            repoNameFilter: "pulse");
 
         // Act
-        var result = repository.MatchesFilter(parameters);
+        Action act = () => _ = repository.MatchesFilter(parameters);
 
         // Assert
-        result.Should().BeTrue();
+        act.Should().Throw<NotImplementedException>();
     }
 
     private static ReportParameters CreateReportParameters(
