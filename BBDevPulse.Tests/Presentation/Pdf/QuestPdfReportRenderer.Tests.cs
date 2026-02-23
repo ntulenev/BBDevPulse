@@ -245,7 +245,10 @@ public sealed class QuestPdfReportRendererTests
                 id: new PullRequestId(1),
                 comments: 1,
                 corrections: 10,
-                firstReactionOn: filterDate.AddDays(9)),
+                firstReactionOn: filterDate.AddDays(9),
+                filesChanged: 4,
+                linesAdded: 150,
+                linesRemoved: 50),
             new(
                 repository: "Repo B",
                 repositorySlug: "repo-b",
@@ -259,7 +262,10 @@ public sealed class QuestPdfReportRendererTests
                 id: new PullRequestId(2),
                 comments: 1,
                 corrections: 3,
-                firstReactionOn: filterDate.AddDays(1)),
+                firstReactionOn: filterDate.AddDays(1),
+                filesChanged: 2,
+                linesAdded: 90,
+                linesRemoved: 10),
             new(
                 repository: "Repo C",
                 repositorySlug: "repo-c",
@@ -273,7 +279,27 @@ public sealed class QuestPdfReportRendererTests
                 id: new PullRequestId(3),
                 comments: 1,
                 corrections: 2,
-                firstReactionOn: filterDate.AddDays(7))
+                firstReactionOn: filterDate.AddDays(7),
+                filesChanged: 3,
+                linesAdded: 100,
+                linesRemoved: 20),
+            new(
+                repository: "Repo D",
+                repositorySlug: "repo-d",
+                author: "Dan",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(1),
+                mergedOn: filterDate.AddDays(1),
+                rejectedOn: null,
+                state: PullRequestState.Merged,
+                id: new PullRequestId(4),
+                comments: 1,
+                corrections: 1,
+                firstReactionOn: filterDate.AddDays(1),
+                filesChanged: 8,
+                linesAdded: 500,
+                linesRemoved: 100)
         };
 
         // Act
@@ -285,11 +311,12 @@ public sealed class QuestPdfReportRendererTests
         // Assert
         selections.Select(selection => selection.MetricName)
             .Should()
-            .Equal("Longest Merge Time", "Longest TTFR", "Most Corrections");
+            .Equal("Longest Merge Time", "Longest TTFR", "Most Corrections", "Biggest PR");
         selections[0].Report!.Id.Value.Should().Be(1);
         selections[1].Report!.Id.Value.Should().Be(3);
         selections[2].Report!.Id.Value.Should().Be(2);
-        selections.Select(selection => selection.Report!.Id.Value).Distinct().Should().HaveCount(3);
+        selections[3].Report!.Id.Value.Should().Be(4);
+        selections.Select(selection => selection.Report!.Id.Value).Distinct().Should().HaveCount(4);
     }
 
     private static BitbucketOptions CreateOptions(PdfOptions pdf)

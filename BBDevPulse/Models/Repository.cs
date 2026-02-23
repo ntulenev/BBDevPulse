@@ -57,10 +57,10 @@ public sealed class Repository
                 repoList.Any(entry =>
                     name.Equals(entry.Value, StringComparison.OrdinalIgnoreCase) ||
                     slug.Equals(entry.Value, StringComparison.OrdinalIgnoreCase)),
-            RepoSearchMode.SearchByFilter => throw new NotImplementedException(),
-            _ => string.IsNullOrWhiteSpace(filterValue) ||
+            RepoSearchMode.SearchByFilter => string.IsNullOrWhiteSpace(filterValue) ||
                             name.Contains(filterValue, StringComparison.OrdinalIgnoreCase) ||
-                            slug.Contains(filterValue, StringComparison.OrdinalIgnoreCase)
+                            slug.Contains(filterValue, StringComparison.OrdinalIgnoreCase),
+            _ => throw new NotImplementedException()
         };
     }
 }

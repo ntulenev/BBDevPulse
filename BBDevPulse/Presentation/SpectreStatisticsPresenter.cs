@@ -143,6 +143,42 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
+    public void RenderPullRequestSizeStats(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+        var pullRequestSizes = reportData.Reports
+            .Where(static report => report.HasSizeData)
+            .Select(static report => (double)report.LineChurn)
+            .OrderBy(static value => value)
+            .ToList();
+
+        if (pullRequestSizes.Count == 0)
+        {
+            AnsiConsole.Write(new Rule("PR Size Stats").RuleStyle("grey"));
+            AnsiConsole.MarkupLine("[yellow]No PR size data available in the report.[/]");
+            return;
+        }
+
+        var smallest = pullRequestSizes.First();
+        var biggest = pullRequestSizes.Last();
+        var median = _statisticsCalculator.Percentile(pullRequestSizes, 50);
+        var p75 = _statisticsCalculator.Percentile(pullRequestSizes, 75);
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Churn");
+
+        _ = table.AddRow("Smallest PR", smallest.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Biggest PR", biggest.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(new Rule("PR Size Stats").RuleStyle("grey"));
+        AnsiConsole.Write(table);
+    }
+
+    /// <inheritdoc />
     public void RenderWorstPullRequestsTable(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
@@ -178,10 +214,17 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
+        var sizeCandidates = reportData.Reports
+            .Where(static report => report.HasSizeData)
+            .Select(static report => new MetricCandidate(report, report.LineChurn))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
         var usedPrKeys = new HashSet<string>(StringComparer.Ordinal);
         var longestMerge = SelectDistinctWorst(mergeCandidates, usedPrKeys);
         var longestTtfr = SelectDistinctWorst(ttfrCandidates, usedPrKeys);
         var mostCorrections = SelectDistinctWorst(correctionCandidates, usedPrKeys);
+        var biggestPr = SelectDistinctWorst(sizeCandidates, usedPrKeys);
 
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -208,6 +251,12 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             "Most Corrections",
             mostCorrections,
             candidate => candidate.Value.ToString("0.##", CultureInfo.InvariantCulture));
+
+        AddWorstMetricRow(
+            table,
+            "Biggest PR",
+            biggestPr,
+            candidate => FormatPullRequestSize(candidate.Value));
 
         AnsiConsole.Write(new Rule("Worst PRs by Metric").RuleStyle("grey"));
         AnsiConsole.Write(table);
@@ -292,6 +341,12 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
 
     private string FormatDurationFromDays(double days) =>
         _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(days));
+
+    private static string FormatPullRequestSize(double lineChurn)
+    {
+        var rounded = (int)System.Math.Round(lineChurn, MidpointRounding.AwayFromZero);
+        return $"{rounded.ToString(CultureInfo.InvariantCulture)} ({PullRequestSizeClassifier.Classify(rounded)})";
+    }
 
     private static string BuildPrKey(PullRequestReport report) =>
         $"{report.RepositorySlug}:{report.Id.Value.ToString(CultureInfo.InvariantCulture)}";

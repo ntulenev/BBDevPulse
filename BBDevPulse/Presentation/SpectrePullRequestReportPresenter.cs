@@ -48,6 +48,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
             .AddColumn("Time to Merge")
             .AddColumn("Comments")
             .AddColumn("Corrections")
+            .AddColumn("Size")
             .AddColumn("PR ID");
 
         var index = 1;
@@ -63,6 +64,9 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
                 : "-";
             var ttfr = report.FirstReactionOn.HasValue
                 ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
+                : "-";
+            var size = report.HasSizeData
+                ? $"{report.SizeTier} ({report.LineChurn.ToString(CultureInfo.InvariantCulture)})"
                 : "-";
             var createdCell = report.CreatedOn < filterDate
                 ? $"[red]{report.CreatedOn:yyyy-MM-dd}[/]"
@@ -81,6 +85,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
                 timeToMerge,
                 report.Comments.ToString(CultureInfo.InvariantCulture),
                 report.Corrections.ToString(CultureInfo.InvariantCulture),
+                size,
                 report.Id.Value.ToString(CultureInfo.InvariantCulture)
         );
 

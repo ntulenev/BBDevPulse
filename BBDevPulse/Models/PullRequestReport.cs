@@ -21,6 +21,9 @@ public sealed class PullRequestReport
     /// <param name="comments">Total comment count.</param>
     /// <param name="corrections">Total corrections count.</param>
     /// <param name="firstReactionOn">First non-author reaction timestamp, when available.</param>
+    /// <param name="filesChanged">Total files changed in pull request diffstat.</param>
+    /// <param name="linesAdded">Total added lines in pull request diffstat.</param>
+    /// <param name="linesRemoved">Total removed lines in pull request diffstat.</param>
     public PullRequestReport(
         string repository,
         string repositorySlug,
@@ -34,7 +37,10 @@ public sealed class PullRequestReport
         PullRequestId id,
         int comments,
         int corrections = 0,
-        DateTimeOffset? firstReactionOn = null)
+        DateTimeOffset? firstReactionOn = null,
+        int filesChanged = 0,
+        int linesAdded = 0,
+        int linesRemoved = 0)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(repositorySlug);
@@ -54,6 +60,9 @@ public sealed class PullRequestReport
         Comments = comments;
         Corrections = corrections;
         FirstReactionOn = firstReactionOn;
+        FilesChanged = filesChanged;
+        LinesAdded = linesAdded;
+        LinesRemoved = linesRemoved;
     }
 
     /// <summary>
@@ -120,4 +129,34 @@ public sealed class PullRequestReport
     /// First non-author reaction timestamp, when available.
     /// </summary>
     public DateTimeOffset? FirstReactionOn { get; }
+
+    /// <summary>
+    /// Total changed files in pull request diffstat.
+    /// </summary>
+    public int FilesChanged { get; }
+
+    /// <summary>
+    /// Total added lines in pull request diffstat.
+    /// </summary>
+    public int LinesAdded { get; }
+
+    /// <summary>
+    /// Total removed lines in pull request diffstat.
+    /// </summary>
+    public int LinesRemoved { get; }
+
+    /// <summary>
+    /// Total changed lines (added + removed).
+    /// </summary>
+    public int LineChurn => LinesAdded + LinesRemoved;
+
+    /// <summary>
+    /// Indicates whether size data is available for this pull request.
+    /// </summary>
+    public bool HasSizeData => FilesChanged > 0 || LinesAdded > 0 || LinesRemoved > 0;
+
+    /// <summary>
+    /// Pull request size tier based on churn.
+    /// </summary>
+    public string SizeTier => PullRequestSizeClassifier.Classify(LineChurn);
 }

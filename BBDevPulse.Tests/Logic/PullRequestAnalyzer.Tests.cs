@@ -114,6 +114,7 @@ public sealed class PullRequestAnalyzerTests
             destination: new PullRequestDestination(new PullRequestBranch("develop")));
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client);
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         var activityFetchCalls = 0;
         client.Setup(x => x.GetPullRequestsAsync(
@@ -160,6 +161,7 @@ public sealed class PullRequestAnalyzerTests
             destination: null);
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client);
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
         var analyzeCalls = 0;
         client.Setup(x => x.GetPullRequestsAsync(
@@ -223,6 +225,7 @@ public sealed class PullRequestAnalyzerTests
         var pullRequestStopPredicateCalled = false;
         var activityStopPredicateCalled = false;
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client, new PullRequestSizeSummary(FilesChanged: 7, LinesAdded: 120, LinesRemoved: 30));
         client.Setup(x => x.GetPullRequestsAsync(
                 It.IsAny<Workspace>(),
                 It.IsAny<RepoSlug>(),
@@ -309,6 +312,11 @@ public sealed class PullRequestAnalyzerTests
         report.Comments.Should().Be(6);
         report.Corrections.Should().Be(2);
         report.FirstReactionOn.Should().Be(filterDate.AddHours(3));
+        report.FilesChanged.Should().Be(7);
+        report.LinesAdded.Should().Be(120);
+        report.LinesRemoved.Should().Be(30);
+        report.LineChurn.Should().Be(150);
+        report.SizeTier.Should().Be("S");
 
         var authorKey = new DeveloperKey(new UserUuid("{alice-1}"));
         reportData.DeveloperStats.Should().ContainKey(authorKey);
@@ -343,6 +351,7 @@ public sealed class PullRequestAnalyzerTests
             destination: null);
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client);
         client.Setup(x => x.GetPullRequestsAsync(
                 It.IsAny<Workspace>(),
                 It.IsAny<RepoSlug>(),
@@ -393,6 +402,7 @@ public sealed class PullRequestAnalyzerTests
             destination: null);
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client);
         client.Setup(x => x.GetPullRequestsAsync(
                 It.IsAny<Workspace>(),
                 It.IsAny<RepoSlug>(),
@@ -449,6 +459,7 @@ public sealed class PullRequestAnalyzerTests
             approval: null);
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client);
         client.Setup(x => x.GetPullRequestsAsync(
                 It.IsAny<Workspace>(),
                 It.IsAny<RepoSlug>(),
@@ -530,6 +541,18 @@ public sealed class PullRequestAnalyzerTests
             BindingFlags.Instance | BindingFlags.NonPublic)!;
         field.SetValue(repoName, value);
         return repoName;
+    }
+
+    private void SetupPullRequestSize(
+        Mock<IBitbucketClient> client,
+        PullRequestSizeSummary? sizeSummary = null)
+    {
+        client.Setup(x => x.GetPullRequestSizeAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(sizeSummary ?? PullRequestSizeSummary.Empty);
     }
 
     private static PullRequestAnalyzer CreateAnalyzer(

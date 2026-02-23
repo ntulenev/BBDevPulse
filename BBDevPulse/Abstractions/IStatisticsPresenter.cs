@@ -26,6 +26,12 @@ public interface IStatisticsPresenter
     void RenderCorrectionsStats(ReportData reportData);
 
     /// <summary>
+    /// Renders pull request size statistics.
+    /// </summary>
+    /// <param name="reportData">Report data.</param>
+    void RenderPullRequestSizeStats(ReportData reportData);
+
+    /// <summary>
     /// Renders worst pull requests by metric.
     /// </summary>
     /// <param name="reportData">Report data.</param>

@@ -201,6 +201,78 @@ internal sealed class BitbucketClient : IBitbucketClient
         }
     }
 
+    /// <inheritdoc />
+    public async Task<PullRequestSizeSummary> GetPullRequestSizeAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(repoSlug);
+        ArgumentNullException.ThrowIfNull(pullRequestId);
+
+        try
+        {
+            var pullRequestUri = new Uri(
+                $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}",
+                UriKind.Relative);
+            var pullRequestReference = await GetAsync<PullRequestSizeReferenceDto>(pullRequestUri, cancellationToken)
+                .ConfigureAwait(false);
+
+            var sourceCommitHash = pullRequestReference.Source?.Commit?.Hash;
+            var destinationCommitHash = pullRequestReference.Destination?.Commit?.Hash;
+
+            if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
+                string.IsNullOrWhiteSpace(destinationCommitHash))
+            {
+                return PullRequestSizeSummary.Empty;
+            }
+
+            var diffStatUri = new Uri(
+                $"repositories/{workspace.Value}/{repoSlug.Value}/diffstat/" +
+                $"{workspace.Value}/{repoSlug.Value}:{sourceCommitHash}..{destinationCommitHash}" +
+                $"?topic=true&pagelen={_options.PageLength}",
+                UriKind.Relative);
+
+            return await ReadPullRequestDiffStatAsync(diffStatUri, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return PullRequestSizeSummary.Empty;
+        }
+    }
+
+    private async Task<PullRequestSizeSummary> ReadPullRequestDiffStatAsync(
+        Uri firstPageUri,
+        CancellationToken cancellationToken)
+    {
+        var filesChanged = 0;
+        var linesAdded = 0;
+        var linesRemoved = 0;
+
+        await foreach (var entry in _paginatorHelper.ReadAllAsync(
+            firstPageUri,
+            async (uri, ct) =>
+            {
+                var page = await GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(uri, ct)
+                    .ConfigureAwait(false);
+                return new PaginatedResult<PullRequestDiffStatDto>(
+                    page.Values ?? [],
+                    GetNextUri(page.Next));
+            },
+            null,
+            cancellationToken).ConfigureAwait(false))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            filesChanged++;
+            linesAdded += entry.LinesAdded ?? 0;
+            linesRemoved += entry.LinesRemoved ?? 0;
+        }
+
+        return new PullRequestSizeSummary(filesChanged, linesAdded, linesRemoved);
+    }
+
     private Task<T> GetAsync<T>(Uri url, CancellationToken cancellationToken) =>
         _transport.GetAsync<T>(url, cancellationToken);
 

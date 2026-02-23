@@ -67,7 +67,10 @@ public sealed class SpectrePullRequestReportPresenterTests
             state: PullRequestState.Merged,
             id: new PullRequestId(11),
             comments: 4,
-            firstReactionOn: createdOn.AddMinutes(30)));
+            firstReactionOn: createdOn.AddMinutes(30),
+            filesChanged: 5,
+            linesAdded: 120,
+            linesRemoved: 20));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestTable(reportData, createdOn.AddDays(1)));

@@ -755,6 +755,95 @@ public sealed class BitbucketClientTests
             new DateTimeOffset(2026, 2, 20, 9, 0, 0, TimeSpan.Zero));
     }
 
+    [Fact(DisplayName = "GetPullRequestSizeAsync aggregates files and line counts from commit range diffstat")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestSizeAsyncWhenCommitHashesExistReturnsAggregatedSummary()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.GetAsync<PullRequestSizeReferenceDto>(
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws/repo/pullrequests/7"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PullRequestSizeReferenceDto
+            {
+                Source = new PullRequestEndpointDto
+                {
+                    Commit = new PullRequestCommitHashDto { Hash = "source-hash" }
+                },
+                Destination = new PullRequestEndpointDto
+                {
+                    Commit = new PullRequestCommitHashDto { Hash = "destination-hash" }
+                }
+            });
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    "repositories/ws/repo/diffstat/ws/repo:source-hash..destination-hash?topic=true&pagelen=25"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDiffStatDto>
+            {
+                Values =
+                [
+                    new PullRequestDiffStatDto { LinesAdded = 10, LinesRemoved = 3 },
+                    new PullRequestDiffStatDto { LinesAdded = 5, LinesRemoved = 2 }
+                ],
+                Next = null
+            });
+
+        var client = CreateClient(transport.Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Act
+        var result = await client.GetPullRequestSizeAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            new PullRequestId(7),
+            cancellationToken);
+
+        // Assert
+        result.FilesChanged.Should().Be(2);
+        result.LinesAdded.Should().Be(15);
+        result.LinesRemoved.Should().Be(5);
+        result.LineChurn.Should().Be(20);
+    }
+
+    [Fact(DisplayName = "GetPullRequestSizeAsync returns empty size when diffstat request fails")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestSizeAsyncWhenDiffStatFailsReturnsEmpty()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.GetAsync<PullRequestSizeReferenceDto>(
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws/repo/pullrequests/7"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PullRequestSizeReferenceDto
+            {
+                Source = new PullRequestEndpointDto
+                {
+                    Commit = new PullRequestCommitHashDto { Hash = "source-hash" }
+                },
+                Destination = new PullRequestEndpointDto
+                {
+                    Commit = new PullRequestCommitHashDto { Hash = "destination-hash" }
+                }
+            });
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    "repositories/ws/repo/diffstat/ws/repo:source-hash..destination-hash?topic=true&pagelen=25"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ThrowsAsync(new InvalidOperationException("Bitbucket API request failed (Forbidden): auth"));
+
+        var client = CreateClient(transport.Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Act
+        var result = await client.GetPullRequestSizeAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            new PullRequestId(7),
+            cancellationToken);
+
+        // Assert
+        result.Should().Be(PullRequestSizeSummary.Empty);
+    }
+
     private static BitbucketClient CreateClient(
         IBitbucketTransport transport,
         IBitbucketMapper mapper)

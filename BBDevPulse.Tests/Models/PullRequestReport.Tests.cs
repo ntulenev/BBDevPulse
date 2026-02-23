@@ -104,7 +104,10 @@ public sealed class PullRequestReportTests
             id: id,
             comments: 7,
             corrections: 3,
-            firstReactionOn: firstReactionOn);
+            firstReactionOn: firstReactionOn,
+            filesChanged: 11,
+            linesAdded: 120,
+            linesRemoved: 20);
 
         // Assert
         report.Repository.Should().Be("repo");
@@ -120,6 +123,12 @@ public sealed class PullRequestReportTests
         report.Comments.Should().Be(7);
         report.Corrections.Should().Be(3);
         report.FirstReactionOn.Should().Be(firstReactionOn);
+        report.FilesChanged.Should().Be(11);
+        report.LinesAdded.Should().Be(120);
+        report.LinesRemoved.Should().Be(20);
+        report.LineChurn.Should().Be(140);
+        report.HasSizeData.Should().BeTrue();
+        report.SizeTier.Should().Be("S");
     }
 
     private static PullRequestReport Create(

@@ -130,6 +130,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var mergedOnResolved = analysis.MergedOnFromActivity ?? pr.MergedOn;
         var corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, cancellationToken)
             .ConfigureAwait(false);
+        var sizeSummary = await GetPullRequestSizeSafeAsync(workspace, repo.Slug, pr.Id, cancellationToken)
+            .ConfigureAwait(false);
 
         lock (reportData)
         {
@@ -178,7 +180,10 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 pr.Id,
                 analysis.TotalComments,
                 corrections,
-                analysis.FirstReactionOn));
+                analysis.FirstReactionOn,
+                sizeSummary.FilesChanged,
+                sizeSummary.LinesAdded,
+                sizeSummary.LinesRemoved));
         }
     }
 
@@ -206,6 +211,26 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
 
         return corrections;
+    }
+
+    private async Task<PullRequestSizeSummary> GetPullRequestSizeSafeAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _client.GetPullRequestSizeAsync(
+                workspace,
+                repoSlug,
+                pullRequestId,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            return PullRequestSizeSummary.Empty;
+        }
     }
 
     private readonly IBitbucketClient _client;

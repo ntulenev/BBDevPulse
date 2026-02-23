@@ -123,6 +123,16 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                             .ToList(),
                         "Min Corrections",
                         "Max Corrections");
+                    ComposeCountSection(
+                        column,
+                        "PR Size Stats",
+                        orderedReports
+                            .Where(static report => report.HasSizeData)
+                            .Select(static report => (double)report.LineChurn)
+                            .OrderBy(static value => value)
+                            .ToList(),
+                        "Smallest PR",
+                        "Biggest PR");
                     ComposeWorstPullRequestsSection(column, orderedReports, workspace, excludeWeekend, excludedDays);
                     ComposeDeveloperSection(column, reportData);
                 });
@@ -174,6 +184,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 columns.ConstantColumn(58);
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(50);
+                columns.ConstantColumn(58);
                 columns.ConstantColumn(35);
             });
 
@@ -192,6 +203,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = header.Cell().Element(HeaderCell).Text("Time to Merge");
                 _ = header.Cell().Element(HeaderCell).Text("Comments");
                 _ = header.Cell().Element(HeaderCell).Text("Corrections");
+                _ = header.Cell().Element(HeaderCell).Text("Size");
                 _ = header.Cell().Element(HeaderCell).Text("PR ID");
             });
 
@@ -210,6 +222,9 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     : "-";
                 var ttfr = report.FirstReactionOn.HasValue
                     ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
+                    : "-";
+                var size = report.HasSizeData
+                    ? $"{report.SizeTier} ({report.LineChurn.ToString(CultureInfo.InvariantCulture)})"
                     : "-";
                 var created = report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 if (report.CreatedOn < filterDate)
@@ -233,6 +248,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(timeToMerge);
                 _ = table.Cell().Element(BodyCell).Text(report.Comments.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(report.Corrections.ToString(CultureInfo.InvariantCulture));
+                _ = table.Cell().Element(BodyCell).Text(size);
                 table.Cell().Element(BodyCell).Hyperlink(pullRequestUrl).Text(text =>
                 {
                     text.Span(report.Id.Value.ToString(CultureInfo.InvariantCulture)).FontColor(Colors.Blue.Medium).Underline();
@@ -413,7 +429,9 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(
                     selection.IsDuration
                         ? FormatDuration(selection.Value.Value)
-                        : selection.Value.Value.ToString("0.##", CultureInfo.InvariantCulture));
+                        : selection.IsPullRequestSize
+                            ? FormatPullRequestSize(selection.Value.Value)
+                            : selection.Value.Value.ToString("0.##", CultureInfo.InvariantCulture));
             }
         });
     }
@@ -490,21 +508,35 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
+        var sizeCandidates = reports
+            .Where(static report => report.HasSizeData)
+            .Select(static report => new MetricCandidate(report, report.LineChurn))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
         var usedPrKeys = new HashSet<string>(StringComparer.Ordinal);
         var longestMerge = SelectDistinctWorst(mergeCandidates, usedPrKeys);
         var longestTtfr = SelectDistinctWorst(ttfrCandidates, usedPrKeys);
         var mostCorrections = SelectDistinctWorst(correctionCandidates, usedPrKeys);
+        var biggestPr = SelectDistinctWorst(sizeCandidates, usedPrKeys);
 
         return
         [
-            CreateSelection("Longest Merge Time", longestMerge, isDuration: true),
-            CreateSelection("Longest TTFR", longestTtfr, isDuration: true),
-            CreateSelection("Most Corrections", mostCorrections, isDuration: false)
+            CreateSelection("Longest Merge Time", longestMerge, isDuration: true, isPullRequestSize: false),
+            CreateSelection("Longest TTFR", longestTtfr, isDuration: true, isPullRequestSize: false),
+            CreateSelection("Most Corrections", mostCorrections, isDuration: false, isPullRequestSize: false),
+            CreateSelection("Biggest PR", biggestPr, isDuration: false, isPullRequestSize: true)
         ];
     }
 
     private string FormatDuration(double totalDays) =>
         _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(totalDays));
+
+    private static string FormatPullRequestSize(double lineChurn)
+    {
+        var rounded = (int)System.Math.Round(lineChurn, MidpointRounding.AwayFromZero);
+        return $"{rounded.ToString(CultureInfo.InvariantCulture)} ({PullRequestSizeClassifier.Classify(rounded)})";
+    }
 
     private string FormatDuration(
         DateTimeOffset start,
@@ -535,11 +567,12 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private static WorstMetricSelection CreateSelection(
         string metricName,
         MetricCandidate? candidate,
-        bool isDuration)
+        bool isDuration,
+        bool isPullRequestSize)
     {
         return candidate is null
-            ? new WorstMetricSelection(metricName, null, null, isDuration)
-            : new WorstMetricSelection(metricName, candidate.Value.Report, candidate.Value.Value, isDuration);
+            ? new WorstMetricSelection(metricName, null, null, isDuration, isPullRequestSize)
+            : new WorstMetricSelection(metricName, candidate.Value.Report, candidate.Value.Value, isDuration, isPullRequestSize);
     }
 
     private static string BuildPrKey(PullRequestReport report) =>
@@ -584,7 +617,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         string MetricName,
         PullRequestReport? Report,
         double? Value,
-        bool IsDuration);
+        bool IsDuration,
+        bool IsPullRequestSize);
 
     private readonly record struct MetricCandidate(PullRequestReport Report, double Value);
 }

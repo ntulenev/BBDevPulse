@@ -69,4 +69,18 @@ internal interface IBitbucketClient
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Fetches aggregated pull request size from diffstat.
+    /// </summary>
+    /// <param name="workspace">Workspace identifier.</param>
+    /// <param name="repoSlug">Repository slug.</param>
+    /// <param name="pullRequestId">Pull request identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Aggregated pull request size summary.</returns>
+    Task<PullRequestSizeSummary> GetPullRequestSizeAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        CancellationToken cancellationToken);
 }

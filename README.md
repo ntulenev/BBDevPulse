@@ -13,13 +13,45 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - `FilterFromTheList` -> uses exact matches from `RepoNameList` (name or slug).
 5. Fetches pull requests for each selected repo (open, merged, declined, superseded), sorted by latest updates.
 6. Applies PR time-stop mode (`PrTimeFilterMode`) to stop reading older PR pages earlier.
-7. Fetches PR activity (comments/approvals/updates), aggregates participation and timing stats.
+7. Fetches PR activity (comments/approvals/updates) and PR diffstat size (added/removed lines), then aggregates participation and timing stats.
 8. Renders output tables:
    - Repositories included in analysis
-   - Pull request report
+   - Pull request report (includes `Size` T-shirt metric)
    - Merge-time statistics (best/median/75p/longest)
+   - PR size statistics (smallest/biggest/median/75p by churn)
    - Developer statistics (grade, department, PRs opened, merged, comments, approvals, corrections)
+   - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
 9. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
+
+## PR Size calculation
+PR size is based on Bitbucket `diffstat` between pull request source and destination commits.
+
+For each PR:
+- Resolve `source` and `destination` commit hashes from PR details.
+- Request diffstat for commit range:
+  - `repositories/{workspace}/{repo}/diffstat/{workspace}/{repo}:{sourceHash}..{destinationHash}?topic=true`
+- Aggregate values:
+  - `linesAdded` = sum of `lines_added`
+  - `linesRemoved` = sum of `lines_removed`
+  - `lineChurn` = `linesAdded + linesRemoved`
+
+T-shirt size (`Size`) is derived from `lineChurn`:
+- `XS` -> `<= 100`
+- `S` -> `101..300`
+- `M` -> `301..700`
+- `L` -> `701..1200`
+- `XL` -> `> 1200`
+
+Where size is shown:
+- Pull Requests table: `Size` column in format `Tier (lineChurn)` (example: `M (574)`).
+- PR Size Stats section:
+  - `Smallest PR` = minimum churn
+  - `Biggest PR` = maximum churn
+  - `Median` = 50th percentile churn
+  - `75P` = 75th percentile churn
+- Worst PRs by Metric: `Biggest PR` is the PR with highest churn (distinct selection from other worst metrics).
+
+If diffstat cannot be read for a PR (API error, missing commit hashes), size is treated as unavailable for that PR and excluded from PR-size aggregates.
 
 ## appsettings.json parameters
 All settings are under the `Bitbucket` object.

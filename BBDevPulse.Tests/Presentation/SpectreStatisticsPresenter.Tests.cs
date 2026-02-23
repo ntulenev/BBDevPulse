@@ -320,6 +320,84 @@ public sealed class SpectreStatisticsPresenterTests
         p75Calls.Should().Be(1);
     }
 
+    [Fact(DisplayName = "RenderPullRequestSizeStats throws when report data is null")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestSizeStatsWhenReportDataIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        ReportData reportData = null!;
+
+        // Act
+        Action act = () => presenter.RenderPullRequestSizeStats(reportData);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "RenderPullRequestSizeStats writes no-data message when no PR size data exists")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestSizeStatsWhenNoSizeDataExistsWritesNoDataMessage()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        var reportData = CreateReportData();
+        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestSizeStats(reportData));
+
+        // Assert
+        output.Should().Contain("PR Size Stats");
+        output.Should().Contain("No PR size data available in the report.");
+    }
+
+    [Fact(DisplayName = "RenderPullRequestSizeStats calculates percentiles and renders size metrics")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestSizeStatsWhenDataExistsCalculatesAndRendersMetrics()
+    {
+        // Arrange
+        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
+        var p50Calls = 0;
+        var p75Calls = 0;
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 50))
+            .Callback(() => p50Calls++)
+            .Returns(150.0);
+        statisticsCalculator.Setup(x => x.Percentile(It.IsAny<IReadOnlyList<double>>(), 75))
+            .Callback(() => p75Calls++)
+            .Returns(190.0);
+
+        var presenter = new SpectreStatisticsPresenter(
+            statisticsCalculator.Object,
+            new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
+
+        var reportData = CreateReportData();
+        reportData.Reports.Add(CreateReport(
+            1,
+            mergedOn: null,
+            firstReactionOn: null,
+            filesChanged: 3,
+            linesAdded: 100,
+            linesRemoved: 20));
+        reportData.Reports.Add(CreateReport(
+            2,
+            mergedOn: null,
+            firstReactionOn: null,
+            filesChanged: 5,
+            linesAdded: 180,
+            linesRemoved: 20));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestSizeStats(reportData));
+
+        // Assert
+        output.Should().Contain("PR Size Stats");
+        output.Should().Contain("Smallest PR");
+        output.Should().Contain("Biggest PR");
+        p50Calls.Should().Be(1);
+        p75Calls.Should().Be(1);
+    }
+
     [Fact(DisplayName = "RenderWorstPullRequestsTable throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderWorstPullRequestsTableWhenReportDataIsNullThrowsArgumentNullException()
@@ -373,7 +451,10 @@ public sealed class SpectreStatisticsPresenterTests
             corrections: 10,
             repository: "RepoA",
             repositorySlug: "repoa",
-            author: "Alice"));
+            author: "Alice",
+            filesChanged: 4,
+            linesAdded: 150,
+            linesRemoved: 50));
         reportData.Reports.Add(CreateReport(
             id: 2,
             mergedOn: BaseDate.AddDays(8),
@@ -381,7 +462,10 @@ public sealed class SpectreStatisticsPresenterTests
             corrections: 1,
             repository: "RepoB",
             repositorySlug: "repob",
-            author: "Bob"));
+            author: "Bob",
+            filesChanged: 3,
+            linesAdded: 100,
+            linesRemoved: 20));
         reportData.Reports.Add(CreateReport(
             id: 3,
             mergedOn: BaseDate.AddDays(2),
@@ -389,7 +473,21 @@ public sealed class SpectreStatisticsPresenterTests
             corrections: 2,
             repository: "RepoC",
             repositorySlug: "repoc",
-            author: "Carol"));
+            author: "Carol",
+            filesChanged: 2,
+            linesAdded: 90,
+            linesRemoved: 10));
+        reportData.Reports.Add(CreateReport(
+            id: 4,
+            mergedOn: BaseDate.AddDays(1),
+            firstReactionOn: BaseDate.AddDays(1),
+            corrections: 0,
+            repository: "RepoD",
+            repositorySlug: "repod",
+            author: "Dan",
+            filesChanged: 8,
+            linesAdded: 500,
+            linesRemoved: 100));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderWorstPullRequestsTable(reportData));
@@ -399,11 +497,14 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("Longest Merge Time");
         output.Should().Contain("Longest TTFR");
         output.Should().Contain("Most Corrections");
+        output.Should().Contain("Biggest PR");
         output.Should().Contain("RepoA");
         output.Should().Contain("RepoC");
         output.Should().Contain("RepoB");
+        output.Should().Contain("RepoD");
         output.IndexOf("RepoA", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("RepoC", StringComparison.Ordinal));
         output.IndexOf("RepoC", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("RepoB", StringComparison.Ordinal));
+        output.IndexOf("RepoB", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("RepoD", StringComparison.Ordinal));
     }
 
     [Fact(DisplayName = "RenderDeveloperStatsTable throws when report data is null")]
@@ -492,7 +593,10 @@ public sealed class SpectreStatisticsPresenterTests
         int corrections = 0,
         string repository = "RepoA",
         string repositorySlug = "repoa",
-        string author = "Alice")
+        string author = "Alice",
+        int filesChanged = 0,
+        int linesAdded = 0,
+        int linesRemoved = 0)
     {
         return new PullRequestReport(
             repository: repository,
@@ -507,7 +611,10 @@ public sealed class SpectreStatisticsPresenterTests
             id: new PullRequestId(id),
             comments: 0,
             corrections: corrections,
-            firstReactionOn: firstReactionOn);
+            firstReactionOn: firstReactionOn,
+            filesChanged: filesChanged,
+            linesAdded: linesAdded,
+            linesRemoved: linesRemoved);
     }
 
     private static readonly DateTimeOffset BaseDate = new(2026, 2, 20, 10, 0, 0, TimeSpan.Zero);
