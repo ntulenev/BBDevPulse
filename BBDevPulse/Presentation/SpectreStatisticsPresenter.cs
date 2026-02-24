@@ -146,9 +146,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     public void RenderPullRequestSizeStats(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
+        var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var pullRequestSizes = reportData.Reports
-            .Where(static report => report.HasSizeData)
-            .Select(static report => (double)report.LineChurn)
+            .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
+            .Select(report => (double)report.GetSizeMetricValue(pullRequestSizeMode))
             .OrderBy(static value => value)
             .ToList();
 
@@ -167,7 +168,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("Metric")
-            .AddColumn("Churn");
+            .AddColumn(GetPullRequestSizeMetricLabel(pullRequestSizeMode));
 
         _ = table.AddRow("Smallest PR", smallest.ToString("0.##", CultureInfo.InvariantCulture));
         _ = table.AddRow("Biggest PR", biggest.ToString("0.##", CultureInfo.InvariantCulture));
@@ -182,6 +183,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     public void RenderWorstPullRequestsTable(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
+        var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
 
         if (reportData.Reports.Count == 0)
         {
@@ -215,8 +217,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .ToList();
 
         var sizeCandidates = reportData.Reports
-            .Where(static report => report.HasSizeData)
-            .Select(static report => new MetricCandidate(report, report.LineChurn))
+            .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
+            .Select(report => new MetricCandidate(report, report.GetSizeMetricValue(pullRequestSizeMode)))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
@@ -256,7 +258,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             table,
             "Biggest PR",
             biggestPr,
-            candidate => FormatPullRequestSize(candidate.Value));
+            candidate => FormatPullRequestSize(candidate.Value, pullRequestSizeMode));
 
         AnsiConsole.Write(new Rule("Worst PRs by Metric").RuleStyle("grey"));
         AnsiConsole.Write(table);
@@ -342,10 +344,20 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     private string FormatDurationFromDays(double days) =>
         _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(days));
 
-    private static string FormatPullRequestSize(double lineChurn)
+    private static string GetPullRequestSizeMetricLabel(PullRequestSizeMode mode)
     {
-        var rounded = (int)System.Math.Round(lineChurn, MidpointRounding.AwayFromZero);
-        return $"{rounded.ToString(CultureInfo.InvariantCulture)} ({PullRequestSizeClassifier.Classify(rounded)})";
+        return mode switch
+        {
+            PullRequestSizeMode.Lines => "Churn",
+            PullRequestSizeMode.Files => "Files",
+            _ => "Churn"
+        };
+    }
+
+    private static string FormatPullRequestSize(double value, PullRequestSizeMode mode)
+    {
+        var rounded = (int)System.Math.Round(value, MidpointRounding.AwayFromZero);
+        return $"{rounded.ToString(CultureInfo.InvariantCulture)} ({PullRequestSizeClassifier.Classify(rounded, mode)})";
     }
 
     private static string BuildPrKey(PullRequestReport report) =>

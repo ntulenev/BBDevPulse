@@ -337,6 +337,63 @@ public sealed class QuestPdfReportRendererTests
         selections.Select(selection => selection.Report!.Id.Value).Distinct().Should().HaveCount(4);
     }
 
+    [Fact(DisplayName = "BuildWorstMetricSelections uses files metric for biggest PR in files mode")]
+    [Trait("Category", "Unit")]
+    public void BuildWorstMetricSelectionsWhenFilesModeConfiguredUsesFilesMetricForBiggestPr()
+    {
+        // Arrange
+        var filterDate = CreateParameters().FilterDate;
+        var reports = new List<PullRequestReport>
+        {
+            new(
+                repository: "Repo A",
+                repositorySlug: "repo-a",
+                author: "Alice",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(1),
+                mergedOn: null,
+                rejectedOn: null,
+                state: PullRequestState.Open,
+                id: new PullRequestId(1),
+                comments: 1,
+                corrections: 10,
+                firstReactionOn: null,
+                filesChanged: 2,
+                linesAdded: 900,
+                linesRemoved: 500),
+            new(
+                repository: "Repo B",
+                repositorySlug: "repo-b",
+                author: "Bob",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(1),
+                mergedOn: null,
+                rejectedOn: null,
+                state: PullRequestState.Open,
+                id: new PullRequestId(2),
+                comments: 1,
+                corrections: 1,
+                firstReactionOn: null,
+                filesChanged: 12,
+                linesAdded: 50,
+                linesRemoved: 10)
+        };
+
+        // Act
+        var selections = QuestPdfReportRenderer.BuildWorstMetricSelections(
+            reports,
+            excludeWeekend: false,
+            excludedDays: new HashSet<DateOnly>(),
+            pullRequestSizeMode: PullRequestSizeMode.Files);
+
+        // Assert
+        selections[3].MetricName.Should().Be("Biggest PR");
+        selections[3].Report!.Id.Value.Should().Be(2);
+        selections[3].Value.Should().Be(12);
+    }
+
     private static BitbucketOptions CreateOptions(PdfOptions pdf)
     {
         return new BitbucketOptions

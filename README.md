@@ -18,13 +18,14 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - Repositories included in analysis
    - Pull request report (includes `Size` T-shirt metric)
    - Merge-time statistics (best/median/75p/longest)
-   - PR size statistics (smallest/biggest/median/75p by churn)
+   - PR size statistics (smallest/biggest/median/75p by selected size mode)
    - Developer statistics (grade, department, PRs opened, merged, comments, approvals, corrections)
    - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
 9. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
 
 ## PR Size calculation
 PR size is based on Bitbucket `diffstat` between pull request source and destination commits.
+The metric used for T-shirt sizing is controlled by `PullRequestSizeMode`.
 
 For each PR:
 - Resolve `source` and `destination` commit hashes from PR details.
@@ -35,6 +36,7 @@ For each PR:
   - `linesRemoved` = sum of `lines_removed`
   - `lineChurn` = `linesAdded + linesRemoved`
 
+### `PullRequestSizeMode = Lines` (default)
 T-shirt size (`Size`) is derived from `lineChurn`:
 - `XS` -> `<= 100`
 - `S` -> `101..300`
@@ -42,14 +44,22 @@ T-shirt size (`Size`) is derived from `lineChurn`:
 - `L` -> `701..1200`
 - `XL` -> `> 1200`
 
+### `PullRequestSizeMode = Files`
+T-shirt size (`Size`) is derived from `filesChanged`:
+- `XS` -> `<= 2`
+- `S` -> `3..5`
+- `M` -> `6..10`
+- `L` -> `11..20`
+- `XL` -> `> 20`
+
 Where size is shown:
-- Pull Requests table: `Size` column in format `Tier (lineChurn)` (example: `M (574)`).
+- Pull Requests table: `Size` column in format `Tier (value)` where value is `lineChurn` (Lines mode) or `filesChanged` (Files mode).
 - PR Size Stats section:
-  - `Smallest PR` = minimum churn
-  - `Biggest PR` = maximum churn
-  - `Median` = 50th percentile churn
-  - `75P` = 75th percentile churn
-- Worst PRs by Metric: `Biggest PR` is the PR with highest churn (distinct selection from other worst metrics).
+  - `Smallest PR` = minimum value for selected mode
+  - `Biggest PR` = maximum value for selected mode
+  - `Median` = 50th percentile value for selected mode
+  - `75P` = 75th percentile value for selected mode
+- Worst PRs by Metric: `Biggest PR` is the PR with highest value for selected mode (distinct selection from other worst metrics).
 
 If diffstat cannot be read for a PR (API error, missing commit hashes), size is treated as unavailable for that PR and excluded from PR-size aggregates.
 
@@ -70,6 +80,9 @@ All settings are under the `Bitbucket` object.
   - `LastKnownUpdateAndCreated` (default behavior): stop PR paging when both
     `lastKnownUpdate` and `createdOn` are older than `filterDate`.
   - `CreatedOnOnly`: stop PR paging when `createdOn` is older than `filterDate`.
+- `PullRequestSizeMode` (`string` enum):
+  - `Lines` (default): PR size metric is `lineChurn = linesAdded + linesRemoved`.
+  - `Files`: PR size metric is number of changed files.
 - `ExcludeWeekend` (`bool`): Excludes Saturdays and Sundays from time-based metrics (TTFR, time-to-merge, open PR age).
 - `ExcludedDays` (`string[]`): Optional explicit holidays/non-working days excluded from time-based metrics.
   Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
@@ -94,6 +107,7 @@ All settings are under the `Bitbucket` object.
     "AppPassword": "your-app-password",
     "RepoSearchMode": "FilterFromTheList",
     "PrTimeFilterMode": "LastKnownUpdateAndCreated",
+    "PullRequestSizeMode": "Lines",
     "ExcludeWeekend": false,
     "ExcludedDays": [
       "01.01.2026",

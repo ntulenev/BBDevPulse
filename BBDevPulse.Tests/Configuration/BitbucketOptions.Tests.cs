@@ -26,6 +26,7 @@ public sealed class BitbucketOptionsTests
             BranchNameList = ["main", "", "develop", " "],
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            PullRequestSizeMode = PullRequestSizeMode.Files,
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026", "2026-02-04", " ", "", "03.02.2026"],
             Pdf = new PdfOptions { Enabled = false, OutputPath = "report.pdf" }
@@ -45,6 +46,7 @@ public sealed class BitbucketOptionsTests
         parameters.BranchNameList.Select(name => name.Value).Should().Equal("main", "develop");
         parameters.RepoSearchMode.Should().Be(RepoSearchMode.FilterFromTheList);
         parameters.PrTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
+        parameters.PullRequestSizeMode.Should().Be(PullRequestSizeMode.Files);
         parameters.ExcludeWeekend.Should().BeTrue();
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 3));
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 4));
@@ -79,6 +81,7 @@ public sealed class BitbucketOptionsTests
         // Assert
         parameters.RepoNameList.Should().BeEmpty();
         parameters.BranchNameList.Should().BeEmpty();
+        parameters.PullRequestSizeMode.Should().Be(PullRequestSizeMode.Lines);
     }
 
     [Fact(DisplayName = "Bitbucket options expose configured property values")]
@@ -105,6 +108,7 @@ public sealed class BitbucketOptionsTests
             BranchNameList = ["main"],
             RepoSearchMode = RepoSearchMode.SearchByFilter,
             PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            PullRequestSizeMode = PullRequestSizeMode.Files,
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026"],
             PeopleCsvPath = "people.csv",
@@ -124,6 +128,7 @@ public sealed class BitbucketOptionsTests
         var branchNameList = options.BranchNameList;
         var repoSearchMode = options.RepoSearchMode;
         var prTimeFilterMode = options.PrTimeFilterMode;
+        var pullRequestSizeMode = options.PullRequestSizeMode;
         var excludeWeekend = options.ExcludeWeekend;
         var excludedDays = options.ExcludedDays;
         var peopleCsvPath = options.PeopleCsvPath;
@@ -142,6 +147,7 @@ public sealed class BitbucketOptionsTests
         branchNameList.Should().Equal("main");
         repoSearchMode.Should().Be(RepoSearchMode.SearchByFilter);
         prTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
+        pullRequestSizeMode.Should().Be(PullRequestSizeMode.Files);
         excludeWeekend.Should().BeTrue();
         excludedDays.Should().Equal("03.02.2026");
         peopleCsvPath.Should().Be("people.csv");
@@ -167,6 +173,7 @@ public sealed class BitbucketOptionsTests
             BranchNameList = ["main"],
             RepoSearchMode = RepoSearchMode.SearchByFilter,
             PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            PullRequestSizeMode = PullRequestSizeMode.Files,
             ExcludedDays = ["02/03/2026"],
             Pdf = new PdfOptions()
         };

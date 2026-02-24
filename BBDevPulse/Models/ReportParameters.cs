@@ -19,6 +19,7 @@ public sealed class ReportParameters
     /// <param name="branchNameList">Target branch filter list.</param>
     /// <param name="excludeWeekend">Whether to exclude weekends in duration calculations.</param>
     /// <param name="excludedDays">Optional list of excluded days.</param>
+    /// <param name="pullRequestSizeMode">Pull request size mode.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -28,7 +29,8 @@ public sealed class ReportParameters
         PrTimeFilterMode prTimeFilterMode,
         IReadOnlyList<BranchName> branchNameList,
         bool excludeWeekend = false,
-        IReadOnlyList<DateOnly>? excludedDays = null)
+        IReadOnlyList<DateOnly>? excludedDays = null,
+        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -43,6 +45,7 @@ public sealed class ReportParameters
         PrTimeFilterMode = prTimeFilterMode;
         BranchNameList = branchNameList;
         ExcludeWeekend = excludeWeekend;
+        PullRequestSizeMode = pullRequestSizeMode;
         ExcludedDays = excludedDays is null
             ? new HashSet<DateOnly>().ToFrozenSet()
             : new HashSet<DateOnly>(excludedDays).ToFrozenSet();
@@ -87,6 +90,11 @@ public sealed class ReportParameters
     /// Gets whether to exclude weekends in duration calculations.
     /// </summary>
     public bool ExcludeWeekend { get; }
+
+    /// <summary>
+    /// Gets pull request size mode.
+    /// </summary>
+    public PullRequestSizeMode PullRequestSizeMode { get; }
 
     /// <summary>
     /// Gets optional list of excluded days.

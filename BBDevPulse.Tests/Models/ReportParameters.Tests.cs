@@ -112,7 +112,8 @@ public sealed class ReportParametersTests
             PrTimeFilterMode.LastKnownUpdateAndCreated,
             branchNameList,
             excludeWeekend: true,
-            excludedDays: excludedDays);
+            excludedDays: excludedDays,
+            pullRequestSizeMode: PullRequestSizeMode.Files);
 
         // Assert
         parameters.FilterDate.Should().Be(filterDate);
@@ -124,6 +125,7 @@ public sealed class ReportParametersTests
         parameters.BranchNameList.Should().BeSameAs(branchNameList);
         parameters.ExcludeWeekend.Should().BeTrue();
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 22));
+        parameters.PullRequestSizeMode.Should().Be(PullRequestSizeMode.Files);
     }
 
 }

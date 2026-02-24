@@ -398,6 +398,51 @@ public sealed class SpectreStatisticsPresenterTests
         p75Calls.Should().Be(1);
     }
 
+    [Fact(DisplayName = "RenderPullRequestSizeStats uses file counts in files mode")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestSizeStatsWhenFilesModeConfiguredUsesFilesMetric()
+    {
+        // Arrange
+        IReadOnlyList<double>? capturedValues = null;
+        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
+        statisticsCalculator
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
+            .Callback<IReadOnlyList<double>, int>((values, _) => capturedValues = values)
+            .Returns(4.0);
+        statisticsCalculator
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
+            .Returns(9.0);
+
+        var presenter = new SpectreStatisticsPresenter(
+            statisticsCalculator.Object,
+            new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
+
+        var reportData = CreateReportData(pullRequestSizeMode: PullRequestSizeMode.Files);
+        reportData.Reports.Add(CreateReport(
+            id: 1,
+            mergedOn: null,
+            firstReactionOn: null,
+            filesChanged: 4,
+            linesAdded: 1000,
+            linesRemoved: 400));
+        reportData.Reports.Add(CreateReport(
+            id: 2,
+            mergedOn: null,
+            firstReactionOn: null,
+            filesChanged: 9,
+            linesAdded: 3000,
+            linesRemoved: 700));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestSizeStats(reportData));
+
+        // Assert
+        output.Should().Contain("PR Size Stats");
+        output.Should().Contain("Files");
+        capturedValues.Should().NotBeNull();
+        capturedValues!.Should().Equal(4.0, 9.0);
+    }
+
     [Fact(DisplayName = "RenderWorstPullRequestsTable throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderWorstPullRequestsTableWhenReportDataIsNullThrowsArgumentNullException()
@@ -507,6 +552,53 @@ public sealed class SpectreStatisticsPresenterTests
         output.IndexOf("RepoB", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("RepoD", StringComparison.Ordinal));
     }
 
+    [Fact(DisplayName = "RenderWorstPullRequestsTable uses files metric for biggest PR in files mode")]
+    [Trait("Category", "Unit")]
+    public void RenderWorstPullRequestsTableWhenFilesModeConfiguredUsesFilesMetricForBiggestPr()
+    {
+        // Arrange
+        var dateDiffFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        dateDiffFormatter
+            .Setup(x => x.Format(It.Is<DateTimeOffset>(start => IsMinValueStart(start)), It.Is<DateTimeOffset>(end => IsNonNegativeDurationEnd(end))))
+            .Returns("formatted");
+
+        var presenter = new SpectreStatisticsPresenter(
+            new Mock<IStatisticsCalculator>(MockBehavior.Strict).Object,
+            dateDiffFormatter.Object);
+
+        var reportData = CreateReportData(pullRequestSizeMode: PullRequestSizeMode.Files);
+        reportData.Reports.Add(CreateReport(
+            id: 11,
+            mergedOn: null,
+            firstReactionOn: null,
+            corrections: 10,
+            repository: "RepoCorrections",
+            repositorySlug: "repo-corrections",
+            author: "Alice",
+            filesChanged: 2,
+            linesAdded: 3000,
+            linesRemoved: 700));
+        reportData.Reports.Add(CreateReport(
+            id: 12,
+            mergedOn: null,
+            firstReactionOn: null,
+            corrections: 1,
+            repository: "RepoFilesBiggest",
+            repositorySlug: "repo-files-biggest",
+            author: "Bob",
+            filesChanged: 12,
+            linesAdded: 100,
+            linesRemoved: 20));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderWorstPullRequestsTable(reportData));
+
+        // Assert
+        output.Should().Contain("Biggest PR");
+        output.Should().Contain("RepoFilesBiggest");
+        output.Should().Contain("12 (L)");
+    }
+
     [Fact(DisplayName = "RenderDeveloperStatsTable throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderDeveloperStatsTableWhenReportDataIsNullThrowsArgumentNullException()
@@ -572,7 +664,8 @@ public sealed class SpectreStatisticsPresenterTests
 
     private static ReportData CreateReportData(
         bool excludeWeekend = false,
-        IReadOnlyList<DateOnly>? excludedDays = null)
+        IReadOnlyList<DateOnly>? excludedDays = null,
+        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines)
     {
         return new ReportData(new ReportParameters(
             BaseDate,
@@ -583,7 +676,8 @@ public sealed class SpectreStatisticsPresenterTests
             PrTimeFilterMode.CreatedOnOnly,
             [],
             excludeWeekend,
-            excludedDays));
+            excludedDays,
+            pullRequestSizeMode));
     }
 
     private static PullRequestReport CreateReport(

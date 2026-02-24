@@ -129,6 +129,12 @@ public sealed class PullRequestReportTests
         report.LineChurn.Should().Be(140);
         report.HasSizeData.Should().BeTrue();
         report.SizeTier.Should().Be("S");
+        report.GetSizeMetricValue(PullRequestSizeMode.Lines).Should().Be(140);
+        report.GetSizeTier(PullRequestSizeMode.Lines).Should().Be("S");
+        report.GetSizeMetricValue(PullRequestSizeMode.Files).Should().Be(11);
+        report.GetSizeTier(PullRequestSizeMode.Files).Should().Be("L");
+        report.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().BeTrue();
+        report.HasSizeDataForMode(PullRequestSizeMode.Files).Should().BeTrue();
     }
 
     private static PullRequestReport Create(

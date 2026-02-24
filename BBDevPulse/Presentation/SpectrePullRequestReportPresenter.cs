@@ -31,6 +31,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
         DateTimeOffset filterDate)
     {
         ArgumentNullException.ThrowIfNull(reportData);
+        var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
         var table = new Table()
@@ -65,9 +66,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
             var ttfr = report.FirstReactionOn.HasValue
                 ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
                 : "-";
-            var size = report.HasSizeData
-                ? $"{report.SizeTier} ({report.LineChurn.ToString(CultureInfo.InvariantCulture)})"
-                : "-";
+            var size = FormatPullRequestSize(report, pullRequestSizeMode);
             var createdCell = report.CreatedOn < filterDate
                 ? $"[red]{report.CreatedOn:yyyy-MM-dd}[/]"
                 : report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -94,6 +93,20 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
 
         AnsiConsole.Write(new Rule("Pull Requests").RuleStyle("grey"));
         AnsiConsole.Write(table);
+    }
+
+    private static string FormatPullRequestSize(
+        PullRequestReport report,
+        PullRequestSizeMode sizeMode)
+    {
+        if (!report.HasSizeDataForMode(sizeMode))
+        {
+            return "-";
+        }
+
+        var sizeValue = report.GetSizeMetricValue(sizeMode);
+        var tier = report.GetSizeTier(sizeMode);
+        return $"{tier} ({sizeValue.ToString(CultureInfo.InvariantCulture)})";
     }
 
     private string FormatDuration(

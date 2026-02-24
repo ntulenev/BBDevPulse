@@ -25,4 +25,24 @@ public sealed class PullRequestSizeClassifierTests
         // Assert
         result.Should().Be(expected);
     }
+
+    [Theory(DisplayName = "Classify maps file ranges to expected T-shirt sizes in files mode")]
+    [InlineData(0, "XS")]
+    [InlineData(2, "XS")]
+    [InlineData(3, "S")]
+    [InlineData(5, "S")]
+    [InlineData(6, "M")]
+    [InlineData(10, "M")]
+    [InlineData(11, "L")]
+    [InlineData(20, "L")]
+    [InlineData(21, "XL")]
+    [Trait("Category", "Unit")]
+    public void ClassifyWhenFilesModeIsUsedReturnsExpectedLabel(int filesChanged, string expected)
+    {
+        // Act
+        var result = PullRequestSizeClassifier.Classify(filesChanged, PullRequestSizeMode.Files);
+
+        // Assert
+        result.Should().Be(expected);
+    }
 }

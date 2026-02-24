@@ -216,10 +216,53 @@ public sealed class SpectrePullRequestReportPresenterTests
         formattedDurations.Should().OnlyContain(days => days == 1.0);
     }
 
+    [Fact(DisplayName = "RenderPullRequestTable uses files metric for size column in files mode")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestTableWhenFilesModeIsConfiguredUsesFilesForSize()
+    {
+        // Arrange
+        var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        formatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
+            .Returns("formatted");
+
+        var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
+        var createdOn = new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateReportParameters(
+            createdOn.AddDays(-1),
+            pullRequestSizeMode: PullRequestSizeMode.Files));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoA",
+            repositorySlug: "repoa",
+            author: "Alice",
+            targetBranch: "develop",
+            createdOn: createdOn,
+            lastActivity: createdOn.AddHours(1),
+            mergedOn: createdOn.AddHours(2),
+            rejectedOn: null,
+            state: PullRequestState.Merged,
+            id: new PullRequestId(51),
+            comments: 1,
+            firstReactionOn: createdOn.AddMinutes(30),
+            filesChanged: 6,
+            linesAdded: 1000,
+            linesRemoved: 500));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestTable(reportData, createdOn.AddDays(-2)));
+
+        // Assert
+        output.Should().Contain("M");
+        output.Should().Contain("(6");
+        output.Should().NotContain("1500");
+    }
+
     private static ReportParameters CreateReportParameters(
         DateTimeOffset filterDate,
         bool excludeWeekend = false,
-        IReadOnlyList<DateOnly>? excludedDays = null)
+        IReadOnlyList<DateOnly>? excludedDays = null,
+        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines)
     {
         return new ReportParameters(
             filterDate,
@@ -230,6 +273,7 @@ public sealed class SpectrePullRequestReportPresenterTests
             PrTimeFilterMode.CreatedOnOnly,
             [],
             excludeWeekend,
-            excludedDays);
+            excludedDays,
+            pullRequestSizeMode);
     }
 }

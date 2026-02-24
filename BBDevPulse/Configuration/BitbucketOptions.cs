@@ -75,6 +75,11 @@ public sealed class BitbucketOptions
     public required Models.PrTimeFilterMode PrTimeFilterMode { get; init; }
 
     /// <summary>
+    /// Pull request size mode (lines or files).
+    /// </summary>
+    public Models.PullRequestSizeMode PullRequestSizeMode { get; init; } = Models.PullRequestSizeMode.Lines;
+
+    /// <summary>
     /// Whether to exclude weekends from duration-based metrics.
     /// </summary>
     public bool ExcludeWeekend { get; init; }
@@ -126,7 +131,8 @@ public sealed class BitbucketOptions
             PrTimeFilterMode,
             branchNameList,
             ExcludeWeekend,
-            excludedDays);
+            excludedDays,
+            PullRequestSizeMode);
     }
 
     private static DateOnly ParseExcludedDay(string value)

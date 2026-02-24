@@ -159,4 +159,42 @@ public sealed class PullRequestReport
     /// Pull request size tier based on churn.
     /// </summary>
     public string SizeTier => PullRequestSizeClassifier.Classify(LineChurn);
+
+    /// <summary>
+    /// Indicates whether size data is available for the selected size mode.
+    /// </summary>
+    /// <param name="mode">Pull request size mode.</param>
+    /// <returns><see langword="true"/> when size data can be rendered.</returns>
+    public bool HasSizeDataForMode(PullRequestSizeMode mode)
+    {
+        return mode switch
+        {
+            PullRequestSizeMode.Lines => HasSizeData,
+            PullRequestSizeMode.Files => FilesChanged > 0,
+            _ => HasSizeData
+        };
+    }
+
+    /// <summary>
+    /// Gets size metric value for the selected size mode.
+    /// </summary>
+    /// <param name="mode">Pull request size mode.</param>
+    /// <returns>Size metric value.</returns>
+    public int GetSizeMetricValue(PullRequestSizeMode mode)
+    {
+        return mode switch
+        {
+            PullRequestSizeMode.Lines => LineChurn,
+            PullRequestSizeMode.Files => FilesChanged,
+            _ => LineChurn
+        };
+    }
+
+    /// <summary>
+    /// Gets pull request size tier for the selected size mode.
+    /// </summary>
+    /// <param name="mode">Pull request size mode.</param>
+    /// <returns>T-shirt size label.</returns>
+    public string GetSizeTier(PullRequestSizeMode mode) =>
+        PullRequestSizeClassifier.Classify(GetSizeMetricValue(mode), mode);
 }

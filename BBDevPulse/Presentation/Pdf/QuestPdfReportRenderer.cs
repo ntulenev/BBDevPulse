@@ -61,6 +61,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         var filterDate = reportData.Parameters.FilterDate;
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
+        var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var workspace = reportData.Parameters.Workspace.Value;
 
         QuestPDF.Settings.License = QLicenseType.Community;
@@ -93,7 +94,14 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 page.Content().PaddingTop(8).Column(column =>
                 {
                     column.Spacing(8);
-                    ComposePullRequestSection(column, orderedReports, filterDate, workspace, excludeWeekend, excludedDays);
+                    ComposePullRequestSection(
+                        column,
+                        orderedReports,
+                        filterDate,
+                        workspace,
+                        excludeWeekend,
+                        excludedDays,
+                        pullRequestSizeMode);
                     ComposeDurationSection(
                         column,
                         "Merge Time Stats",
@@ -127,13 +135,20 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         column,
                         "PR Size Stats",
                         orderedReports
-                            .Where(static report => report.HasSizeData)
-                            .Select(static report => (double)report.LineChurn)
+                            .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
+                            .Select(report => (double)report.GetSizeMetricValue(pullRequestSizeMode))
                             .OrderBy(static value => value)
                             .ToList(),
                         "Smallest PR",
-                        "Biggest PR");
-                    ComposeWorstPullRequestsSection(column, orderedReports, workspace, excludeWeekend, excludedDays);
+                        "Biggest PR",
+                        GetPullRequestSizeMetricLabel(pullRequestSizeMode));
+                    ComposeWorstPullRequestsSection(
+                        column,
+                        orderedReports,
+                        workspace,
+                        excludeWeekend,
+                        excludedDays,
+                        pullRequestSizeMode);
                     ComposeDeveloperSection(column, reportData);
                 });
 
@@ -158,7 +173,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         DateTimeOffset filterDate,
         string workspace,
         bool excludeWeekend,
-        IReadOnlySet<DateOnly> excludedDays)
+        IReadOnlySet<DateOnly> excludedDays,
+        PullRequestSizeMode pullRequestSizeMode)
     {
         _ = column.Item().Text("Pull Requests").Bold().FontSize(12);
         if (reports.Count == 0)
@@ -223,9 +239,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 var ttfr = report.FirstReactionOn.HasValue
                     ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
                     : "-";
-                var size = report.HasSizeData
-                    ? $"{report.SizeTier} ({report.LineChurn.ToString(CultureInfo.InvariantCulture)})"
-                    : "-";
+                var size = FormatPullRequestSize(report, pullRequestSizeMode);
                 var created = report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 if (report.CreatedOn < filterDate)
                 {
@@ -371,7 +385,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         List<PullRequestReport> reports,
         string workspace,
         bool excludeWeekend,
-        IReadOnlySet<DateOnly> excludedDays)
+        IReadOnlySet<DateOnly> excludedDays,
+        PullRequestSizeMode pullRequestSizeMode)
     {
         _ = column.Item().Text("Worst PRs by Metric").Bold().FontSize(12);
         if (reports.Count == 0)
@@ -380,7 +395,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             return;
         }
 
-        var selections = BuildWorstMetricSelections(reports, excludeWeekend, excludedDays);
+        var selections = BuildWorstMetricSelections(reports, excludeWeekend, excludedDays, pullRequestSizeMode);
         column.Item().Table(table =>
         {
             table.ColumnsDefinition(columns =>
@@ -430,7 +445,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     selection.IsDuration
                         ? FormatDuration(selection.Value.Value)
                         : selection.IsPullRequestSize
-                            ? FormatPullRequestSize(selection.Value.Value)
+                            ? FormatPullRequestSize(selection.Value.Value, pullRequestSizeMode)
                             : selection.Value.Value.ToString("0.##", CultureInfo.InvariantCulture));
             }
         });
@@ -441,7 +456,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         string title,
         List<double> orderedValues,
         string minLabel,
-        string maxLabel)
+        string maxLabel,
+        string valueHeader = "Count")
     {
         _ = column.Item().Text(title).Bold().FontSize(12);
         if (orderedValues.Count == 0)
@@ -466,7 +482,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             table.Header(header =>
             {
                 _ = header.Cell().Element(HeaderCell).Text("Metric");
-                _ = header.Cell().Element(HeaderCell).Text("Count");
+                _ = header.Cell().Element(HeaderCell).Text(valueHeader);
             });
 
             AddMetricRow(table, minLabel, min.ToString("0.##", CultureInfo.InvariantCulture));
@@ -485,7 +501,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     internal static IReadOnlyList<WorstMetricSelection> BuildWorstMetricSelections(
         List<PullRequestReport> reports,
         bool excludeWeekend,
-        IReadOnlySet<DateOnly> excludedDays)
+        IReadOnlySet<DateOnly> excludedDays,
+        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines)
     {
         var mergeCandidates = reports
             .Where(static report => report.MergedOn.HasValue)
@@ -509,8 +526,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .ToList();
 
         var sizeCandidates = reports
-            .Where(static report => report.HasSizeData)
-            .Select(static report => new MetricCandidate(report, report.LineChurn))
+            .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
+            .Select(report => new MetricCandidate(report, report.GetSizeMetricValue(pullRequestSizeMode)))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
@@ -532,10 +549,34 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private string FormatDuration(double totalDays) =>
         _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.AddDays(totalDays));
 
-    private static string FormatPullRequestSize(double lineChurn)
+    private static string GetPullRequestSizeMetricLabel(PullRequestSizeMode mode)
     {
-        var rounded = (int)System.Math.Round(lineChurn, MidpointRounding.AwayFromZero);
-        return $"{rounded.ToString(CultureInfo.InvariantCulture)} ({PullRequestSizeClassifier.Classify(rounded)})";
+        return mode switch
+        {
+            PullRequestSizeMode.Lines => "Churn",
+            PullRequestSizeMode.Files => "Files",
+            _ => "Churn"
+        };
+    }
+
+    private static string FormatPullRequestSize(
+        PullRequestReport report,
+        PullRequestSizeMode sizeMode)
+    {
+        if (!report.HasSizeDataForMode(sizeMode))
+        {
+            return "-";
+        }
+
+        var sizeValue = report.GetSizeMetricValue(sizeMode);
+        var tier = report.GetSizeTier(sizeMode);
+        return $"{tier} ({sizeValue.ToString(CultureInfo.InvariantCulture)})";
+    }
+
+    private static string FormatPullRequestSize(double value, PullRequestSizeMode sizeMode)
+    {
+        var rounded = (int)System.Math.Round(value, MidpointRounding.AwayFromZero);
+        return $"{rounded.ToString(CultureInfo.InvariantCulture)} ({PullRequestSizeClassifier.Classify(rounded, sizeMode)})";
     }
 
     private string FormatDuration(
