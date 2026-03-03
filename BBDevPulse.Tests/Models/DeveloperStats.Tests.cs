@@ -38,6 +38,7 @@ public sealed class DeveloperStatsTests
         stats.ApprovalsAfter.Should().Be(0);
         stats.Corrections.Should().Be(0);
         stats.Grade.Should().Be(DeveloperStats.NOT_AVAILABLE);
+        stats.BitbucketUuid.Should().BeNull();
         stats.Department.Should().Be(DeveloperStats.NOT_AVAILABLE);
     }
 
@@ -56,6 +57,7 @@ public sealed class DeveloperStatsTests
         stats.ApprovalsAfter = 4;
         stats.Corrections = 5;
         stats.Grade = "Senior";
+        stats.BitbucketUuid = new UserUuid("{alice-1}");
         stats.Department = "Platform";
 
         // Assert
@@ -66,6 +68,7 @@ public sealed class DeveloperStatsTests
         stats.ApprovalsAfter.Should().Be(4);
         stats.Corrections.Should().Be(5);
         stats.Grade.Should().Be("Senior");
+        stats.BitbucketUuid!.Value.Should().Be("{alice-1}");
         stats.Department.Should().Be("Platform");
     }
 }

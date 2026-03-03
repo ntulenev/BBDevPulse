@@ -704,6 +704,38 @@ public sealed class SpectreStatisticsPresenterTests
         output.IndexOf("Alice", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("Bob", StringComparison.Ordinal));
     }
 
+    [Fact(DisplayName = "RenderDeveloperStatsTable shows UUID column when configured")]
+    [Trait("Category", "Unit")]
+    public void RenderDeveloperStatsTableWhenUuidOptionEnabledRendersUuidValues()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        var reportData = CreateReportData(showDeveloperUuidInStats: true);
+
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")))] =
+            new DeveloperStats(new DisplayName("Alice"), new UserUuid("{alice-1}"))
+            {
+                Grade = "Senior",
+                Department = "Platform",
+                PrsOpenedSince = 1
+            };
+
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
+            new DeveloperStats(new DisplayName("Bob"))
+            {
+                Department = "Platform"
+            };
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData, BaseDate));
+
+        // Assert
+        output.Should().Contain("UUID");
+        output.Should().Contain("{alice");
+        output.Should().Contain("-1}");
+        output.Should().Contain(DeveloperStats.NOT_AVAILABLE);
+    }
+
     private static SpectreStatisticsPresenter CreatePresenter()
     {
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict).Object;
@@ -714,7 +746,8 @@ public sealed class SpectreStatisticsPresenterTests
     private static ReportData CreateReportData(
         bool excludeWeekend = false,
         IReadOnlyList<DateOnly>? excludedDays = null,
-        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines)
+        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines,
+        bool showDeveloperUuidInStats = false)
     {
         return new ReportData(new ReportParameters(
             BaseDate,
@@ -726,7 +759,8 @@ public sealed class SpectreStatisticsPresenterTests
             [],
             excludeWeekend,
             excludedDays,
-            pullRequestSizeMode));
+            pullRequestSizeMode,
+            showDeveloperUuidInStats: showDeveloperUuidInStats));
     }
 
     private static PullRequestReport CreateReport(

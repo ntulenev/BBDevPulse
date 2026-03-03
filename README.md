@@ -97,6 +97,7 @@ All settings are under the `Bitbucket` object.
 - `PeopleCsvPath` (`string`): Optional path to a CSV file with developer metadata in format `Name;Grade;Department`.
   Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
 - `TeamFilter` (`string`): Optional team name resolved from the `Department` column in `PeopleCsvPath`. When set, PR rows, PR metrics, and developer output are limited to that team, while team member review activity on other authors' PRs is still counted.
+- `ShowDeveloperUuidInStats` (`bool`): Optional flag to include Bitbucket user UUIDs in developer stats output. Default is `false`.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
@@ -124,6 +125,7 @@ All settings are under the `Bitbucket` object.
     ],
     "PeopleCsvPath": "people.csv",
     "TeamFilter": "",
+    "ShowDeveloperUuidInStats": false,
     "RepoNameFilter": "ABC.",
     "RepoNameList": [
       "Service.A",

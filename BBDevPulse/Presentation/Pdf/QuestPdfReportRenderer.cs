@@ -276,7 +276,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 
         if (reports.Any(static report => report.IsActivityOnlyMatch))
         {
-            _ = column.Item().PaddingTop(2).Text("Orange rows indicate PRs authored outside the selected team but with team activity.")
+            _ = column.Item().PaddingTop(2).Text("Orange rows indicate PRs authored outside the selected team but with team activity. They do not count in PR metrics and are used only for comment/approval counts in developer stats.")
                 .Italic()
                 .FontSize(8)
                 .FontColor(ActivityOnlyHighlightColor);
@@ -325,6 +325,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 
     private static void ComposeDeveloperSection(ColumnDescriptor column, ReportData reportData)
     {
+        var showDeveloperUuidInStats = reportData.Parameters.ShowDeveloperUuidInStats;
         _ = column.Item().Text(
             string.Format(
                 CultureInfo.InvariantCulture,
@@ -347,6 +348,11 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             {
                 columns.ConstantColumn(20);
                 columns.RelativeColumn(1.8f);
+                if (showDeveloperUuidInStats)
+                {
+                    columns.RelativeColumn(1.8f);
+                }
+
                 columns.RelativeColumn(1);
                 columns.RelativeColumn(1.2f);
                 columns.ConstantColumn(45);
@@ -360,6 +366,11 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             {
                 _ = header.Cell().Element(HeaderCell).Text("#");
                 _ = header.Cell().Element(HeaderCell).Text("Developer");
+                if (showDeveloperUuidInStats)
+                {
+                    _ = header.Cell().Element(HeaderCell).Text("UUID");
+                }
+
                 _ = header.Cell().Element(HeaderCell).Text("Grade");
                 _ = header.Cell().Element(HeaderCell).Text("Department");
                 _ = header.Cell().Element(HeaderCell).Text("PRs Opened");
@@ -374,6 +385,11 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             {
                 _ = table.Cell().Element(BodyCell).Text(index.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.DisplayName.Value);
+                if (showDeveloperUuidInStats)
+                {
+                    _ = table.Cell().Element(BodyCell).Text(stat.BitbucketUuid?.Value ?? DeveloperStats.NOT_AVAILABLE);
+                }
+
                 _ = table.Cell().Element(BodyCell).Text(stat.Grade);
                 _ = table.Cell().Element(BodyCell).Text(stat.Department);
                 _ = table.Cell().Element(BodyCell).Text(stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture));

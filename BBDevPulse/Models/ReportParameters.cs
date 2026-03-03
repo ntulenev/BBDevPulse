@@ -21,6 +21,7 @@ public sealed class ReportParameters
     /// <param name="excludedDays">Optional list of excluded days.</param>
     /// <param name="pullRequestSizeMode">Pull request size mode.</param>
     /// <param name="teamFilter">Optional team filter resolved from people CSV.</param>
+    /// <param name="showDeveloperUuidInStats">Whether to show Bitbucket UUIDs in developer stats.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -32,7 +33,8 @@ public sealed class ReportParameters
         bool excludeWeekend = false,
         IReadOnlyList<DateOnly>? excludedDays = null,
         PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines,
-        string? teamFilter = null)
+        string? teamFilter = null,
+        bool showDeveloperUuidInStats = false)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -51,6 +53,7 @@ public sealed class ReportParameters
         TeamFilter = string.IsNullOrWhiteSpace(teamFilter)
             ? null
             : teamFilter.Trim();
+        ShowDeveloperUuidInStats = showDeveloperUuidInStats;
         ExcludedDays = excludedDays is null
             ? new HashSet<DateOnly>().ToFrozenSet()
             : new HashSet<DateOnly>(excludedDays).ToFrozenSet();
@@ -110,6 +113,11 @@ public sealed class ReportParameters
     /// Gets a value indicating whether a team filter is active.
     /// </summary>
     public bool HasTeamFilter => !string.IsNullOrWhiteSpace(TeamFilter);
+
+    /// <summary>
+    /// Gets a value indicating whether Bitbucket UUIDs should be shown in developer stats.
+    /// </summary>
+    public bool ShowDeveloperUuidInStats { get; }
 
     /// <summary>
     /// Gets optional list of excluded days.

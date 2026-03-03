@@ -292,7 +292,9 @@ public sealed class SpectrePullRequestReportPresenterTests
 
         // Assert
         output.Should().Contain("Orange rows indicate PRs authored outside the selected team");
-        output.Should().Contain("activity.");
+        output.Should().Contain("They do not count in PR metrics");
+        output.Should().Contain("comment/approval");
+        output.Should().Contain("counts in developer stats.");
     }
 
     private static ReportParameters CreateReportParameters(

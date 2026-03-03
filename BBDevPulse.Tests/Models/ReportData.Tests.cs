@@ -97,6 +97,7 @@ public sealed class ReportDataTests
         // Assert
         secondStats.Should().BeSameAs(firstStats);
         secondStats.DisplayName.Value.Should().Be("Alice");
+        secondStats.BitbucketUuid!.Value.Should().Be("{ABC-123}");
         reportData.DeveloperStats.Should().HaveCount(1);
     }
 
@@ -115,7 +116,26 @@ public sealed class ReportDataTests
 
         // Assert
         stats.DisplayName.Value.Should().Be("Bob");
+        stats.BitbucketUuid.Should().BeNull();
         reportData.DeveloperStats.Should().HaveCount(1);
+    }
+
+    [Fact(DisplayName = "GetOrAddDeveloper updates missing UUID when same developer is seen later with UUID")]
+    [Trait("Category", "Unit")]
+    public void GetOrAddDeveloperWhenUuidArrivesLaterStoresItOnExistingStats()
+    {
+        // Arrange
+        var reportData = new ReportData(CreateReportParameters());
+        var withoutUuid = new DeveloperIdentity(null, new DisplayName("Alice"));
+        var withUuid = new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice"));
+
+        // Act
+        var firstStats = reportData.GetOrAddDeveloper(withoutUuid);
+        var secondStats = reportData.GetOrAddDeveloper(withUuid);
+
+        // Assert
+        secondStats.Should().BeSameAs(firstStats);
+        secondStats.BitbucketUuid!.Value.Should().Be("{alice-1}");
     }
 
     [Fact(DisplayName = "SortReportsByCreatedOn sorts reports in ascending creation order")]

@@ -114,7 +114,8 @@ public sealed class ReportParametersTests
             excludeWeekend: true,
             excludedDays: excludedDays,
             pullRequestSizeMode: PullRequestSizeMode.Files,
-            teamFilter: "Core");
+            teamFilter: "Core",
+            showDeveloperUuidInStats: true);
 
         // Assert
         parameters.FilterDate.Should().Be(filterDate);
@@ -129,6 +130,7 @@ public sealed class ReportParametersTests
         parameters.PullRequestSizeMode.Should().Be(PullRequestSizeMode.Files);
         parameters.TeamFilter.Should().Be("Core");
         parameters.HasTeamFilter.Should().BeTrue();
+        parameters.ShowDeveloperUuidInStats.Should().BeTrue();
     }
 
 }

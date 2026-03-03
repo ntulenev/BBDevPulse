@@ -66,10 +66,37 @@ public sealed class ReportData
         var key = DeveloperKey.FromIdentity(identity);
         if (DeveloperStats.TryGetValue(key, out var existing))
         {
+            if (existing.BitbucketUuid is null && identity.Uuid is not null)
+            {
+                existing.BitbucketUuid = identity.Uuid;
+            }
+
             return existing;
         }
 
-        var created = new DeveloperStats(identity.DisplayName);
+        foreach (var entry in DeveloperStats)
+        {
+            if (string.Equals(
+                entry.Value.DisplayName.Value,
+                identity.DisplayName.Value,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                if (entry.Value.BitbucketUuid is null && identity.Uuid is not null)
+                {
+                    entry.Value.BitbucketUuid = identity.Uuid;
+                }
+
+                if (identity.Uuid is not null && entry.Key != key)
+                {
+                    _ = DeveloperStats.Remove(entry.Key);
+                    DeveloperStats[key] = entry.Value;
+                }
+
+                return entry.Value;
+            }
+        }
+
+        var created = new DeveloperStats(identity.DisplayName, identity.Uuid);
         DeveloperStats[key] = created;
         return created;
     }

@@ -96,7 +96,8 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
         AnsiConsole.Write(table);
         if (reportData.Reports.Any(static report => report.IsActivityOnlyMatch))
         {
-            AnsiConsole.MarkupLine($"[{ActivityOnlyMarkupColor}]Orange rows indicate PRs authored outside the selected team but with team activity.[/]");
+            AnsiConsole.MarkupLine(
+                $"[{ActivityOnlyMarkupColor}]Orange rows indicate PRs authored outside the selected team but with team activity. They do not count in PR metrics and are used only for comment/approval counts in developer stats.[/]");
         }
     }
 

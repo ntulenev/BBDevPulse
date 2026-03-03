@@ -16,10 +16,12 @@ public sealed class DeveloperStats
     /// Initializes a new instance of the <see cref="DeveloperStats"/> class.
     /// </summary>
     /// <param name="displayName">Developer display name.</param>
-    public DeveloperStats(DisplayName displayName)
+    /// <param name="bitbucketUuid">Developer Bitbucket UUID.</param>
+    public DeveloperStats(DisplayName displayName, UserUuid? bitbucketUuid = null)
     {
         ArgumentNullException.ThrowIfNull(displayName);
         DisplayName = displayName;
+        BitbucketUuid = bitbucketUuid;
     }
 
     /// <summary>
@@ -31,6 +33,11 @@ public sealed class DeveloperStats
     /// Developer grade from CSV enrichment.
     /// </summary>
     public string Grade { get; set; } = NOT_AVAILABLE;
+
+    /// <summary>
+    /// Developer Bitbucket UUID.
+    /// </summary>
+    public UserUuid? BitbucketUuid { get; set; }
 
     /// <summary>
     /// Developer department from CSV enrichment.

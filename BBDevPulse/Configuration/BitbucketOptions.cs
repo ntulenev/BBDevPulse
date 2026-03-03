@@ -100,6 +100,11 @@ public sealed class BitbucketOptions
     public string? TeamFilter { get; init; }
 
     /// <summary>
+    /// Whether to show Bitbucket UUIDs in developer stats.
+    /// </summary>
+    public bool ShowDeveloperUuidInStats { get; init; }
+
+    /// <summary>
     /// PDF report output options.
     /// </summary>
     public PdfOptions Pdf { get; init; } = new();
@@ -138,7 +143,8 @@ public sealed class BitbucketOptions
             ExcludeWeekend,
             excludedDays,
             PullRequestSizeMode,
-            TeamFilter);
+            TeamFilter,
+            ShowDeveloperUuidInStats);
     }
 
     private static DateOnly ParseExcludedDay(string value)

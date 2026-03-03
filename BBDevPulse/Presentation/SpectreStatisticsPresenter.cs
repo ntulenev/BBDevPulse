@@ -277,11 +277,18 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         DateTimeOffset filterDate)
     {
         ArgumentNullException.ThrowIfNull(reportData);
+        var showDeveloperUuidInStats = reportData.Parameters.ShowDeveloperUuidInStats;
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("#")
-            .AddColumn("Developer")
-            .AddColumn("Grade")
+            .AddColumn("Developer");
+
+        if (showDeveloperUuidInStats)
+        {
+            _ = table.AddColumn("UUID");
+        }
+
+        _ = table.AddColumn("Grade")
             .AddColumn("Department")
             .AddColumn("PRs Opened")
             .AddColumn("PRs Merged")
@@ -294,17 +301,25 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .OrderByDescending(s => s.PrsOpenedSince)
             .ThenBy(s => s.DisplayName.Value, StringComparer.OrdinalIgnoreCase))
         {
-            _ = table.AddRow(
+            var row = new List<string>
+            {
                 index.ToString(CultureInfo.InvariantCulture),
                 stat.DisplayName.Value,
-                stat.Grade,
-                stat.Department,
-                stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture),
-                stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture),
-                stat.CommentsAfter.ToString(CultureInfo.InvariantCulture),
-                stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture),
-                stat.Corrections.ToString(CultureInfo.InvariantCulture)
-            );
+            };
+
+            if (showDeveloperUuidInStats)
+            {
+                row.Add(stat.BitbucketUuid?.Value ?? DeveloperStats.NOT_AVAILABLE);
+            }
+
+            row.Add(stat.Grade);
+            row.Add(stat.Department);
+            row.Add(stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture));
+            row.Add(stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture));
+            row.Add(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
+            row.Add(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
+            row.Add(stat.Corrections.ToString(CultureInfo.InvariantCulture));
+            _ = table.AddRow([.. row]);
             index++;
         }
 
