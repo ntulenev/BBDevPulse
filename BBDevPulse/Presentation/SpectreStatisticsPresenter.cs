@@ -38,6 +38,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
         var mergeDays = reportData.Reports
+            .Where(static report => report.IncludeInMetrics)
             .Where(r => r.MergedOn.HasValue)
             .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays)
             .OrderBy(days => days)
@@ -76,6 +77,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
         var ttfrDays = reportData.Reports
+            .Where(static report => report.IncludeInMetrics)
             .Where(r => r.FirstReactionOn.HasValue)
             .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
             .OrderBy(days => days)
@@ -112,6 +114,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     {
         ArgumentNullException.ThrowIfNull(reportData);
         var corrections = reportData.Reports
+            .Where(static report => report.IncludeInMetrics)
             .Select(r => (double)r.Corrections)
             .OrderBy(value => value)
             .ToList();
@@ -148,6 +151,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         ArgumentNullException.ThrowIfNull(reportData);
         var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var pullRequestSizes = reportData.Reports
+            .Where(static report => report.IncludeInMetrics)
             .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
             .Select(report => (double)report.GetSizeMetricValue(pullRequestSizeMode))
             .OrderBy(static value => value)
@@ -184,8 +188,11 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     {
         ArgumentNullException.ThrowIfNull(reportData);
         var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
+        var metricReports = reportData.Reports
+            .Where(static report => report.IncludeInMetrics)
+            .ToList();
 
-        if (reportData.Reports.Count == 0)
+        if (metricReports.Count == 0)
         {
             AnsiConsole.Write(new Rule("Worst PRs by Metric").RuleStyle("grey"));
             AnsiConsole.MarkupLine("[yellow]No pull requests available to calculate worst metrics.[/]");
@@ -195,7 +202,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
 
-        var mergeCandidates = reportData.Reports
+        var mergeCandidates = metricReports
             .Where(static report => report.MergedOn.HasValue)
             .Select(report => new MetricCandidate(
                 report,
@@ -203,7 +210,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
-        var ttfrCandidates = reportData.Reports
+        var ttfrCandidates = metricReports
             .Where(static report => report.FirstReactionOn.HasValue)
             .Select(report => new MetricCandidate(
                 report,
@@ -211,12 +218,12 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
-        var correctionCandidates = reportData.Reports
+        var correctionCandidates = metricReports
             .Select(static report => new MetricCandidate(report, report.Corrections))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
-        var sizeCandidates = reportData.Reports
+        var sizeCandidates = metricReports
             .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
             .Select(report => new MetricCandidate(report, report.GetSizeMetricValue(pullRequestSizeMode)))
             .OrderByDescending(static candidate => candidate.Value)

@@ -513,9 +513,147 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats[authorKey].Corrections.Should().Be(2);
     }
 
+    [Fact(DisplayName = "AnalyzeAsync with team filter reports team authored PRs and external PRs with team activity")]
+    [Trait("Category", "Unit")]
+    public async Task AnalyzeAsyncWhenTeamFilterConfiguredIncludesExternalPrsWithTeamActivityButExcludesThemFromMetrics()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
+        var parameters = CreateParameters(filterDate, teamFilter: "Core");
+        var reportData = new ReportData(
+            parameters,
+            new Dictionary<DisplayName, PersonCsvRow>
+            {
+                [new DisplayName("Alice")] = new("Senior", "Core"),
+                [new DisplayName("Reviewer")] = new("Senior", "Core"),
+                [new DisplayName("Outsider")] = new("Senior", "Other"),
+                [new DisplayName("External Reviewer")] = new("Senior", "Other")
+            });
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var outsiderAuthor = new User(new DisplayName("Outsider"), new UserUuid("{outsider-1}"));
+        var teamAuthor = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
+        var reviewerIdentity = new DeveloperIdentity(new UserUuid("{reviewer-1}"), new DisplayName("Reviewer"));
+        var externalReviewerIdentity = new DeveloperIdentity(new UserUuid("{external-reviewer-1}"), new DisplayName("External Reviewer"));
+        var outsiderPullRequest = new PullRequest(
+            new PullRequestId(10),
+            PullRequestState.Open,
+            closedOn: null,
+            createdOn: filterDate.AddDays(1),
+            updatedOn: filterDate.AddDays(2),
+            mergedOn: null,
+            author: outsiderAuthor,
+            destination: null);
+        var teamPullRequest = new PullRequest(
+            new PullRequestId(11),
+            PullRequestState.Merged,
+            closedOn: filterDate.AddDays(4),
+            createdOn: filterDate.AddDays(2),
+            updatedOn: filterDate.AddDays(3),
+            mergedOn: filterDate.AddDays(4),
+            author: teamAuthor,
+            destination: new PullRequestDestination(new PullRequestBranch("develop")));
+        var outsiderCommentActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(2),
+            mergeDate: null,
+            actor: reviewerIdentity,
+            comment: new ActivityComment(reviewerIdentity, filterDate.AddDays(2)),
+            approval: null);
+        var outsiderApprovalActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(2).AddHours(1),
+            mergeDate: null,
+            actor: reviewerIdentity,
+            comment: null,
+            approval: new ActivityApproval(reviewerIdentity, filterDate.AddDays(2).AddHours(1)));
+        var teamCommentActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(3),
+            mergeDate: null,
+            actor: externalReviewerIdentity,
+            comment: new ActivityComment(externalReviewerIdentity, filterDate.AddDays(3)),
+            approval: null);
+        var teamMergeActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(3),
+            mergeDate: filterDate.AddDays(4),
+            actor: externalReviewerIdentity,
+            comment: null,
+            approval: null);
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<Func<PullRequest, bool>>(shouldStop => shouldStop != null),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([outsiderPullRequest, teamPullRequest]));
+        client.Setup(x => x.GetPullRequestActivityAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 10),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([outsiderCommentActivity, outsiderApprovalActivity]));
+        client.Setup(x => x.GetPullRequestActivityAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 11),
+                It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([teamCommentActivity, teamMergeActivity]));
+        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 10),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
+        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 11),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([
+                filterDate.AddDays(5),
+                filterDate.AddDays(3),
+                filterDate.AddDays(2)
+            ]));
+        client.Setup(x => x.GetPullRequestSizeAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 10),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(PullRequestSizeSummary.Empty);
+        client.Setup(x => x.GetPullRequestSizeAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 11),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PullRequestSizeSummary(FilesChanged: 4, LinesAdded: 100, LinesRemoved: 20));
+
+        var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer());
+
+        // Act
+        await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
+
+        // Assert
+        reportData.Reports.Should().HaveCount(2);
+        reportData.Reports.Should().ContainSingle(report => report.Author == "Outsider" && report.IsActivityOnlyMatch);
+        reportData.Reports.Should().ContainSingle(report => report.Author == "Alice" && !report.IsActivityOnlyMatch);
+
+        reportData.DeveloperStats.Should().ContainKey(new DeveloperKey(new UserUuid("{alice-1}")));
+        reportData.DeveloperStats[new DeveloperKey(new UserUuid("{alice-1}"))].PrsOpenedSince.Should().Be(1);
+        reportData.DeveloperStats[new DeveloperKey(new UserUuid("{alice-1}"))].PrsMergedAfter.Should().Be(1);
+        reportData.DeveloperStats[new DeveloperKey(new UserUuid("{alice-1}"))].Corrections.Should().Be(2);
+
+        reportData.DeveloperStats.Should().ContainKey(new DeveloperKey(new UserUuid("{reviewer-1}")));
+        reportData.DeveloperStats[new DeveloperKey(new UserUuid("{reviewer-1}"))].CommentsAfter.Should().Be(1);
+        reportData.DeveloperStats[new DeveloperKey(new UserUuid("{reviewer-1}"))].ApprovalsAfter.Should().Be(1);
+
+        reportData.DeveloperStats.Should().NotContainKey(new DeveloperKey(new UserUuid("{outsider-1}")));
+        reportData.DeveloperStats.Should().NotContainKey(new DeveloperKey(new UserUuid("{external-reviewer-1}")));
+    }
+
     private static ReportParameters CreateParameters(
         DateTimeOffset filterDate,
-        IReadOnlyList<BranchName>? branchNameList = null)
+        IReadOnlyList<BranchName>? branchNameList = null,
+        string? teamFilter = null)
     {
         return new ReportParameters(
             filterDate,
@@ -524,7 +662,8 @@ public sealed class PullRequestAnalyzerTests
             repoNameList: [],
             RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode.CreatedOnOnly,
-            branchNameList ?? []);
+            branchNameList ?? [],
+            teamFilter: teamFilter);
     }
 
     private static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(IReadOnlyList<T> values)

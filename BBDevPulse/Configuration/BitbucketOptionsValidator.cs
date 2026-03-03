@@ -53,6 +53,12 @@ internal sealed class BitbucketOptionsValidator : IValidateOptions<BitbucketOpti
             errors.Add("Bitbucket:AppPassword is required.");
         }
 
+        if (!string.IsNullOrWhiteSpace(options.TeamFilter) &&
+            string.IsNullOrWhiteSpace(options.PeopleCsvPath))
+        {
+            errors.Add("Bitbucket:PeopleCsvPath is required when Bitbucket:TeamFilter is configured.");
+        }
+
         return errors.Count == 0
             ? ValidateOptionsResult.Success
             : ValidateOptionsResult.Fail(errors);

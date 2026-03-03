@@ -29,6 +29,7 @@ public sealed class BitbucketOptionsTests
             PullRequestSizeMode = PullRequestSizeMode.Files,
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026", "2026-02-04", " ", "", "03.02.2026"],
+            TeamFilter = "Core Team",
             Pdf = new PdfOptions { Enabled = false, OutputPath = "report.pdf" }
         };
         var expectedLowerBound = DateTimeOffset.UtcNow.AddDays(-10).AddSeconds(-2);
@@ -51,6 +52,7 @@ public sealed class BitbucketOptionsTests
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 3));
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 4));
         parameters.ExcludedDays.Should().HaveCount(2);
+        parameters.TeamFilter.Should().Be("Core Team");
     }
 
     [Fact(DisplayName = "CreateReportParameters treats null repo and branch lists as empty")]
@@ -112,6 +114,7 @@ public sealed class BitbucketOptionsTests
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026"],
             PeopleCsvPath = "people.csv",
+            TeamFilter = "Import",
             Pdf = pdf
         };
 
@@ -132,6 +135,7 @@ public sealed class BitbucketOptionsTests
         var excludeWeekend = options.ExcludeWeekend;
         var excludedDays = options.ExcludedDays;
         var peopleCsvPath = options.PeopleCsvPath;
+        var teamFilter = options.TeamFilter;
         var pdfOptions = options.Pdf;
 
         // Assert
@@ -151,6 +155,7 @@ public sealed class BitbucketOptionsTests
         excludeWeekend.Should().BeTrue();
         excludedDays.Should().Equal("03.02.2026");
         peopleCsvPath.Should().Be("people.csv");
+        teamFilter.Should().Be("Import");
         pdfOptions.Should().BeSameAs(pdf);
     }
 

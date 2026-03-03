@@ -443,6 +443,55 @@ public sealed class SpectreStatisticsPresenterTests
         capturedValues!.Should().Equal(4.0, 9.0);
     }
 
+    [Fact(DisplayName = "RenderCorrectionsStats ignores activity-only PR rows")]
+    [Trait("Category", "Unit")]
+    public void RenderCorrectionsStatsWhenActivityOnlyRowsExistExcludesThemFromMetrics()
+    {
+        // Arrange
+        IReadOnlyList<double>? capturedValues = null;
+        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
+        statisticsCalculator
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
+            .Callback<IReadOnlyList<double>, int>((values, _) => capturedValues = values)
+            .Returns(1.0);
+        statisticsCalculator
+            .Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
+            .Returns(1.0);
+
+        var presenter = new SpectreStatisticsPresenter(
+            statisticsCalculator.Object,
+            new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
+
+        var reportData = CreateReportData();
+        reportData.Reports.Add(CreateReport(
+            id: 1,
+            mergedOn: null,
+            firstReactionOn: null,
+            corrections: 2));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoB",
+            repositorySlug: "repob",
+            author: "External",
+            targetBranch: "develop",
+            createdOn: BaseDate,
+            lastActivity: BaseDate.AddHours(1),
+            mergedOn: null,
+            rejectedOn: null,
+            state: PullRequestState.Open,
+            id: new PullRequestId(2),
+            comments: 0,
+            corrections: 100,
+            firstReactionOn: null,
+            isActivityOnlyMatch: true));
+
+        // Act
+        _ = TestConsoleRunner.Run(_ => presenter.RenderCorrectionsStats(reportData));
+
+        // Assert
+        capturedValues.Should().NotBeNull();
+        capturedValues!.Should().Equal(2.0);
+    }
+
     [Fact(DisplayName = "RenderWorstPullRequestsTable throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderWorstPullRequestsTableWhenReportDataIsNullThrowsArgumentNullException()

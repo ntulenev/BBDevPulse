@@ -101,6 +101,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var workspace = parameters.Workspace;
 
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
+        var includeAuthoredPullRequest = !parameters.HasTeamFilter ||
+            (authorIdentity.HasValue && reportData.IsDeveloperIncluded(authorIdentity.Value));
         var analysis = new ActivityAnalysisState(
             pr.CreatedOn,
             authorIdentity,
@@ -113,11 +115,23 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                            pullRequestActivity => pullRequestActivity.IsBefore(filterDate),
                            cancellationToken).ConfigureAwait(false))
         {
+            if (parameters.HasTeamFilter && HasIncludedTeamActivity(activity, reportData))
+            {
+                analysis.HasIncludedTeamActivity = true;
+            }
+
             _activityAnalyzer.Analyze(analysis, activity, filterDate);
         }
 
         var matchesFilter = pr.CreatedOn >= filterDate || analysis.LastActivity >= filterDate;
         if (!matchesFilter)
+        {
+            return;
+        }
+
+        var hasTeamActivity = parameters.HasTeamFilter && analysis.HasIncludedTeamActivity;
+        var shouldDisplayPullRequest = includeAuthoredPullRequest || hasTeamActivity;
+        if (!shouldDisplayPullRequest)
         {
             return;
         }
@@ -128,14 +142,19 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
 
         var mergedOnResolved = analysis.MergedOnFromActivity ?? pr.MergedOn;
-        var corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, cancellationToken)
-            .ConfigureAwait(false);
-        var sizeSummary = await GetPullRequestSizeSafeAsync(workspace, repo.Slug, pr.Id, cancellationToken)
-            .ConfigureAwait(false);
+        var corrections = 0;
+        var sizeSummary = PullRequestSizeSummary.Empty;
+        if (shouldDisplayPullRequest)
+        {
+            corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, cancellationToken)
+                .ConfigureAwait(false);
+            sizeSummary = await GetPullRequestSizeSafeAsync(workspace, repo.Slug, pr.Id, cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         lock (reportData)
         {
-            if (authorIdentity.HasValue)
+            if (authorIdentity.HasValue && includeAuthoredPullRequest)
             {
                 var authorStats = reportData.GetOrAddDeveloper(authorIdentity.Value);
                 if (pr.CreatedOn >= filterDate)
@@ -153,7 +172,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
             foreach (var entry in analysis.CommentCounts)
             {
-                if (analysis.Participants.TryGetValue(entry.Key, out var participant))
+                if (analysis.Participants.TryGetValue(entry.Key, out var participant) &&
+                    reportData.IsDeveloperIncluded(participant))
                 {
                     reportData.GetOrAddDeveloper(participant).CommentsAfter += entry.Value;
                 }
@@ -161,29 +181,34 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
             foreach (var entry in analysis.ApprovalCounts)
             {
-                if (analysis.Participants.TryGetValue(entry.Key, out var participant))
+                if (analysis.Participants.TryGetValue(entry.Key, out var participant) &&
+                    reportData.IsDeveloperIncluded(participant))
                 {
                     reportData.GetOrAddDeveloper(participant).ApprovalsAfter += entry.Value;
                 }
             }
 
-            reportData.Reports.Add(new PullRequestReport(
-                string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
-                repo.Slug.Value,
-                pr.Author?.DisplayName.Value ?? "unknown",
-                pr.Destination?.Branch?.Name ?? "-",
-                pr.CreatedOn,
-                analysis.LastActivity,
-                mergedOnResolved,
-                pr.ResolveRejectedOn(),
-                pr.State,
-                pr.Id,
-                analysis.TotalComments,
-                corrections,
-                analysis.FirstReactionOn,
+            if (shouldDisplayPullRequest)
+            {
+                reportData.Reports.Add(new PullRequestReport(
+                    string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
+                    repo.Slug.Value,
+                    pr.Author?.DisplayName.Value ?? "unknown",
+                    pr.Destination?.Branch?.Name ?? "-",
+                    pr.CreatedOn,
+                    analysis.LastActivity,
+                    mergedOnResolved,
+                    pr.ResolveRejectedOn(),
+                    pr.State,
+                    pr.Id,
+                    analysis.TotalComments,
+                    corrections,
+                    analysis.FirstReactionOn,
                 sizeSummary.FilesChanged,
                 sizeSummary.LinesAdded,
-                sizeSummary.LinesRemoved));
+                sizeSummary.LinesRemoved,
+                isActivityOnlyMatch: !includeAuthoredPullRequest));
+            }
         }
     }
 
@@ -211,6 +236,21 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
 
         return corrections;
+    }
+
+    private static bool HasIncludedTeamActivity(PullRequestActivity activity, ReportData reportData)
+    {
+        if (activity.Actor.HasValue && reportData.IsDeveloperIncluded(activity.Actor.Value))
+        {
+            return true;
+        }
+
+        if (activity.Comment is not null && reportData.IsDeveloperIncluded(activity.Comment.User))
+        {
+            return true;
+        }
+
+        return activity.Approval is not null && reportData.IsDeveloperIncluded(activity.Approval.User);
     }
 
     private async Task<PullRequestSizeSummary> GetPullRequestSizeSafeAsync(

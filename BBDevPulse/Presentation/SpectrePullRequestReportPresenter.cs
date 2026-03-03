@@ -13,6 +13,7 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresenter
 {
+    private const string ActivityOnlyMarkupColor = "orange1";
     private readonly IDateDiffFormatter _dateDiffFormatter;
 
     /// <summary>
@@ -67,25 +68,25 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
                 ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
                 : "-";
             var size = FormatPullRequestSize(report, pullRequestSizeMode);
-            var createdCell = report.CreatedOn < filterDate
+            var createdCell = report.CreatedOn < filterDate && !report.IsActivityOnlyMatch
                 ? $"[red]{report.CreatedOn:yyyy-MM-dd}[/]"
-                : report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                : FormatCell(report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
             _ = table.AddRow(
-                index.ToString(CultureInfo.InvariantCulture),
-                report.Repository,
-                report.Author,
-                report.TargetBranch,
+                FormatCell(index.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch),
+                FormatCell(report.Repository, report.IsActivityOnlyMatch),
+                FormatCell(report.Author, report.IsActivityOnlyMatch),
+                FormatCell(report.TargetBranch, report.IsActivityOnlyMatch),
                 createdCell,
-                ttfr,
-                report.LastActivity.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-",
-                report.RejectedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-",
-                prAge,
-                timeToMerge,
-                report.Comments.ToString(CultureInfo.InvariantCulture),
-                report.Corrections.ToString(CultureInfo.InvariantCulture),
-                size,
-                report.Id.Value.ToString(CultureInfo.InvariantCulture)
+                FormatCell(ttfr, report.IsActivityOnlyMatch),
+                FormatCell(report.LastActivity.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), report.IsActivityOnlyMatch),
+                FormatCell(report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", report.IsActivityOnlyMatch),
+                FormatCell(report.RejectedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", report.IsActivityOnlyMatch),
+                FormatCell(prAge, report.IsActivityOnlyMatch),
+                FormatCell(timeToMerge, report.IsActivityOnlyMatch),
+                FormatCell(report.Comments.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch),
+                FormatCell(report.Corrections.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch),
+                FormatCell(size, report.IsActivityOnlyMatch),
+                FormatCell(report.Id.Value.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch)
         );
 
             index++;
@@ -93,6 +94,18 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
 
         AnsiConsole.Write(new Rule("Pull Requests").RuleStyle("grey"));
         AnsiConsole.Write(table);
+        if (reportData.Reports.Any(static report => report.IsActivityOnlyMatch))
+        {
+            AnsiConsole.MarkupLine($"[{ActivityOnlyMarkupColor}]Orange rows indicate PRs authored outside the selected team but with team activity.[/]");
+        }
+    }
+
+    private static string FormatCell(string value, bool highlight)
+    {
+        var escaped = Markup.Escape(value);
+        return highlight
+            ? $"[{ActivityOnlyMarkupColor}]{escaped}[/]"
+            : escaped;
     }
 
     private static string FormatPullRequestSize(

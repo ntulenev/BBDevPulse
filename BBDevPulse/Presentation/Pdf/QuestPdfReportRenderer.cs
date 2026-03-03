@@ -20,6 +20,7 @@ namespace BBDevPulse.Presentation.Pdf;
 /// </summary>
 internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 {
+    private static readonly string ActivityOnlyHighlightColor = Colors.Orange.Medium;
     /// <summary>
     /// Initializes a new instance of the <see cref="QuestPdfReportRenderer"/> class.
     /// </summary>
@@ -56,6 +57,9 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 
         var orderedReports = reportData.Reports
             .OrderBy(static report => report.CreatedOn)
+            .ToList();
+        var metricReports = orderedReports
+            .Where(static report => report.IncludeInMetrics)
             .ToList();
         var outputPath = _pdfOptions.ResolveOutputPath();
         var filterDate = reportData.Parameters.FilterDate;
@@ -105,7 +109,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     ComposeDurationSection(
                         column,
                         "Merge Time Stats",
-                        orderedReports
+                        metricReports
                             .Where(static report => report.MergedOn.HasValue)
                             .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays)
                             .OrderBy(static days => days)
@@ -115,7 +119,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     ComposeDurationSection(
                         column,
                         "TTFR Stats",
-                        orderedReports
+                        metricReports
                             .Where(static report => report.FirstReactionOn.HasValue)
                             .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
                             .OrderBy(static days => days)
@@ -125,7 +129,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     ComposeCountSection(
                         column,
                         "Corrections Stats",
-                        orderedReports
+                        metricReports
                             .Select(static report => (double)report.Corrections)
                             .OrderBy(static value => value)
                             .ToList(),
@@ -134,7 +138,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     ComposeCountSection(
                         column,
                         "PR Size Stats",
-                        orderedReports
+                        metricReports
                             .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
                             .Select(report => (double)report.GetSizeMetricValue(pullRequestSizeMode))
                             .OrderBy(static value => value)
@@ -144,7 +148,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         GetPullRequestSizeMetricLabel(pullRequestSizeMode));
                     ComposeWorstPullRequestsSection(
                         column,
-                        orderedReports,
+                        metricReports,
                         workspace,
                         excludeWeekend,
                         excludedDays,
@@ -246,27 +250,21 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     created += " *";
                 }
 
-                _ = table.Cell().Element(BodyCell).Text(index.ToString(CultureInfo.InvariantCulture));
-                table.Cell().Element(BodyCell).Hyperlink(repositoryUrl).Text(text =>
-                {
-                    text.Span(report.Repository).FontColor(Colors.Blue.Medium).Underline();
-                });
-                _ = table.Cell().Element(BodyCell).Text(report.Author);
-                _ = table.Cell().Element(BodyCell).Text(report.TargetBranch);
-                _ = table.Cell().Element(BodyCell).Text(created);
-                _ = table.Cell().Element(BodyCell).Text(ttfr);
-                _ = table.Cell().Element(BodyCell).Text(report.LastActivity.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-                _ = table.Cell().Element(BodyCell).Text(report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-");
-                _ = table.Cell().Element(BodyCell).Text(report.RejectedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-");
-                _ = table.Cell().Element(BodyCell).Text(prAge);
-                _ = table.Cell().Element(BodyCell).Text(timeToMerge);
-                _ = table.Cell().Element(BodyCell).Text(report.Comments.ToString(CultureInfo.InvariantCulture));
-                _ = table.Cell().Element(BodyCell).Text(report.Corrections.ToString(CultureInfo.InvariantCulture));
-                _ = table.Cell().Element(BodyCell).Text(size);
-                table.Cell().Element(BodyCell).Hyperlink(pullRequestUrl).Text(text =>
-                {
-                    text.Span(report.Id.Value.ToString(CultureInfo.InvariantCulture)).FontColor(Colors.Blue.Medium).Underline();
-                });
+                AddBodyTextCell(table, index.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
+                AddHyperlinkCell(table, repositoryUrl, report.Repository, report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.Author, report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.TargetBranch, report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, created, report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, ttfr, report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.LastActivity.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.RejectedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, prAge, report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, timeToMerge, report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.Comments.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.Corrections.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, size, report.IsActivityOnlyMatch);
+                AddHyperlinkCell(table, pullRequestUrl, report.Id.Value.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
                 index++;
             }
         });
@@ -274,6 +272,14 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         if (reports.Any(report => report.CreatedOn < filterDate))
         {
             _ = column.Item().PaddingTop(2).Text("* Created before filter date").Italic().FontSize(8);
+        }
+
+        if (reports.Any(static report => report.IsActivityOnlyMatch))
+        {
+            _ = column.Item().PaddingTop(2).Text("Orange rows indicate PRs authored outside the selected team but with team activity.")
+                .Italic()
+                .FontSize(8)
+                .FontColor(ActivityOnlyHighlightColor);
         }
     }
 
@@ -496,6 +502,27 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     {
         _ = table.Cell().Element(BodyCell).Text(metricName);
         _ = table.Cell().Element(BodyCell).Text(metricValue);
+    }
+
+    private static void AddBodyTextCell(TableDescriptor table, string value, bool highlight)
+    {
+        table.Cell().Element(BodyCell).Text(text =>
+        {
+            var span = text.Span(value);
+            if (highlight)
+            {
+                span.FontColor(ActivityOnlyHighlightColor);
+            }
+        });
+    }
+
+    private static void AddHyperlinkCell(TableDescriptor table, string url, string value, bool highlight)
+    {
+        table.Cell().Element(BodyCell).Hyperlink(url).Text(text =>
+        {
+            var span = text.Span(value);
+            span.FontColor(highlight ? ActivityOnlyHighlightColor : Colors.Blue.Medium).Underline();
+        });
     }
 
     internal static IReadOnlyList<WorstMetricSelection> BuildWorstMetricSelections(

@@ -75,7 +75,8 @@ internal sealed class ReportRunner : IReportRunner
 
     private async Task BuildReportsAsync(List<Repository> filteredRepos, CancellationToken cancellationToken)
     {
-        var reportData = new ReportData(_parameters);
+        var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
+        var reportData = new ReportData(_parameters, peopleByName);
         await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
         {
             await _analyzer.AnalyzeAsync(
@@ -85,7 +86,6 @@ internal sealed class ReportRunner : IReportRunner
         }, cancellationToken).ConfigureAwait(false);
         if (reportData.DeveloperStats.Count > 0)
         {
-            var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
         }
         _presenter.RenderReport(reportData);

@@ -23,6 +23,14 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
 9. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
 
+When `TeamFilter` is configured:
+- All matching repositories and pull requests are still analyzed for activity.
+- PR rows include pull requests whose author belongs to the selected team, plus PRs authored outside the team when the selected team had activity on them.
+- External-author PRs shown because of team activity are highlighted in orange in console/PDF output.
+- PR-based metrics still include only pull requests whose author belongs to the selected team.
+- Developer output includes only developers from the selected team.
+- Team members still get comment/approval activity counted even on PRs authored by people outside the team.
+
 ## PR Size calculation
 PR size is based on Bitbucket `diffstat` between pull request source and destination commits.
 The metric used for T-shirt sizing is controlled by `PullRequestSizeMode`.
@@ -88,6 +96,7 @@ All settings are under the `Bitbucket` object.
   Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
 - `PeopleCsvPath` (`string`): Optional path to a CSV file with developer metadata in format `Name;Grade;Department`.
   Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
+- `TeamFilter` (`string`): Optional team name resolved from the `Department` column in `PeopleCsvPath`. When set, PR rows, PR metrics, and developer output are limited to that team, while team member review activity on other authors' PRs is still counted.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
@@ -114,6 +123,7 @@ All settings are under the `Bitbucket` object.
       "2026-01-02"
     ],
     "PeopleCsvPath": "people.csv",
+    "TeamFilter": "",
     "RepoNameFilter": "ABC.",
     "RepoNameList": [
       "Service.A",
@@ -133,7 +143,7 @@ All settings are under the `Bitbucket` object.
 Example `people.csv`:
 ```text
 Name;Grade;Department
-Alice Doe;Senior;Platform
+Alice Doe;Senior;Core
 Bob Smith;Middle;Import
 ```
 ## Output

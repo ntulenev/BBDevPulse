@@ -113,7 +113,8 @@ public sealed class ReportParametersTests
             branchNameList,
             excludeWeekend: true,
             excludedDays: excludedDays,
-            pullRequestSizeMode: PullRequestSizeMode.Files);
+            pullRequestSizeMode: PullRequestSizeMode.Files,
+            teamFilter: "Core");
 
         // Assert
         parameters.FilterDate.Should().Be(filterDate);
@@ -126,6 +127,8 @@ public sealed class ReportParametersTests
         parameters.ExcludeWeekend.Should().BeTrue();
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 22));
         parameters.PullRequestSizeMode.Should().Be(PullRequestSizeMode.Files);
+        parameters.TeamFilter.Should().Be("Core");
+        parameters.HasTeamFilter.Should().BeTrue();
     }
 
 }

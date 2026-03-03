@@ -496,9 +496,105 @@ public sealed class ReportRunnerTests
         statsByName["Bob"].Department.Should().Be(DeveloperStats.NOT_AVAILABLE);
     }
 
+    [Fact(DisplayName = "RunAsync loads people CSV before analysis when team filter is configured")]
+    [Trait("Category", "Unit")]
+    public async Task RunAsyncWhenTeamFilterConfiguredMakesPeopleAvailableDuringAnalysis()
+    {
+        // Arrange
+        var options = CreateOptions(repoNameList: ["RepoA"], peopleCsvPath: "people.csv", teamFilter: "Core");
+        var repository = new Repository(new RepoName("RepoA"), new RepoSlug("repo-a"));
+        var peopleLoadedBeforeAnalyze = false;
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetCurrentUserAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new AuthUser(new DisplayName("Tester"), new Username("tester"), new UserUuid("{tester-1}")));
+        client.Setup(x => x.GetRepositoriesAsync(
+                It.Is<Workspace>(workspace => workspace.Value == "workspace"),
+                It.Is<Action<int>>(onPage => onPage != null),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns((Workspace _, Action<int>? __, CancellationToken token) =>
+                ToAsyncEnumerable([repository], token));
+
+        var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
+        analyzer.Setup(x => x.AnalyzeAsync(
+                repository,
+                It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
+            {
+                peopleLoadedBeforeAnalyze = reportData.IsDeveloperIncluded(
+                    new DeveloperIdentity(null, new DisplayName("Alice")));
+            })
+            .Returns(Task.CompletedTask);
+
+        var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.AnnounceAuthAsync(
+                It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(async (Func<CancellationToken, Task<AuthUser>> fetchUser, CancellationToken token) =>
+            {
+                _ = await fetchUser(token);
+            });
+        presenter.Setup(x => x.FetchRepositoriesAsync(
+                It.Is<Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>>>(fetch => fetch != null),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns((Func<Action<int>, CancellationToken, IAsyncEnumerable<Repository>> fetch, CancellationToken token) =>
+                ReadAllAsync(fetch(_ => { }, token)));
+        presenter.Setup(x => x.RenderRepositoryTable(
+            It.Is<IReadOnlyCollection<Repository>>(repositories =>
+                repositories.Count == 1 &&
+                repositories.Single().Slug.Value == "repo-a"),
+            It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
+        presenter.Setup(x => x.RenderBranchFilterInfo(
+            It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
+        presenter.Setup(x => x.AnalyzeRepositoriesAsync(
+                It.Is<IReadOnlyList<Repository>>(repositories =>
+                    repositories.Count == 1 &&
+                    repositories.Single().Slug.Value == "repo-a"),
+                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
+            {
+                foreach (var repo in repositories)
+                {
+                    await analyze(repo, token);
+                }
+            });
+        presenter.Setup(x => x.RenderReport(
+                It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core")));
+
+        var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
+        pdfRenderer.Setup(x => x.RenderReportAsync(
+                It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(Task.CompletedTask);
+
+        var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>
+            {
+                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core")
+            });
+
+        var runner = new ReportRunner(
+            client.Object,
+            analyzer.Object,
+            presenter.Object,
+            pdfRenderer.Object,
+            peopleCsvProvider.Object,
+            Options.Create(options));
+
+        // Act
+        await runner.RunAsync(cancellationToken);
+
+        // Assert
+        peopleLoadedBeforeAnalyze.Should().BeTrue();
+    }
+
     private static BitbucketOptions CreateOptions(
         IReadOnlyList<string>? repoNameList = null,
-        string? peopleCsvPath = null)
+        string? peopleCsvPath = null,
+        string? teamFilter = null)
     {
         return new BitbucketOptions
         {
@@ -513,6 +609,7 @@ public sealed class ReportRunnerTests
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
             PeopleCsvPath = peopleCsvPath,
+            TeamFilter = teamFilter,
             Pdf = new PdfOptions()
         };
     }

@@ -258,6 +258,43 @@ public sealed class SpectrePullRequestReportPresenterTests
         output.Should().NotContain("1500");
     }
 
+    [Fact(DisplayName = "RenderPullRequestTable shows legend for activity-only team matches")]
+    [Trait("Category", "Unit")]
+    public void RenderPullRequestTableWhenActivityOnlyMatchExistsRendersLegend()
+    {
+        // Arrange
+        var formatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        formatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
+            .Returns("formatted");
+
+        var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
+        var createdOn = new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateReportParameters(createdOn.AddDays(-1)));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoA",
+            repositorySlug: "repoa",
+            author: "External",
+            targetBranch: "develop",
+            createdOn: createdOn,
+            lastActivity: createdOn.AddHours(1),
+            mergedOn: createdOn.AddHours(2),
+            rejectedOn: null,
+            state: PullRequestState.Merged,
+            id: new PullRequestId(61),
+            comments: 1,
+            firstReactionOn: createdOn.AddMinutes(30),
+            isActivityOnlyMatch: true));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestTable(reportData, createdOn.AddDays(-2)));
+
+        // Assert
+        output.Should().Contain("Orange rows indicate PRs authored outside the selected team");
+        output.Should().Contain("activity.");
+    }
+
     private static ReportParameters CreateReportParameters(
         DateTimeOffset filterDate,
         bool excludeWeekend = false,

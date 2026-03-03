@@ -24,6 +24,7 @@ public sealed class PullRequestReport
     /// <param name="filesChanged">Total files changed in pull request diffstat.</param>
     /// <param name="linesAdded">Total added lines in pull request diffstat.</param>
     /// <param name="linesRemoved">Total removed lines in pull request diffstat.</param>
+    /// <param name="isActivityOnlyMatch">Whether this pull request is shown because the selected team was active on it.</param>
     public PullRequestReport(
         string repository,
         string repositorySlug,
@@ -40,7 +41,8 @@ public sealed class PullRequestReport
         DateTimeOffset? firstReactionOn = null,
         int filesChanged = 0,
         int linesAdded = 0,
-        int linesRemoved = 0)
+        int linesRemoved = 0,
+        bool isActivityOnlyMatch = false)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(repositorySlug);
@@ -63,6 +65,7 @@ public sealed class PullRequestReport
         FilesChanged = filesChanged;
         LinesAdded = linesAdded;
         LinesRemoved = linesRemoved;
+        IsActivityOnlyMatch = isActivityOnlyMatch;
     }
 
     /// <summary>
@@ -149,6 +152,16 @@ public sealed class PullRequestReport
     /// Total changed lines (added + removed).
     /// </summary>
     public int LineChurn => LinesAdded + LinesRemoved;
+
+    /// <summary>
+    /// Gets a value indicating whether the pull request is shown only because the selected team had activity on it.
+    /// </summary>
+    public bool IsActivityOnlyMatch { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the pull request should be included in PR-based metrics.
+    /// </summary>
+    public bool IncludeInMetrics => !IsActivityOnlyMatch;
 
     /// <summary>
     /// Indicates whether size data is available for this pull request.

@@ -10,10 +10,18 @@ public sealed class ReportData
     /// Initializes a new instance of the <see cref="ReportData"/> class.
     /// </summary>
     /// <param name="parameters">Report parameters.</param>
-    public ReportData(ReportParameters parameters)
+    public ReportData(
+        ReportParameters parameters,
+        IReadOnlyDictionary<DisplayName, PersonCsvRow>? peopleByDisplayName = null)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         Parameters = parameters;
+        _peopleByDisplayName = peopleByDisplayName is null
+            ? new Dictionary<string, PersonCsvRow>(StringComparer.Ordinal)
+            : peopleByDisplayName.ToDictionary(
+                static entry => entry.Key.Value,
+                static entry => entry.Value,
+                StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -36,6 +44,23 @@ public sealed class ReportData
     /// </summary>
     public void SortReportsByCreatedOn() => Reports.Sort((left, right) => left.CreatedOn.CompareTo(right.CreatedOn));
 
+    public bool IsDeveloperIncluded(DeveloperIdentity identity)
+    {
+        if (!Parameters.HasTeamFilter)
+        {
+            return true;
+        }
+
+        return _peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var person) &&
+            person.IsInTeam(Parameters.TeamFilter!);
+    }
+
+    public bool TryGetPerson(DisplayName displayName, out PersonCsvRow person)
+    {
+        ArgumentNullException.ThrowIfNull(displayName);
+        return _peopleByDisplayName.TryGetValue(displayName.Value, out person);
+    }
+
     public DeveloperStats GetOrAddDeveloper(DeveloperIdentity identity)
     {
         var key = DeveloperKey.FromIdentity(identity);
@@ -48,4 +73,6 @@ public sealed class ReportData
         DeveloperStats[key] = created;
         return created;
     }
+
+    private readonly Dictionary<string, PersonCsvRow> _peopleByDisplayName;
 }

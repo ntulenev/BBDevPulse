@@ -11,6 +11,8 @@ namespace BBDevPulse.Logic;
 /// </summary>
 internal sealed class PeopleCsvProvider : IPeopleCsvProvider
 {
+    private const string BasicHeader = "Name;Grade;Department";
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PeopleCsvProvider"/> class.
     /// </summary>
@@ -65,7 +67,7 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
             }
 
             var trimmedLine = line.Trim();
-            if (lineNumber == 1 && trimmedLine.Equals("Name;Grade;Department", StringComparison.OrdinalIgnoreCase))
+            if (lineNumber == 1 && trimmedLine.Equals(BasicHeader, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -74,7 +76,7 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
             if (parts.Length != 3)
             {
                 throw new FormatException(
-                    $"Invalid people CSV format at line {lineNumber}. Expected 'Name;Grade;Department'.");
+                    $"Invalid people CSV format at line {lineNumber}. Expected '{BasicHeader}'.");
             }
 
             var name = parts[0].Trim();

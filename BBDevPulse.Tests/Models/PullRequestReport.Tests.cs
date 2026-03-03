@@ -135,6 +135,34 @@ public sealed class PullRequestReportTests
         report.GetSizeTier(PullRequestSizeMode.Files).Should().Be("L");
         report.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().BeTrue();
         report.HasSizeDataForMode(PullRequestSizeMode.Files).Should().BeTrue();
+        report.IsActivityOnlyMatch.Should().BeFalse();
+        report.IncludeInMetrics.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "Activity-only match is excluded from metrics")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenActivityOnlyMatchProvidedMarksReportAsExcludedFromMetrics()
+    {
+        // Arrange
+
+        // Act
+        var report = new PullRequestReport(
+            repository: "repo",
+            repositorySlug: "slug",
+            author: "author",
+            targetBranch: "develop",
+            createdOn: new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero),
+            lastActivity: new DateTimeOffset(2026, 2, 20, 11, 0, 0, TimeSpan.Zero),
+            mergedOn: null,
+            rejectedOn: null,
+            state: PullRequestState.Open,
+            id: new PullRequestId(1),
+            comments: 0,
+            isActivityOnlyMatch: true);
+
+        // Assert
+        report.IsActivityOnlyMatch.Should().BeTrue();
+        report.IncludeInMetrics.Should().BeFalse();
     }
 
     private static PullRequestReport Create(

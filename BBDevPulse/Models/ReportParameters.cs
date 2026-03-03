@@ -20,6 +20,7 @@ public sealed class ReportParameters
     /// <param name="excludeWeekend">Whether to exclude weekends in duration calculations.</param>
     /// <param name="excludedDays">Optional list of excluded days.</param>
     /// <param name="pullRequestSizeMode">Pull request size mode.</param>
+    /// <param name="teamFilter">Optional team filter resolved from people CSV.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -30,7 +31,8 @@ public sealed class ReportParameters
         IReadOnlyList<BranchName> branchNameList,
         bool excludeWeekend = false,
         IReadOnlyList<DateOnly>? excludedDays = null,
-        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines)
+        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines,
+        string? teamFilter = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -46,6 +48,9 @@ public sealed class ReportParameters
         BranchNameList = branchNameList;
         ExcludeWeekend = excludeWeekend;
         PullRequestSizeMode = pullRequestSizeMode;
+        TeamFilter = string.IsNullOrWhiteSpace(teamFilter)
+            ? null
+            : teamFilter.Trim();
         ExcludedDays = excludedDays is null
             ? new HashSet<DateOnly>().ToFrozenSet()
             : new HashSet<DateOnly>(excludedDays).ToFrozenSet();
@@ -95,6 +100,16 @@ public sealed class ReportParameters
     /// Gets pull request size mode.
     /// </summary>
     public PullRequestSizeMode PullRequestSizeMode { get; }
+
+    /// <summary>
+    /// Gets optional team filter resolved from people CSV.
+    /// </summary>
+    public string? TeamFilter { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether a team filter is active.
+    /// </summary>
+    public bool HasTeamFilter => !string.IsNullOrWhiteSpace(TeamFilter);
 
     /// <summary>
     /// Gets optional list of excluded days.

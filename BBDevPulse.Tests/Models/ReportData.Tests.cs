@@ -34,6 +34,49 @@ public sealed class ReportDataTests
         reportData.Parameters.Should().BeSameAs(parameters);
     }
 
+    [Fact(DisplayName = "IsDeveloperIncluded returns true for matching team member when team filter is active")]
+    [Trait("Category", "Unit")]
+    public void IsDeveloperIncludedWhenTeamMatchesReturnsTrue()
+    {
+        // Arrange
+        var parameters = CreateReportParameters(teamFilter: "Core");
+        var reportData = new ReportData(
+            parameters,
+            new Dictionary<DisplayName, PersonCsvRow>
+            {
+                [new DisplayName("Alice")] = new("Senior", "Core")
+            });
+        var identity = new DeveloperIdentity(null, new DisplayName("Alice"));
+
+        // Act
+        var result = reportData.IsDeveloperIncluded(identity);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "IsDeveloperIncluded returns false for missing or mismatched team member when team filter is active")]
+    [Trait("Category", "Unit")]
+    public void IsDeveloperIncludedWhenTeamDoesNotMatchReturnsFalse()
+    {
+        // Arrange
+        var parameters = CreateReportParameters(teamFilter: "Core");
+        var reportData = new ReportData(
+            parameters,
+            new Dictionary<DisplayName, PersonCsvRow>
+            {
+                [new DisplayName("Bob")] = new("Senior", "Other")
+            });
+
+        // Act
+        var missingResult = reportData.IsDeveloperIncluded(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var mismatchedResult = reportData.IsDeveloperIncluded(new DeveloperIdentity(null, new DisplayName("Bob")));
+
+        // Assert
+        missingResult.Should().BeFalse();
+        mismatchedResult.Should().BeFalse();
+    }
+
     [Fact(DisplayName = "GetOrAddDeveloper returns existing stats for the same UUID regardless of case")]
     [Trait("Category", "Unit")]
     public void GetOrAddDeveloperWhenUuidMatchesIgnoringCaseReturnsExistingStats()
@@ -111,7 +154,7 @@ public sealed class ReportDataTests
             firstReactionOn: null);
     }
 
-    private static ReportParameters CreateReportParameters()
+    private static ReportParameters CreateReportParameters(string? teamFilter = null)
     {
         return new ReportParameters(
             filterDate: new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero),
@@ -120,6 +163,7 @@ public sealed class ReportDataTests
             repoNameList: [],
             repoSearchMode: RepoSearchMode.FilterFromTheList,
             prTimeFilterMode: PrTimeFilterMode.CreatedOnOnly,
-            branchNameList: []);
+            branchNameList: [],
+            teamFilter: teamFilter);
     }
 }

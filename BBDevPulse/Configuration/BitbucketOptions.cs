@@ -95,6 +95,11 @@ public sealed class BitbucketOptions
     public string? PeopleCsvPath { get; init; }
 
     /// <summary>
+    /// Optional team name filter resolved from the people CSV.
+    /// </summary>
+    public string? TeamFilter { get; init; }
+
+    /// <summary>
     /// PDF report output options.
     /// </summary>
     public PdfOptions Pdf { get; init; } = new();
@@ -132,7 +137,8 @@ public sealed class BitbucketOptions
             branchNameList,
             ExcludeWeekend,
             excludedDays,
-            PullRequestSizeMode);
+            PullRequestSizeMode,
+            TeamFilter);
     }
 
     private static DateOnly ParseExcludedDay(string value)
