@@ -18,9 +18,17 @@ internal sealed class BitbucketOptionsValidator : IValidateOptions<BitbucketOpti
         ArgumentNullException.ThrowIfNull(options);
         var errors = new List<string>();
 
-        if (options.Days <= 0)
+        if (string.IsNullOrWhiteSpace(options.FromDate) && string.IsNullOrWhiteSpace(options.ToDate))
         {
-            errors.Add("Bitbucket:Days must be greater than 0.");
+            if (!options.Days.HasValue || options.Days.Value <= 0)
+            {
+                errors.Add("Bitbucket:Days must be greater than 0 when Bitbucket:FromDate and Bitbucket:ToDate are not configured.");
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(options.FromDate) != string.IsNullOrWhiteSpace(options.ToDate))
+        {
+            errors.Add("Bitbucket:FromDate and Bitbucket:ToDate must be configured together.");
         }
 
         if (options.PageLength <= 0)

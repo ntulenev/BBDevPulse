@@ -28,6 +28,8 @@ internal sealed class ActivityAnalysisState
 
     public bool ShouldCalculateTtfr { get; }
 
+    public bool HasActivityInRange { get; set; }
+
     public bool HasIncludedTeamActivity { get; set; }
 
     public Dictionary<string, DeveloperIdentity> Participants { get; } =

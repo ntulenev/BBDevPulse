@@ -321,7 +321,7 @@ public sealed class SpectreReportPresenterTests
             .Callback(() => renderPullRequestSizeStatsCalls++);
         statisticsPresenter.Setup(x => x.RenderWorstPullRequestsTable(reportData))
             .Callback(() => renderWorstPullRequestsCalls++);
-        statisticsPresenter.Setup(x => x.RenderDeveloperStatsTable(reportData, parameters.FilterDate))
+        statisticsPresenter.Setup(x => x.RenderDeveloperStatsTable(reportData))
             .Callback(() => renderDeveloperStatsCalls++);
 
         var sut = CreateSut(

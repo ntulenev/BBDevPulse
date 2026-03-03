@@ -12,6 +12,6 @@ internal interface IActivityAnalyzer
     /// </summary>
     /// <param name="analysis">Current analysis state.</param>
     /// <param name="activity">Activity entry to analyze.</param>
-    /// <param name="filterDate">Filter cutoff date.</param>
-    void Analyze(ActivityAnalysisState analysis, PullRequestActivity activity, DateTimeOffset filterDate);
+    /// <param name="parameters">Report parameters.</param>
+    void Analyze(ActivityAnalysisState analysis, PullRequestActivity activity, ReportParameters parameters);
 }

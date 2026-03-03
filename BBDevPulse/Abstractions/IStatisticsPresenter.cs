@@ -41,8 +41,5 @@ public interface IStatisticsPresenter
     /// Renders per-developer statistics.
     /// </summary>
     /// <param name="reportData">Report data.</param>
-    /// <param name="filterDate">Filter cutoff date.</param>
-    void RenderDeveloperStatsTable(
-        ReportData reportData,
-        DateTimeOffset filterDate);
+    void RenderDeveloperStatsTable(ReportData reportData);
 }

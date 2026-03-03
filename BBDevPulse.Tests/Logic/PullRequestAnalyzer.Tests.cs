@@ -180,7 +180,7 @@ public sealed class PullRequestAnalyzerTests
         activityAnalyzer.Setup(x => x.Analyze(
                 It.Is<ActivityAnalysisState>(analysis => analysis != null),
                 It.Is<PullRequestActivity>(activity => activity != null),
-                It.Is<DateTimeOffset>(date => date == filterDate)))
+                It.Is<ReportParameters>(parameters => parameters.FilterDate == filterDate && !parameters.HasUpperBound)))
             .Callback(() => analyzeCalls++);
 
         var analyzer = CreateAnalyzer(client.Object, activityAnalyzer.Object);
@@ -281,9 +281,10 @@ public sealed class PullRequestAnalyzerTests
                     analysis.AuthorIdentity.HasValue &&
                     analysis.AuthorIdentity.Value.DisplayName.Value == "Alice"),
                 activity,
-                filterDate))
-            .Callback<ActivityAnalysisState, PullRequestActivity, DateTimeOffset>((analysis, _, _) =>
+                It.Is<ReportParameters>(value => value.FilterDate == filterDate && !value.HasUpperBound)))
+            .Callback<ActivityAnalysisState, PullRequestActivity, ReportParameters>((analysis, _, _) =>
             {
+                analysis.HasActivityInRange = true;
                 analysis.LastActivity = filterDate.AddDays(4);
                 analysis.MergedOnFromActivity = filterDate.AddDays(5);
                 analysis.TotalComments = 6;
@@ -491,9 +492,10 @@ public sealed class PullRequestAnalyzerTests
         activityAnalyzer.Setup(x => x.Analyze(
                 It.Is<ActivityAnalysisState>(analysis => analysis.CreatedOn == pullRequest.CreatedOn),
                 activity,
-                filterDate))
-            .Callback<ActivityAnalysisState, PullRequestActivity, DateTimeOffset>((analysis, _, _) =>
+                It.Is<ReportParameters>(value => value.FilterDate == filterDate && !value.HasUpperBound)))
+            .Callback<ActivityAnalysisState, PullRequestActivity, ReportParameters>((analysis, _, _) =>
             {
+                analysis.HasActivityInRange = true;
                 analysis.LastActivity = filterDate.AddDays(2);
                 analysis.MergedOnFromActivity = null;
             });
@@ -650,10 +652,82 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats.Should().NotContainKey(new DeveloperKey(new UserUuid("{external-reviewer-1}")));
     }
 
+    [Fact(DisplayName = "AnalyzeAsync excludes merge and correction metrics outside configured upper bound")]
+    [Trait("Category", "Unit")]
+    public async Task AnalyzeAsyncWhenUpperBoundConfiguredOnlyCountsInRangeMetrics()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+        var toDateExclusive = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
+        var pullRequest = new PullRequest(
+            new PullRequestId(77),
+            PullRequestState.Merged,
+            closedOn: new DateTimeOffset(2026, 3, 2, 0, 0, 0, TimeSpan.Zero),
+            createdOn: new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero),
+            updatedOn: new DateTimeOffset(2026, 3, 2, 0, 0, 0, TimeSpan.Zero),
+            mergedOn: new DateTimeOffset(2026, 3, 2, 0, 0, 0, TimeSpan.Zero),
+            author: author,
+            destination: null);
+        var activity = new PullRequestActivity(
+            activityDate: new DateTimeOffset(2026, 2, 25, 0, 0, 0, TimeSpan.Zero),
+            mergeDate: new DateTimeOffset(2026, 3, 2, 0, 0, 0, TimeSpan.Zero),
+            actor: null,
+            comment: null,
+            approval: null);
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client);
+        client.Setup(x => x.GetPullRequestsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([pullRequest]));
+        client.Setup(x => x.GetPullRequestActivityAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 77),
+                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([activity]));
+        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 77),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([
+                new DateTimeOffset(2026, 3, 2, 10, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 2, 25, 10, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero)
+            ]));
+
+        var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer());
+
+        // Act
+        await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
+
+        // Assert
+        reportData.Reports.Should().ContainSingle();
+        var report = reportData.Reports[0];
+        report.MergedOn.Should().BeNull();
+        report.RejectedOn.Should().BeNull();
+        report.Corrections.Should().Be(1);
+
+        var authorKey = new DeveloperKey(new UserUuid("{alice-1}"));
+        reportData.DeveloperStats.Should().ContainKey(authorKey);
+        reportData.DeveloperStats[authorKey].PrsOpenedSince.Should().Be(1);
+        reportData.DeveloperStats[authorKey].PrsMergedAfter.Should().Be(0);
+        reportData.DeveloperStats[authorKey].Corrections.Should().Be(1);
+    }
+
     private static ReportParameters CreateParameters(
         DateTimeOffset filterDate,
         IReadOnlyList<BranchName>? branchNameList = null,
-        string? teamFilter = null)
+        string? teamFilter = null,
+        DateTimeOffset? toDateExclusive = null)
     {
         return new ReportParameters(
             filterDate,
@@ -663,7 +737,8 @@ public sealed class PullRequestAnalyzerTests
             RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode.CreatedOnOnly,
             branchNameList ?? [],
-            teamFilter: teamFilter);
+            teamFilter: teamFilter,
+            toDateExclusive: toDateExclusive);
     }
 
     private static async IAsyncEnumerable<T> ToAsyncEnumerable<T>(IReadOnlyList<T> values)

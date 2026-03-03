@@ -657,7 +657,7 @@ public sealed class SpectreStatisticsPresenterTests
         ReportData reportData = null!;
 
         // Act
-        Action act = () => presenter.RenderDeveloperStatsTable(reportData, BaseDate);
+        Action act = () => presenter.RenderDeveloperStatsTable(reportData);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -692,7 +692,7 @@ public sealed class SpectreStatisticsPresenterTests
             };
 
         // Act
-        var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData, BaseDate));
+        var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData));
 
         // Assert
         output.Should().Contain("Developer Stats (since 2026-02-20)");
@@ -727,13 +727,39 @@ public sealed class SpectreStatisticsPresenterTests
             };
 
         // Act
-        var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData, BaseDate));
+        var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData));
 
         // Assert
         output.Should().Contain("UUID");
         output.Should().Contain("{alice");
         output.Should().Contain("-1}");
         output.Should().Contain(DeveloperStats.NOT_AVAILABLE);
+    }
+
+    [Fact(DisplayName = "RenderDeveloperStatsTable uses bounded date window label when upper bound exists")]
+    [Trait("Category", "Unit")]
+    public void RenderDeveloperStatsTableWhenUpperBoundConfiguredShowsDateWindow()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        var reportData = new ReportData(new ReportParameters(
+            new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero),
+            new Workspace("workspace"),
+            new RepoNameFilter(string.Empty),
+            [],
+            RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode.CreatedOnOnly,
+            [],
+            toDateExclusive: new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero)));
+
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
+            new DeveloperStats(new DisplayName("Alice"));
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData));
+
+        // Assert
+        output.Should().Contain("Developer Stats (2026-02-20 to 2026-02-28)");
     }
 
     private static SpectreStatisticsPresenter CreatePresenter()

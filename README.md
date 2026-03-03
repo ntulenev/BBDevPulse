@@ -14,14 +14,17 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
 5. Fetches pull requests for each selected repo (open, merged, declined, superseded), sorted by latest updates.
 6. Applies PR time-stop mode (`PrTimeFilterMode`) to stop reading older PR pages earlier.
 7. Fetches PR activity (comments/approvals/updates) and PR diffstat size (added/removed lines), then aggregates participation and timing stats.
-8. Renders output tables:
+8. Applies the configured report window:
+   - `Days` for a rolling lookback from now, or
+   - `FromDate` + `ToDate` for an explicit inclusive date range.
+9. Renders output tables:
    - Repositories included in analysis
    - Pull request report (includes `Size` T-shirt metric)
    - Merge-time statistics (best/median/75p/longest)
    - PR size statistics (smallest/biggest/median/75p by selected size mode)
    - Developer statistics (grade, department, PRs opened, merged, comments, approvals, corrections)
    - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
-9. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
+10. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
 
 When `TeamFilter` is configured:
 - All matching repositories and pull requests are still analyzed for activity.
@@ -74,7 +77,9 @@ If diffstat cannot be read for a PR (API error, missing commit hashes), size is 
 ## appsettings.json parameters
 All settings are under the `Bitbucket` object.
 
-- `Days` (`int`): Number of days to look back from now. Used to build `filterDate = UtcNow - Days`.
+- `Days` (`int`): Optional rolling lookback window. Used only when `FromDate` and `ToDate` are not configured.
+- `FromDate` (`string`): Optional inclusive report start date. Supports `dd.MM.yyyy` and `yyyy-MM-dd`.
+- `ToDate` (`string`): Optional inclusive report end date. Supports `dd.MM.yyyy` and `yyyy-MM-dd`.
 - `Workspace` (`string`): Bitbucket workspace slug/name to scan repositories from.
 - `PageLength` (`int`): API page size for repository/PR/activity requests.
 - `PullRequestConcurrency` (`int`): Maximum number of pull requests analyzed in parallel per repository.
@@ -109,6 +114,8 @@ All settings are under the `Bitbucket` object.
 {
   "Bitbucket": {
     "Days": 30,
+    "FromDate": "",
+    "ToDate": "",
     "Workspace": "your-workspace",
     "PageLength": 50,
     "PullRequestConcurrency": 4,
@@ -138,6 +145,16 @@ All settings are under the `Bitbucket` object.
       "Enabled": true,
       "OutputPath": "bbdevpulse-report.pdf"
     }
+  }
+}
+```
+
+For a fixed monthly report, prefer:
+```json
+{
+  "Bitbucket": {
+    "FromDate": "2026-02-01",
+    "ToDate": "2026-02-28"
   }
 }
 ```

@@ -106,7 +106,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var analysis = new ActivityAnalysisState(
             pr.CreatedOn,
             authorIdentity,
-            pr.ShouldCalculateTtfr(filterDate));
+            pr.IsCreatedInRange(parameters));
 
         await foreach (var activity in _client.GetPullRequestActivityAsync(
                            workspace,
@@ -115,15 +115,17 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                            pullRequestActivity => pullRequestActivity.IsBefore(filterDate),
                            cancellationToken).ConfigureAwait(false))
         {
-            if (parameters.HasTeamFilter && HasIncludedTeamActivity(activity, reportData))
+            if (parameters.HasTeamFilter &&
+                parameters.IsInRange(activity.ActivityDate) &&
+                HasIncludedTeamActivity(activity, reportData))
             {
                 analysis.HasIncludedTeamActivity = true;
             }
 
-            _activityAnalyzer.Analyze(analysis, activity, filterDate);
+            _activityAnalyzer.Analyze(analysis, activity, parameters);
         }
 
-        var matchesFilter = pr.CreatedOn >= filterDate || analysis.LastActivity >= filterDate;
+        var matchesFilter = parameters.IsInRange(pr.CreatedOn) || analysis.HasActivityInRange;
         if (!matchesFilter)
         {
             return;
@@ -142,11 +144,22 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
 
         var mergedOnResolved = analysis.MergedOnFromActivity ?? pr.MergedOn;
+        if (!parameters.IsInRange(mergedOnResolved))
+        {
+            mergedOnResolved = null;
+        }
+
+        var rejectedOn = pr.ResolveRejectedOn();
+        if (!parameters.IsInRange(rejectedOn))
+        {
+            rejectedOn = null;
+        }
+
         var corrections = 0;
         var sizeSummary = PullRequestSizeSummary.Empty;
         if (shouldDisplayPullRequest)
         {
-            corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, cancellationToken)
+            corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, parameters, cancellationToken)
                 .ConfigureAwait(false);
             sizeSummary = await GetPullRequestSizeSafeAsync(workspace, repo.Slug, pr.Id, cancellationToken)
                 .ConfigureAwait(false);
@@ -157,12 +170,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             if (authorIdentity.HasValue && includeAuthoredPullRequest)
             {
                 var authorStats = reportData.GetOrAddDeveloper(authorIdentity.Value);
-                if (pr.CreatedOn >= filterDate)
+                if (parameters.IsInRange(pr.CreatedOn))
                 {
                     authorStats.PrsOpenedSince++;
                 }
 
-                if (mergedOnResolved.HasValue && mergedOnResolved.Value >= filterDate)
+                if (parameters.IsInRange(mergedOnResolved))
                 {
                     authorStats.PrsMergedAfter++;
                 }
@@ -198,7 +211,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                     pr.CreatedOn,
                     analysis.LastActivity,
                     mergedOnResolved,
-                    pr.ResolveRejectedOn(),
+                    rejectedOn,
                     pr.State,
                     pr.Id,
                     analysis.TotalComments,
@@ -217,6 +230,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
         DateTimeOffset createdOn,
+        ReportParameters parameters,
         CancellationToken cancellationToken)
     {
         var corrections = 0;
@@ -228,7 +242,11 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         {
             if (commitDate > createdOn)
             {
-                corrections++;
+                if (parameters.IsInRange(commitDate))
+                {
+                    corrections++;
+                }
+
                 continue;
             }
 

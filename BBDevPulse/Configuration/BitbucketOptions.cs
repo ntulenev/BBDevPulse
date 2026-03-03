@@ -17,12 +17,22 @@ public sealed class BitbucketOptions
     /// <summary>
     /// Lookback window in days.
     /// </summary>
-    public required int Days { get; init; }
+    public int? Days { get; init; }
 
     /// <summary>
     /// Bitbucket workspace key.
     /// </summary>
     public required string Workspace { get; init; }
+
+    /// <summary>
+    /// Optional inclusive start date for report range in dd.MM.yyyy or yyyy-MM-dd format.
+    /// </summary>
+    public string? FromDate { get; init; }
+
+    /// <summary>
+    /// Optional inclusive end date for report range in dd.MM.yyyy or yyyy-MM-dd format.
+    /// </summary>
+    public string? ToDate { get; init; }
 
     /// <summary>
     /// Page size for Bitbucket API requests.
@@ -114,7 +124,7 @@ public sealed class BitbucketOptions
     /// </summary>
     public Models.ReportParameters CreateReportParameters()
     {
-        var filterDate = DateTimeOffset.UtcNow.AddDays(-Days);
+        var (filterDate, toDateExclusive) = ResolveDateRange();
         var workspace = new Models.Workspace(Workspace);
         var repoNameFilter = new Models.RepoNameFilter(RepoNameFilter);
         var repoNameList = (RepoNameList ?? [])
@@ -144,7 +154,37 @@ public sealed class BitbucketOptions
             excludedDays,
             PullRequestSizeMode,
             TeamFilter,
-            ShowDeveloperUuidInStats);
+            ShowDeveloperUuidInStats,
+            toDateExclusive);
+    }
+
+    private (DateTimeOffset FilterDate, DateTimeOffset? ToDateExclusive) ResolveDateRange()
+    {
+        if (!string.IsNullOrWhiteSpace(FromDate) || !string.IsNullOrWhiteSpace(ToDate))
+        {
+            if (string.IsNullOrWhiteSpace(FromDate) || string.IsNullOrWhiteSpace(ToDate))
+            {
+                throw new FormatException("Both FromDate and ToDate must be configured together.");
+            }
+
+            var fromDate = ParseExcludedDay(FromDate.Trim());
+            var toDate = ParseExcludedDay(ToDate.Trim());
+            if (toDate < fromDate)
+            {
+                throw new FormatException($"ToDate '{toDate:yyyy-MM-dd}' must be on or after FromDate '{fromDate:yyyy-MM-dd}'.");
+            }
+
+            return (
+                new DateTimeOffset(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+                new DateTimeOffset(toDate.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero));
+        }
+
+        if (!Days.HasValue || Days.Value <= 0)
+        {
+            throw new FormatException("Days must be greater than 0 when FromDate and ToDate are not configured.");
+        }
+
+        return (DateTimeOffset.UtcNow.AddDays(-Days.Value), null);
     }
 
     private static DateOnly ParseExcludedDay(string value)

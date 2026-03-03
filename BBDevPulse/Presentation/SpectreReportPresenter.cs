@@ -83,15 +83,13 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
         reportData.SortReportsByCreatedOn();
 
-        var filterDate = reportData.Parameters.FilterDate;
-
-        _pullRequestReportPresenter.RenderPullRequestTable(reportData, filterDate);
+        _pullRequestReportPresenter.RenderPullRequestTable(reportData, reportData.Parameters.FilterDate);
         _statisticsPresenter.RenderMergeTimeStats(reportData);
         _statisticsPresenter.RenderTtfrStats(reportData);
         _statisticsPresenter.RenderCorrectionsStats(reportData);
         _statisticsPresenter.RenderPullRequestSizeStats(reportData);
         _statisticsPresenter.RenderWorstPullRequestsTable(reportData);
-        _statisticsPresenter.RenderDeveloperStatsTable(reportData, filterDate);
+        _statisticsPresenter.RenderDeveloperStatsTable(reportData);
     }
 
     private readonly IAuthPresenter _authPresenter;

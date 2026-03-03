@@ -24,6 +24,8 @@ public sealed class ActivityAnalysisStateTests
         state.FirstReactionOn.Should().BeNull();
         state.AuthorIdentity.Should().Be(author);
         state.ShouldCalculateTtfr.Should().BeTrue();
+        state.HasActivityInRange.Should().BeFalse();
+        state.HasIncludedTeamActivity.Should().BeFalse();
         state.Participants.Should().BeEmpty();
         state.CommentCounts.Should().BeEmpty();
         state.ApprovalCounts.Should().BeEmpty();

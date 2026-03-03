@@ -22,6 +22,7 @@ public sealed class ReportParameters
     /// <param name="pullRequestSizeMode">Pull request size mode.</param>
     /// <param name="teamFilter">Optional team filter resolved from people CSV.</param>
     /// <param name="showDeveloperUuidInStats">Whether to show Bitbucket UUIDs in developer stats.</param>
+    /// <param name="toDateExclusive">Optional exclusive upper bound for the report range.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -34,7 +35,8 @@ public sealed class ReportParameters
         IReadOnlyList<DateOnly>? excludedDays = null,
         PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines,
         string? teamFilter = null,
-        bool showDeveloperUuidInStats = false)
+        bool showDeveloperUuidInStats = false,
+        DateTimeOffset? toDateExclusive = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -54,6 +56,7 @@ public sealed class ReportParameters
             ? null
             : teamFilter.Trim();
         ShowDeveloperUuidInStats = showDeveloperUuidInStats;
+        ToDateExclusive = toDateExclusive;
         ExcludedDays = excludedDays is null
             ? new HashSet<DateOnly>().ToFrozenSet()
             : new HashSet<DateOnly>(excludedDays).ToFrozenSet();
@@ -118,6 +121,42 @@ public sealed class ReportParameters
     /// Gets a value indicating whether Bitbucket UUIDs should be shown in developer stats.
     /// </summary>
     public bool ShowDeveloperUuidInStats { get; }
+
+    /// <summary>
+    /// Gets optional exclusive upper bound for the report range.
+    /// </summary>
+    public DateTimeOffset? ToDateExclusive { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether the report uses a bounded date range.
+    /// </summary>
+    public bool HasUpperBound => ToDateExclusive.HasValue;
+
+    /// <summary>
+    /// Determines whether the provided timestamp is inside the configured report range.
+    /// </summary>
+    /// <param name="timestamp">Timestamp to test.</param>
+    /// <returns>True when the timestamp is in range.</returns>
+    public bool IsInRange(DateTimeOffset timestamp) =>
+        timestamp >= FilterDate &&
+        (!ToDateExclusive.HasValue || timestamp < ToDateExclusive.Value);
+
+    /// <summary>
+    /// Determines whether the provided timestamp is inside the configured report range.
+    /// </summary>
+    /// <param name="timestamp">Timestamp to test.</param>
+    /// <returns>True when the timestamp is in range.</returns>
+    public bool IsInRange(DateTimeOffset? timestamp) =>
+        timestamp.HasValue && IsInRange(timestamp.Value);
+
+    /// <summary>
+    /// Formats the report date window for display.
+    /// </summary>
+    /// <returns>Human readable date window.</returns>
+    public string GetDateWindowLabel() =>
+        ToDateExclusive.HasValue
+            ? $"{FilterDate:yyyy-MM-dd} to {ToDateExclusive.Value.AddDays(-1):yyyy-MM-dd}"
+            : $"since {FilterDate:yyyy-MM-dd}";
 
     /// <summary>
     /// Gets optional list of excluded days.

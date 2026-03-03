@@ -63,6 +63,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .ToList();
         var outputPath = _pdfOptions.ResolveOutputPath();
         var filterDate = reportData.Parameters.FilterDate;
+        var dateWindowLabel = reportData.Parameters.GetDateWindowLabel();
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
         var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
@@ -89,8 +90,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                             DateTimeOffset.Now));
                     _ = column.Item().Text("Workspace: " + reportData.Parameters.Workspace.Value);
                     _ = column.Item().Text(
-                        "Filter date: "
-                        + filterDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+                        "Date window: "
+                        + dateWindowLabel
                         + "    Repositories analyzed: "
                         + orderedReports.Select(static report => report.Repository).Distinct(StringComparer.OrdinalIgnoreCase).Count().ToString(CultureInfo.InvariantCulture));
                 });
@@ -329,8 +330,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         _ = column.Item().Text(
             string.Format(
                 CultureInfo.InvariantCulture,
-                "Developer Stats (since {0:yyyy-MM-dd})",
-                reportData.Parameters.FilterDate)).Bold().FontSize(12);
+                "Developer Stats ({0})",
+                reportData.Parameters.GetDateWindowLabel())).Bold().FontSize(12);
 
         var orderedDeveloperStats = reportData.DeveloperStats.Values
             .OrderByDescending(static stat => stat.PrsOpenedSince)

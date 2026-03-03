@@ -66,13 +66,46 @@ public sealed class BitbucketOptionsValidatorTests
 
         // Assert
         result.Failed.Should().BeTrue();
-        result.Failures.Should().Contain("Bitbucket:Days must be greater than 0.");
+        result.Failures.Should().Contain("Bitbucket:Days must be greater than 0 when Bitbucket:FromDate and Bitbucket:ToDate are not configured.");
         result.Failures.Should().Contain("Bitbucket:PageLength must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:PullRequestConcurrency must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:RepositoryConcurrency must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:Workspace is required.");
         result.Failures.Should().Contain("Bitbucket:Username is required.");
         result.Failures.Should().Contain("Bitbucket:AppPassword is required.");
+    }
+
+    [Fact(DisplayName = "Validate requires FromDate and ToDate together")]
+    [Trait("Category", "Unit")]
+    public void ValidateWhenOnlyOneDateRangeBoundConfiguredReturnsFailure()
+    {
+        // Arrange
+        var validator = new BitbucketOptionsValidator();
+        var options = new BitbucketOptions
+        {
+            Days = null,
+            FromDate = "2026-02-01",
+            Workspace = "workspace",
+            PageLength = 25,
+            PullRequestConcurrency = 2,
+            RepositoryConcurrency = 2,
+            Username = "user",
+            AppPassword = "pass",
+            RepoNameFilter = string.Empty,
+            RepoNameList = [],
+            BranchNameList = [],
+            RepoSearchMode = RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
+            PeopleCsvPath = "people.csv",
+            Pdf = new PdfOptions()
+        };
+
+        // Act
+        var result = validator.Validate(name: "Bitbucket", options);
+
+        // Assert
+        result.Failed.Should().BeTrue();
+        result.Failures.Should().Contain("Bitbucket:FromDate and Bitbucket:ToDate must be configured together.");
     }
 
     [Fact(DisplayName = "Validate requires people CSV path when team filter is configured")]

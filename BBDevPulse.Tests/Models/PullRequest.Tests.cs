@@ -339,6 +339,52 @@ public sealed class PullRequestTests
         result.Should().BeFalse();
     }
 
+    [Fact(DisplayName = "IsCreatedInRange returns true when created within configured date range")]
+    [Trait("Category", "Unit")]
+    public void IsCreatedInRangeWhenCreationWithinRangeReturnsTrue()
+    {
+        // Arrange
+        var pullRequest = CreatePullRequest(createdOn: new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero));
+        var parameters = new ReportParameters(
+            new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+            new Workspace("workspace"),
+            new RepoNameFilter(string.Empty),
+            [],
+            RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode.CreatedOnOnly,
+            [],
+            toDateExclusive: new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
+
+        // Act
+        var result = pullRequest.IsCreatedInRange(parameters);
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact(DisplayName = "IsCreatedInRange returns false when created on upper bound")]
+    [Trait("Category", "Unit")]
+    public void IsCreatedInRangeWhenCreationAtUpperBoundReturnsFalse()
+    {
+        // Arrange
+        var pullRequest = CreatePullRequest(createdOn: new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
+        var parameters = new ReportParameters(
+            new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+            new Workspace("workspace"),
+            new RepoNameFilter(string.Empty),
+            [],
+            RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode.CreatedOnOnly,
+            [],
+            toDateExclusive: new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
+
+        // Act
+        var result = pullRequest.IsCreatedInRange(parameters);
+
+        // Assert
+        result.Should().BeFalse();
+    }
+
     private static PullRequest CreatePullRequest(
         DateTimeOffset createdOn,
         DateTimeOffset? updatedOn = null,

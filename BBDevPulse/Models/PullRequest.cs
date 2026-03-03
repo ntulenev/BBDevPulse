@@ -136,4 +136,15 @@ public sealed class PullRequest
     /// <param name="filterDate">Filter cutoff date.</param>
     /// <returns>True when TTFR should be calculated.</returns>
     public bool ShouldCalculateTtfr(DateTimeOffset filterDate) => CreatedOn >= filterDate;
+
+    /// <summary>
+    /// Determines whether the pull request was created within the configured report range.
+    /// </summary>
+    /// <param name="parameters">Report parameters.</param>
+    /// <returns>True when the creation date is in range.</returns>
+    public bool IsCreatedInRange(ReportParameters parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+        return parameters.IsInRange(CreatedOn);
+    }
 }

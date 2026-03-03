@@ -55,6 +55,40 @@ public sealed class BitbucketOptionsTests
         parameters.ExcludedDays.Should().HaveCount(2);
         parameters.TeamFilter.Should().Be("Core Team");
         parameters.ShowDeveloperUuidInStats.Should().BeTrue();
+        parameters.HasUpperBound.Should().BeFalse();
+    }
+
+    [Fact(DisplayName = "CreateReportParameters maps explicit inclusive date range")]
+    [Trait("Category", "Unit")]
+    public void CreateReportParametersWhenDateRangeConfiguredUsesInclusiveBounds()
+    {
+        // Arrange
+        var options = new BitbucketOptions
+        {
+            Workspace = "workspace",
+            FromDate = "2026-02-01",
+            ToDate = "28.02.2026",
+            PageLength = 25,
+            PullRequestConcurrency = 3,
+            RepositoryConcurrency = 2,
+            Username = "user",
+            AppPassword = "pass",
+            RepoNameFilter = "pulse",
+            RepoNameList = ["RepoA"],
+            BranchNameList = ["main"],
+            RepoSearchMode = RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            Pdf = new PdfOptions()
+        };
+
+        // Act
+        var parameters = options.CreateReportParameters();
+
+        // Assert
+        parameters.FilterDate.Should().Be(new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero));
+        parameters.ToDateExclusive.Should().Be(new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
+        parameters.HasUpperBound.Should().BeTrue();
+        parameters.GetDateWindowLabel().Should().Be("2026-02-01 to 2026-02-28");
     }
 
     [Fact(DisplayName = "CreateReportParameters treats null repo and branch lists as empty")]
@@ -194,5 +228,66 @@ public sealed class BitbucketOptionsTests
         // Assert
         act.Should().Throw<FormatException>()
             .WithMessage("Invalid excluded day '02/03/2026'. Expected dd.MM.yyyy or yyyy-MM-dd.");
+    }
+
+    [Fact(DisplayName = "CreateReportParameters throws when only one date range bound is configured")]
+    [Trait("Category", "Unit")]
+    public void CreateReportParametersWhenOnlyOneDateBoundConfiguredThrowsFormatException()
+    {
+        // Arrange
+        var options = new BitbucketOptions
+        {
+            Workspace = "workspace",
+            FromDate = "2026-02-01",
+            PageLength = 50,
+            PullRequestConcurrency = 1,
+            RepositoryConcurrency = 1,
+            Username = "username",
+            AppPassword = "password",
+            RepoNameFilter = "filter",
+            RepoNameList = ["RepoA"],
+            BranchNameList = ["main"],
+            RepoSearchMode = RepoSearchMode.SearchByFilter,
+            PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            Pdf = new PdfOptions()
+        };
+
+        // Act
+        Action act = () => _ = options.CreateReportParameters();
+
+        // Assert
+        act.Should().Throw<FormatException>()
+            .WithMessage("Both FromDate and ToDate must be configured together.");
+    }
+
+    [Fact(DisplayName = "CreateReportParameters throws when ToDate is before FromDate")]
+    [Trait("Category", "Unit")]
+    public void CreateReportParametersWhenToDateIsBeforeFromDateThrowsFormatException()
+    {
+        // Arrange
+        var options = new BitbucketOptions
+        {
+            Workspace = "workspace",
+            FromDate = "2026-02-28",
+            ToDate = "2026-02-01",
+            PageLength = 50,
+            PullRequestConcurrency = 1,
+            RepositoryConcurrency = 1,
+            Username = "username",
+            AppPassword = "password",
+            RepoNameFilter = "filter",
+            RepoNameList = ["RepoA"],
+            BranchNameList = ["main"],
+            RepoSearchMode = RepoSearchMode.SearchByFilter,
+            PrTimeFilterMode = PrTimeFilterMode.LastKnownUpdateAndCreated,
+            Pdf = new PdfOptions()
+        };
+
+        // Act
+        Action act = () => _ = options.CreateReportParameters();
+
+        // Assert
+        act.Should().Throw<FormatException>()
+            .WithMessage("ToDate '2026-02-01' must be on or after FromDate '2026-02-28'.");
     }
 }

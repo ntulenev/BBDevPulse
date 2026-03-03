@@ -9,18 +9,30 @@ namespace BBDevPulse.Logic;
 internal sealed class ActivityAnalyzer : IActivityAnalyzer
 {
     /// <inheritdoc />
-    public void Analyze(ActivityAnalysisState analysis, PullRequestActivity activity, DateTimeOffset filterDate)
+    public void Analyze(ActivityAnalysisState analysis, PullRequestActivity activity, ReportParameters parameters)
     {
         ArgumentNullException.ThrowIfNull(analysis);
         ArgumentNullException.ThrowIfNull(activity);
+        ArgumentNullException.ThrowIfNull(parameters);
 
-        var lastActivity = analysis.LastActivity;
-        _ = activity.TryUpdateLastActivity(ref lastActivity);
-        analysis.LastActivity = lastActivity;
+        if (parameters.IsInRange(activity.ActivityDate))
+        {
+            analysis.HasActivityInRange = true;
+        }
 
-        var mergedOnFromActivity = analysis.MergedOnFromActivity;
-        _ = activity.TryUpdateMergedOn(ref mergedOnFromActivity);
-        analysis.MergedOnFromActivity = mergedOnFromActivity;
+        if (parameters.IsInRange(activity.ActivityDate))
+        {
+            var lastActivity = analysis.LastActivity;
+            _ = activity.TryUpdateLastActivity(ref lastActivity);
+            analysis.LastActivity = lastActivity;
+        }
+
+        if (parameters.IsInRange(activity.MergeDate))
+        {
+            var mergedOnFromActivity = analysis.MergedOnFromActivity;
+            _ = activity.TryUpdateMergedOn(ref mergedOnFromActivity);
+            analysis.MergedOnFromActivity = mergedOnFromActivity;
+        }
 
         if (!activity.TryGetActor(out var activityUser))
         {
@@ -31,9 +43,9 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
 
         if (activity.Comment is not null)
         {
-            analysis.TotalComments++;
-            if (activity.Comment.IsOnOrAfter(filterDate))
+            if (parameters.IsInRange(activity.Comment.Date))
             {
+                analysis.TotalComments++;
                 var commentUser = activity.Comment.User;
                 var commentKey = commentUser.ToKey();
                 analysis.CommentCounts[commentKey] =
@@ -42,6 +54,7 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
             }
 
             if (analysis.ShouldCalculateTtfr &&
+                parameters.IsInRange(activity.Comment.Date) &&
                 activity.Comment.IsOnOrAfter(analysis.CreatedOn) &&
                 activity.Comment.IsByDifferentDeveloper(analysis.AuthorIdentity))
             {
@@ -53,7 +66,7 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
 
         if (activity.Approval is not null)
         {
-            if (activity.Approval.IsOnOrAfter(filterDate))
+            if (parameters.IsInRange(activity.Approval.Date))
             {
                 var approvalUser = activity.Approval.User;
                 var approvalKey = approvalUser.ToKey();
@@ -63,6 +76,7 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
             }
 
             if (analysis.ShouldCalculateTtfr &&
+                parameters.IsInRange(activity.Approval.Date) &&
                 activity.Approval.IsOnOrAfter(analysis.CreatedOn) &&
                 activity.Approval.IsByDifferentDeveloper(analysis.AuthorIdentity))
             {

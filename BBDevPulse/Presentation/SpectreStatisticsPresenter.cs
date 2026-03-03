@@ -272,12 +272,11 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
-    public void RenderDeveloperStatsTable(
-        ReportData reportData,
-        DateTimeOffset filterDate)
+    public void RenderDeveloperStatsTable(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
         var showDeveloperUuidInStats = reportData.Parameters.ShowDeveloperUuidInStats;
+        var dateWindowLabel = reportData.Parameters.GetDateWindowLabel();
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("#")
@@ -323,7 +322,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             index++;
         }
 
-        AnsiConsole.Write(new Rule($"Developer Stats (since {filterDate:yyyy-MM-dd})").RuleStyle("grey"));
+        AnsiConsole.Write(new Rule($"Developer Stats ({dateWindowLabel})").RuleStyle("grey"));
         AnsiConsole.Write(table);
     }
 

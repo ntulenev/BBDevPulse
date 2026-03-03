@@ -131,6 +131,32 @@ public sealed class ReportParametersTests
         parameters.TeamFilter.Should().Be("Core");
         parameters.HasTeamFilter.Should().BeTrue();
         parameters.ShowDeveloperUuidInStats.Should().BeTrue();
+        parameters.ToDateExclusive.Should().BeNull();
+        parameters.HasUpperBound.Should().BeFalse();
+        parameters.GetDateWindowLabel().Should().Be("since 2026-02-21");
     }
 
+    [Fact(DisplayName = "IsInRange applies inclusive lower bound and exclusive upper bound")]
+    [Trait("Category", "Unit")]
+    public void IsInRangeWhenUpperBoundConfiguredUsesHalfOpenInterval()
+    {
+        // Arrange
+        var parameters = new ReportParameters(
+            new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero),
+            new Workspace("workspace"),
+            new RepoNameFilter(string.Empty),
+            [],
+            RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode.CreatedOnOnly,
+            [],
+            toDateExclusive: new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero));
+
+        // Act / Assert
+        parameters.HasUpperBound.Should().BeTrue();
+        parameters.IsInRange(new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero)).Should().BeTrue();
+        parameters.IsInRange(new DateTimeOffset(2026, 2, 28, 23, 59, 59, TimeSpan.Zero)).Should().BeTrue();
+        parameters.IsInRange(new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero)).Should().BeFalse();
+        parameters.IsInRange((DateTimeOffset?)null).Should().BeFalse();
+        parameters.GetDateWindowLabel().Should().Be("2026-02-01 to 2026-02-28");
+    }
 }
