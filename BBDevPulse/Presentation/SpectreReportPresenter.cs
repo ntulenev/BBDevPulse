@@ -90,6 +90,10 @@ public sealed class SpectreReportPresenter : IReportPresenter
         _statisticsPresenter.RenderPullRequestSizeStats(reportData);
         _statisticsPresenter.RenderWorstPullRequestsTable(reportData);
         _statisticsPresenter.RenderDeveloperStatsTable(reportData);
+        if (reportData.Parameters.ShowAllDetailsForDevelopers)
+        {
+            _statisticsPresenter.RenderDeveloperDetails(reportData);
+        }
     }
 
     private readonly IAuthPresenter _authPresenter;

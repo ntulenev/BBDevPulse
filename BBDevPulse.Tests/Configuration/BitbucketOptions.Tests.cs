@@ -31,6 +31,7 @@ public sealed class BitbucketOptionsTests
             ExcludedDays = ["03.02.2026", "2026-02-04", " ", "", "03.02.2026"],
             TeamFilter = "Core Team",
             ShowDeveloperUuidInStats = true,
+            ShowAllDetailsForDevelopers = true,
             Pdf = new PdfOptions { Enabled = false, OutputPath = "report.pdf" }
         };
         var expectedLowerBound = DateTimeOffset.UtcNow.AddDays(-10).AddSeconds(-2);
@@ -55,6 +56,7 @@ public sealed class BitbucketOptionsTests
         parameters.ExcludedDays.Should().HaveCount(2);
         parameters.TeamFilter.Should().Be("Core Team");
         parameters.ShowDeveloperUuidInStats.Should().BeTrue();
+        parameters.ShowAllDetailsForDevelopers.Should().BeTrue();
         parameters.HasUpperBound.Should().BeFalse();
     }
 
@@ -152,6 +154,7 @@ public sealed class BitbucketOptionsTests
             PeopleCsvPath = "people.csv",
             TeamFilter = "Import",
             ShowDeveloperUuidInStats = true,
+            ShowAllDetailsForDevelopers = true,
             Pdf = pdf
         };
 
@@ -174,6 +177,7 @@ public sealed class BitbucketOptionsTests
         var peopleCsvPath = options.PeopleCsvPath;
         var teamFilter = options.TeamFilter;
         var showDeveloperUuidInStats = options.ShowDeveloperUuidInStats;
+        var showAllDetailsForDevelopers = options.ShowAllDetailsForDevelopers;
         var pdfOptions = options.Pdf;
 
         // Assert
@@ -195,6 +199,7 @@ public sealed class BitbucketOptionsTests
         peopleCsvPath.Should().Be("people.csv");
         teamFilter.Should().Be("Import");
         showDeveloperUuidInStats.Should().BeTrue();
+        showAllDetailsForDevelopers.Should().BeTrue();
         pdfOptions.Should().BeSameAs(pdf);
     }
 

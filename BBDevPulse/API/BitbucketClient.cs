@@ -166,7 +166,7 @@ internal sealed class BitbucketClient : IBitbucketClient
     }
 
     /// <inheritdoc />
-    public async IAsyncEnumerable<DateTimeOffset> GetPullRequestCommitDatesAsync(
+    public async IAsyncEnumerable<PullRequestCommitInfo> GetPullRequestCommitsAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
@@ -194,9 +194,9 @@ internal sealed class BitbucketClient : IBitbucketClient
             cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (commit.Date.HasValue)
+            if (commit.Date.HasValue && !string.IsNullOrWhiteSpace(commit.Hash))
             {
-                yield return commit.Date.Value;
+                yield return new PullRequestCommitInfo(commit.Hash, commit.Date.Value);
             }
         }
     }

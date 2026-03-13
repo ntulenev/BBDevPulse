@@ -42,4 +42,10 @@ public interface IStatisticsPresenter
     /// </summary>
     /// <param name="reportData">Report data.</param>
     void RenderDeveloperStatsTable(ReportData reportData);
+
+    /// <summary>
+    /// Renders detailed per-developer activity sections.
+    /// </summary>
+    /// <param name="reportData">Report data.</param>
+    void RenderDeveloperDetails(ReportData reportData);
 }

@@ -263,15 +263,15 @@ public sealed class PullRequestAnalyzerTests
                     approval: null));
                 return ToAsyncEnumerable([activity]);
             });
-        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+        client.Setup(x => x.GetPullRequestCommitsAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
                 It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 42),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                filterDate.AddDays(6),
-                filterDate.AddDays(2),
-                filterDate.AddDays(1)
+                new PullRequestCommitInfo("commit-42-3", filterDate.AddDays(6)),
+                new PullRequestCommitInfo("commit-42-2", filterDate.AddDays(2)),
+                new PullRequestCommitInfo("commit-42-1", filterDate.AddDays(1))
             ]));
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
@@ -369,12 +369,12 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
-        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+        client.Setup(x => x.GetPullRequestCommitsAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
                 It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 3),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
-            .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
+            .Returns(ToAsyncEnumerable<PullRequestCommitInfo>([]));
 
         var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
 
@@ -420,12 +420,12 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
-        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+        client.Setup(x => x.GetPullRequestCommitsAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
                 It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 4),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
-            .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
+            .Returns(ToAsyncEnumerable<PullRequestCommitInfo>([]));
 
         var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
 
@@ -477,15 +477,15 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([activity]));
-        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+        client.Setup(x => x.GetPullRequestCommitsAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
                 It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 5),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                filterDate.AddDays(2),
-                filterDate.AddDays(1),
-                filterDate.AddDays(-11)
+                new PullRequestCommitInfo("commit-5-2", filterDate.AddDays(2)),
+                new PullRequestCommitInfo("commit-5-1", filterDate.AddDays(1)),
+                new PullRequestCommitInfo("commit-5-0", filterDate.AddDays(-11))
             ]));
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
@@ -600,21 +600,21 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<Func<PullRequestActivity, bool>>(shouldStop => shouldStop != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([teamCommentActivity, teamMergeActivity]));
-        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+        client.Setup(x => x.GetPullRequestCommitsAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
                 It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 10),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
-            .Returns(ToAsyncEnumerable<DateTimeOffset>([]));
-        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+            .Returns(ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
                 It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo"),
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 11),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                filterDate.AddDays(5),
-                filterDate.AddDays(3),
-                filterDate.AddDays(2)
+                new PullRequestCommitInfo("commit-11-3", filterDate.AddDays(5)),
+                new PullRequestCommitInfo("commit-11-2", filterDate.AddDays(3)),
+                new PullRequestCommitInfo("commit-11-1", filterDate.AddDays(2))
             ]));
         client.Setup(x => x.GetPullRequestSizeAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
@@ -693,15 +693,15 @@ public sealed class PullRequestAnalyzerTests
                 It.IsAny<Func<PullRequestActivity, bool>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([activity]));
-        client.Setup(x => x.GetPullRequestCommitDatesAsync(
+        client.Setup(x => x.GetPullRequestCommitsAsync(
                 It.IsAny<Workspace>(),
                 It.IsAny<RepoSlug>(),
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 77),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                new DateTimeOffset(2026, 3, 2, 10, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 2, 25, 10, 0, 0, TimeSpan.Zero),
-                new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero)
+                new PullRequestCommitInfo("commit-77-3", new DateTimeOffset(2026, 3, 2, 10, 0, 0, TimeSpan.Zero)),
+                new PullRequestCommitInfo("commit-77-2", new DateTimeOffset(2026, 2, 25, 10, 0, 0, TimeSpan.Zero)),
+                new PullRequestCommitInfo("commit-77-1", new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero))
             ]));
 
         var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer());
@@ -723,10 +723,90 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats[authorKey].Corrections.Should().Be(1);
     }
 
+    [Fact(DisplayName = "AnalyzeAsync collects detailed per-developer activities when configured")]
+    [Trait("Category", "Unit")]
+    public async Task AnalyzeAsyncWhenDetailedDeveloperOptionEnabledCollectsDetails()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateParameters(filterDate, showAllDetailsForDevelopers: true));
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
+        var reviewerIdentity = new DeveloperIdentity(new UserUuid("{reviewer-1}"), new DisplayName("Reviewer"));
+        var pullRequest = new PullRequest(
+            new PullRequestId(88),
+            PullRequestState.Merged,
+            closedOn: filterDate.AddDays(5),
+            createdOn: filterDate.AddDays(1),
+            updatedOn: filterDate.AddDays(4),
+            mergedOn: filterDate.AddDays(5),
+            author: author,
+            destination: new PullRequestDestination(new PullRequestBranch("develop")));
+        var commentActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(2),
+            mergeDate: null,
+            actor: reviewerIdentity,
+            comment: new ActivityComment(reviewerIdentity, filterDate.AddDays(2)),
+            approval: null);
+        var approvalActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(3),
+            mergeDate: null,
+            actor: reviewerIdentity,
+            comment: null,
+            approval: new ActivityApproval(reviewerIdentity, filterDate.AddDays(3)));
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client, new PullRequestSizeSummary(FilesChanged: 3, LinesAdded: 30, LinesRemoved: 20));
+        client.Setup(x => x.GetPullRequestsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([pullRequest]));
+        client.Setup(x => x.GetPullRequestActivityAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 88),
+                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([commentActivity, approvalActivity]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 88),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([
+                new PullRequestCommitInfo("commit-88-3", filterDate.AddDays(4)),
+                new PullRequestCommitInfo("commit-88-2", filterDate.AddDays(2)),
+                new PullRequestCommitInfo("commit-88-1", filterDate.AddDays(1))
+            ]));
+
+        var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer());
+
+        // Act
+        await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
+
+        // Assert
+        var authorKey = new DeveloperKey(new UserUuid("{alice-1}"));
+        reportData.DeveloperStats.Should().ContainKey(authorKey);
+        reportData.DeveloperStats[authorKey].AuthoredPullRequests.Should().ContainSingle();
+        reportData.DeveloperStats[authorKey].AuthoredPullRequests[0].Id.Value.Should().Be(88);
+        reportData.DeveloperStats[authorKey].CommitActivities.Should().HaveCount(2);
+        reportData.DeveloperStats[authorKey].CommitActivities[0].CommitHash.Should().Be("commit-88-3");
+
+        var reviewerKey = new DeveloperKey(new UserUuid("{reviewer-1}"));
+        reportData.DeveloperStats.Should().ContainKey(reviewerKey);
+        reportData.DeveloperStats[reviewerKey].CommentActivities.Should().ContainSingle();
+        reportData.DeveloperStats[reviewerKey].ApprovalActivities.Should().ContainSingle();
+        reportData.DeveloperStats[reviewerKey].CommentActivities[0].PullRequestId.Value.Should().Be(88);
+        reportData.DeveloperStats[reviewerKey].ApprovalActivities[0].PullRequestId.Value.Should().Be(88);
+    }
+
     private static ReportParameters CreateParameters(
         DateTimeOffset filterDate,
         IReadOnlyList<BranchName>? branchNameList = null,
         string? teamFilter = null,
+        bool showAllDetailsForDevelopers = false,
         DateTimeOffset? toDateExclusive = null)
     {
         return new ReportParameters(
@@ -738,6 +818,7 @@ public sealed class PullRequestAnalyzerTests
             PrTimeFilterMode.CreatedOnOnly,
             branchNameList ?? [],
             teamFilter: teamFilter,
+            showAllDetailsForDevelopers: showAllDetailsForDevelopers,
             toDateExclusive: toDateExclusive);
     }
 

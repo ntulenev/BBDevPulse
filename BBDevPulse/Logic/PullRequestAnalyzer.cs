@@ -99,6 +99,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var parameters = reportData.Parameters;
         var filterDate = parameters.FilterDate;
         var workspace = parameters.Workspace;
+        var collectDeveloperDetails = parameters.ShowAllDetailsForDevelopers;
 
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
         var includeAuthoredPullRequest = !parameters.HasTeamFilter ||
@@ -107,6 +108,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             pr.CreatedOn,
             authorIdentity,
             pr.IsCreatedInRange(parameters));
+        var detailedComments = collectDeveloperDetails
+            ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
+            : null;
+        var detailedApprovals = collectDeveloperDetails
+            ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
+            : null;
 
         await foreach (var activity in _client.GetPullRequestActivityAsync(
                            workspace,
@@ -123,6 +130,19 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             }
 
             _activityAnalyzer.Analyze(analysis, activity, parameters);
+
+            if (collectDeveloperDetails)
+            {
+                if (activity.Comment is not null && parameters.IsInRange(activity.Comment.Date))
+                {
+                    detailedComments!.Add((activity.Comment.User, activity.Comment.Date));
+                }
+
+                if (activity.Approval is not null && parameters.IsInRange(activity.Approval.Date))
+                {
+                    detailedApprovals!.Add((activity.Approval.User, activity.Approval.Date));
+                }
+            }
         }
 
         var matchesFilter = parameters.IsInRange(pr.CreatedOn) || analysis.HasActivityInRange;
@@ -155,15 +175,39 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             rejectedOn = null;
         }
 
-        var corrections = 0;
+        IReadOnlyList<PullRequestCommitInfo> correctionCommits = [];
         var sizeSummary = PullRequestSizeSummary.Empty;
         if (shouldDisplayPullRequest)
         {
-            corrections = await CountCorrectionsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, parameters, cancellationToken)
+            correctionCommits = await GetCorrectionCommitsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, parameters, cancellationToken)
                 .ConfigureAwait(false);
             sizeSummary = await GetPullRequestSizeSafeAsync(workspace, repo.Slug, pr.Id, cancellationToken)
                 .ConfigureAwait(false);
         }
+
+        var corrections = correctionCommits.Count;
+        var repositoryName = string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value;
+        var pullRequestAuthor = pr.Author?.DisplayName.Value ?? "unknown";
+        var reportEntry = shouldDisplayPullRequest
+            ? new PullRequestReport(
+                repositoryName,
+                repo.Slug.Value,
+                pullRequestAuthor,
+                pr.Destination?.Branch?.Name ?? "-",
+                pr.CreatedOn,
+                analysis.LastActivity,
+                mergedOnResolved,
+                rejectedOn,
+                pr.State,
+                pr.Id,
+                analysis.TotalComments,
+                corrections,
+                analysis.FirstReactionOn,
+                sizeSummary.FilesChanged,
+                sizeSummary.LinesAdded,
+                sizeSummary.LinesRemoved,
+                isActivityOnlyMatch: !includeAuthoredPullRequest)
+            : null;
 
         lock (reportData)
         {
@@ -181,6 +225,19 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 }
 
                 authorStats.Corrections += corrections;
+                if (collectDeveloperDetails && reportEntry is not null)
+                {
+                    authorStats.AuthoredPullRequests.Add(reportEntry);
+                    foreach (var commit in correctionCommits)
+                    {
+                        authorStats.CommitActivities.Add(new DeveloperCommitActivity(
+                            repositoryName,
+                            repo.Slug.Value,
+                            pr.Id,
+                            commit.Hash,
+                            commit.Date));
+                    }
+                }
             }
 
             foreach (var entry in analysis.CommentCounts)
@@ -201,31 +258,43 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 }
             }
 
+            if (collectDeveloperDetails)
+            {
+                foreach (var detail in detailedComments!)
+                {
+                    if (reportData.IsDeveloperIncluded(detail.User))
+                    {
+                        reportData.GetOrAddDeveloper(detail.User).CommentActivities.Add(new DeveloperCommentActivity(
+                            repositoryName,
+                            repo.Slug.Value,
+                            pr.Id,
+                            pullRequestAuthor,
+                            detail.Date));
+                    }
+                }
+
+                foreach (var detail in detailedApprovals!)
+                {
+                    if (reportData.IsDeveloperIncluded(detail.User))
+                    {
+                        reportData.GetOrAddDeveloper(detail.User).ApprovalActivities.Add(new DeveloperApprovalActivity(
+                            repositoryName,
+                            repo.Slug.Value,
+                            pr.Id,
+                            pullRequestAuthor,
+                            detail.Date));
+                    }
+                }
+            }
+
             if (shouldDisplayPullRequest)
             {
-                reportData.Reports.Add(new PullRequestReport(
-                    string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
-                    repo.Slug.Value,
-                    pr.Author?.DisplayName.Value ?? "unknown",
-                    pr.Destination?.Branch?.Name ?? "-",
-                    pr.CreatedOn,
-                    analysis.LastActivity,
-                    mergedOnResolved,
-                    rejectedOn,
-                    pr.State,
-                    pr.Id,
-                    analysis.TotalComments,
-                    corrections,
-                    analysis.FirstReactionOn,
-                sizeSummary.FilesChanged,
-                sizeSummary.LinesAdded,
-                sizeSummary.LinesRemoved,
-                isActivityOnlyMatch: !includeAuthoredPullRequest));
+                reportData.Reports.Add(reportEntry!);
             }
         }
     }
 
-    private async Task<int> CountCorrectionsAsync(
+    private async Task<IReadOnlyList<PullRequestCommitInfo>> GetCorrectionCommitsAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
@@ -233,18 +302,18 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         ReportParameters parameters,
         CancellationToken cancellationToken)
     {
-        var corrections = 0;
-        await foreach (var commitDate in _client.GetPullRequestCommitDatesAsync(
+        var correctionCommits = new List<PullRequestCommitInfo>();
+        await foreach (var commit in _client.GetPullRequestCommitsAsync(
                            workspace,
                            repoSlug,
                            pullRequestId,
                            cancellationToken).ConfigureAwait(false))
         {
-            if (commitDate > createdOn)
+            if (commit.Date > createdOn)
             {
-                if (parameters.IsInRange(commitDate))
+                if (parameters.IsInRange(commit.Date))
                 {
-                    corrections++;
+                    correctionCommits.Add(commit);
                 }
 
                 continue;
@@ -253,7 +322,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             break;
         }
 
-        return corrections;
+        return correctionCommits;
     }
 
     private static bool HasIncludedTeamActivity(PullRequestActivity activity, ReportData reportData)

@@ -57,14 +57,14 @@ internal interface IBitbucketClient
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Fetches pull request commit dates.
+    /// Fetches pull request commits.
     /// </summary>
     /// <param name="workspace">Workspace identifier.</param>
     /// <param name="repoSlug">Repository slug.</param>
     /// <param name="pullRequestId">Pull request identifier.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Commit dates for the pull request.</returns>
-    IAsyncEnumerable<DateTimeOffset> GetPullRequestCommitDatesAsync(
+    /// <returns>Commit information for the pull request.</returns>
+    IAsyncEnumerable<PullRequestCommitInfo> GetPullRequestCommitsAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         PullRequestId pullRequestId,

@@ -155,6 +155,10 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         excludedDays,
                         pullRequestSizeMode);
                     ComposeDeveloperSection(column, reportData);
+                    if (reportData.Parameters.ShowAllDetailsForDevelopers)
+                    {
+                        ComposeDeveloperDetailsSection(column, reportData, workspace);
+                    }
                 });
 
                 page.Footer().AlignRight().Text(text =>
@@ -401,6 +405,33 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 index++;
             }
         });
+    }
+
+    private static void ComposeDeveloperDetailsSection(
+        ColumnDescriptor column,
+        ReportData reportData,
+        string workspace)
+    {
+        var orderedDeveloperStats = reportData.DeveloperStats.Values
+            .OrderByDescending(static stat => stat.PrsOpenedSince)
+            .ThenBy(static stat => stat.DisplayName.Value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (orderedDeveloperStats.Count == 0)
+        {
+            _ = column.Item().Text("Developer Details").Bold().FontSize(12);
+            _ = column.Item().Text("No developer activity found in the report.");
+            return;
+        }
+
+        _ = column.Item().Text("Developer Details").Bold().FontSize(12);
+        foreach (var stat in orderedDeveloperStats)
+        {
+            _ = column.Item().PaddingTop(4).Text(stat.DisplayName.Value).Bold().FontSize(11);
+            ComposeAuthoredPullRequestDetails(column, stat, workspace);
+            ComposeCommentDetails(column, stat, workspace);
+            ComposeApprovalDetails(column, stat, workspace);
+            ComposeCommitDetails(column, stat, workspace);
+        }
     }
 
     private void ComposeWorstPullRequestsSection(
@@ -677,6 +708,198 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             Uri.EscapeDataString(workspace),
             Uri.EscapeDataString(repositorySlug),
             pullRequestId.ToString(CultureInfo.InvariantCulture));
+
+    private static string BuildCommitUrl(string workspace, string repositorySlug, string commitHash) =>
+        string.Format(
+            CultureInfo.InvariantCulture,
+            "https://bitbucket.org/{0}/{1}/commits/{2}",
+            Uri.EscapeDataString(workspace),
+            Uri.EscapeDataString(repositorySlug),
+            Uri.EscapeDataString(commitHash));
+
+    private static string ShortCommitHash(string commitHash) =>
+        commitHash.Length <= 12
+            ? commitHash
+            : commitHash[..12];
+
+    private static void ComposeAuthoredPullRequestDetails(
+        ColumnDescriptor column,
+        DeveloperStats stat,
+        string workspace)
+    {
+        _ = column.Item().Text("Authored PRs").Bold();
+        if (stat.AuthoredPullRequests.Count == 0)
+        {
+            _ = column.Item().Text("No authored PRs.");
+            return;
+        }
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn(2);
+                columns.ConstantColumn(45);
+                columns.RelativeColumn(1.2f);
+                columns.ConstantColumn(58);
+                columns.ConstantColumn(58);
+                columns.ConstantColumn(58);
+                columns.ConstantColumn(55);
+                columns.ConstantColumn(45);
+                columns.ConstantColumn(58);
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Repository");
+                _ = header.Cell().Element(HeaderCell).Text("PR ID");
+                _ = header.Cell().Element(HeaderCell).Text("Target");
+                _ = header.Cell().Element(HeaderCell).Text("Created");
+                _ = header.Cell().Element(HeaderCell).Text("State");
+                _ = header.Cell().Element(HeaderCell).Text("Merged");
+                _ = header.Cell().Element(HeaderCell).Text("Comments");
+                _ = header.Cell().Element(HeaderCell).Text("Fixes");
+                _ = header.Cell().Element(HeaderCell).Text("Size");
+            });
+
+            foreach (var report in stat.AuthoredPullRequests
+                .OrderByDescending(static report => report.CreatedOn))
+            {
+                AddHyperlinkCell(table, BuildRepositoryUrl(workspace, report.RepositorySlug), report.Repository, highlight: false);
+                AddHyperlinkCell(table, BuildPullRequestUrl(workspace, report.RepositorySlug, report.Id.Value), report.Id.Value.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, report.TargetBranch, highlight: false);
+                AddBodyTextCell(table, report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, report.State.ToString(), highlight: false);
+                AddBodyTextCell(table, report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", highlight: false);
+                AddBodyTextCell(table, report.Comments.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, report.Corrections.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, FormatPullRequestSize(report, PullRequestSizeMode.Lines), highlight: false);
+            }
+        });
+    }
+
+    private static void ComposeCommentDetails(
+        ColumnDescriptor column,
+        DeveloperStats stat,
+        string workspace)
+    {
+        _ = column.Item().Text("Comments").Bold();
+        if (stat.CommentActivities.Count == 0)
+        {
+            _ = column.Item().Text("No comments.");
+            return;
+        }
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn(2);
+                columns.ConstantColumn(45);
+                columns.RelativeColumn(1.5f);
+                columns.ConstantColumn(85);
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Repository");
+                _ = header.Cell().Element(HeaderCell).Text("PR ID");
+                _ = header.Cell().Element(HeaderCell).Text("PR Author");
+                _ = header.Cell().Element(HeaderCell).Text("Date");
+            });
+
+            foreach (var activity in stat.CommentActivities
+                .OrderByDescending(static activity => activity.Date))
+            {
+                AddHyperlinkCell(table, BuildRepositoryUrl(workspace, activity.RepositorySlug), activity.Repository, highlight: false);
+                AddHyperlinkCell(table, BuildPullRequestUrl(workspace, activity.RepositorySlug, activity.PullRequestId.Value), activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, activity.PullRequestAuthor, highlight: false);
+                AddBodyTextCell(table, activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), highlight: false);
+            }
+        });
+    }
+
+    private static void ComposeApprovalDetails(
+        ColumnDescriptor column,
+        DeveloperStats stat,
+        string workspace)
+    {
+        _ = column.Item().Text("Approvals").Bold();
+        if (stat.ApprovalActivities.Count == 0)
+        {
+            _ = column.Item().Text("No approvals.");
+            return;
+        }
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn(2);
+                columns.ConstantColumn(45);
+                columns.RelativeColumn(1.5f);
+                columns.ConstantColumn(85);
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Repository");
+                _ = header.Cell().Element(HeaderCell).Text("PR ID");
+                _ = header.Cell().Element(HeaderCell).Text("PR Author");
+                _ = header.Cell().Element(HeaderCell).Text("Date");
+            });
+
+            foreach (var activity in stat.ApprovalActivities
+                .OrderByDescending(static activity => activity.Date))
+            {
+                AddHyperlinkCell(table, BuildRepositoryUrl(workspace, activity.RepositorySlug), activity.Repository, highlight: false);
+                AddHyperlinkCell(table, BuildPullRequestUrl(workspace, activity.RepositorySlug, activity.PullRequestId.Value), activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, activity.PullRequestAuthor, highlight: false);
+                AddBodyTextCell(table, activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), highlight: false);
+            }
+        });
+    }
+
+    private static void ComposeCommitDetails(
+        ColumnDescriptor column,
+        DeveloperStats stat,
+        string workspace)
+    {
+        _ = column.Item().Text("Follow-up Commits").Bold();
+        if (stat.CommitActivities.Count == 0)
+        {
+            _ = column.Item().Text("No follow-up commits.");
+            return;
+        }
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn(2);
+                columns.ConstantColumn(45);
+                columns.ConstantColumn(75);
+                columns.ConstantColumn(85);
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Repository");
+                _ = header.Cell().Element(HeaderCell).Text("PR ID");
+                _ = header.Cell().Element(HeaderCell).Text("Commit");
+                _ = header.Cell().Element(HeaderCell).Text("Date");
+            });
+
+            foreach (var activity in stat.CommitActivities
+                .OrderByDescending(static activity => activity.Date))
+            {
+                AddHyperlinkCell(table, BuildRepositoryUrl(workspace, activity.RepositorySlug), activity.Repository, highlight: false);
+                AddHyperlinkCell(table, BuildPullRequestUrl(workspace, activity.RepositorySlug, activity.PullRequestId.Value), activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddHyperlinkCell(table, BuildCommitUrl(workspace, activity.RepositorySlug, activity.CommitHash), ShortCommitHash(activity.CommitHash), highlight: false);
+                AddBodyTextCell(table, activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), highlight: false);
+            }
+        });
+    }
 
     private static IContainer HeaderCell(IContainer container) =>
         container

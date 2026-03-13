@@ -326,6 +326,35 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         AnsiConsole.Write(table);
     }
 
+    /// <inheritdoc />
+    public void RenderDeveloperDetails(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+
+        var orderedDeveloperStats = reportData.DeveloperStats.Values
+            .OrderByDescending(static stat => stat.PrsOpenedSince)
+            .ThenBy(static stat => stat.DisplayName.Value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (orderedDeveloperStats.Count == 0)
+        {
+            AnsiConsole.Write(new Rule("Developer Details").RuleStyle("grey"));
+            AnsiConsole.MarkupLine("[yellow]No developer activity found in the report.[/]");
+            return;
+        }
+
+        AnsiConsole.Write(new Rule("Developer Details").RuleStyle("grey"));
+
+        foreach (var stat in orderedDeveloperStats)
+        {
+            AnsiConsole.Write(new Rule(stat.DisplayName.Value).RuleStyle("grey"));
+
+            RenderAuthoredPullRequests(stat);
+            RenderCommentActivities(stat);
+            RenderApprovalActivities(stat);
+            RenderCommitActivities(stat, reportData.Parameters.Workspace.Value);
+        }
+    }
+
     private static MetricCandidate? SelectDistinctWorst(
         IEnumerable<MetricCandidate> orderedCandidates,
         HashSet<string> usedPrKeys)
@@ -383,6 +412,148 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
 
     private static string BuildPrKey(PullRequestReport report) =>
         $"{report.RepositorySlug}:{report.Id.Value.ToString(CultureInfo.InvariantCulture)}";
+
+    private static void RenderAuthoredPullRequests(DeveloperStats stat)
+    {
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("Authored PRs")
+            .AddColumn("Repository")
+            .AddColumn("PR ID")
+            .AddColumn("Target")
+            .AddColumn("Created")
+            .AddColumn("State")
+            .AddColumn("Merged")
+            .AddColumn("Comments")
+            .AddColumn("Corrections")
+            .AddColumn("Size");
+
+        if (stat.AuthoredPullRequests.Count == 0)
+        {
+            _ = table.AddRow("No authored PRs", "-", "-", "-", "-", "-", "-", "-", "-");
+            AnsiConsole.Write(table);
+            return;
+        }
+
+        foreach (var report in stat.AuthoredPullRequests
+            .OrderByDescending(static report => report.CreatedOn))
+        {
+            _ = table.AddRow(
+                report.Repository,
+                report.Id.Value.ToString(CultureInfo.InvariantCulture),
+                report.TargetBranch,
+                report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                report.State.ToString(),
+                report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-",
+                report.Comments.ToString(CultureInfo.InvariantCulture),
+                report.Corrections.ToString(CultureInfo.InvariantCulture),
+                report.HasSizeData
+                    ? $"{report.GetSizeMetricValue(PullRequestSizeMode.Lines).ToString(CultureInfo.InvariantCulture)} ({report.GetSizeTier(PullRequestSizeMode.Lines)})"
+                    : "-");
+        }
+
+        AnsiConsole.Write(table);
+    }
+
+    private static void RenderCommentActivities(DeveloperStats stat)
+    {
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("Comments")
+            .AddColumn("Repository")
+            .AddColumn("PR ID")
+            .AddColumn("PR Author")
+            .AddColumn("Date");
+
+        if (stat.CommentActivities.Count == 0)
+        {
+            _ = table.AddRow("No comments", "-", "-", "-");
+            AnsiConsole.Write(table);
+            return;
+        }
+
+        foreach (var activity in stat.CommentActivities
+            .OrderByDescending(static activity => activity.Date))
+        {
+            _ = table.AddRow(
+                activity.Repository,
+                activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture),
+                activity.PullRequestAuthor,
+                activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+        }
+
+        AnsiConsole.Write(table);
+    }
+
+    private static void RenderApprovalActivities(DeveloperStats stat)
+    {
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("Approvals")
+            .AddColumn("Repository")
+            .AddColumn("PR ID")
+            .AddColumn("PR Author")
+            .AddColumn("Date");
+
+        if (stat.ApprovalActivities.Count == 0)
+        {
+            _ = table.AddRow("No approvals", "-", "-", "-");
+            AnsiConsole.Write(table);
+            return;
+        }
+
+        foreach (var activity in stat.ApprovalActivities
+            .OrderByDescending(static activity => activity.Date))
+        {
+            _ = table.AddRow(
+                activity.Repository,
+                activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture),
+                activity.PullRequestAuthor,
+                activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+        }
+
+        AnsiConsole.Write(table);
+    }
+
+    private static void RenderCommitActivities(DeveloperStats stat, string workspace)
+    {
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("Follow-up Commits")
+            .AddColumn("Repository")
+            .AddColumn("PR ID")
+            .AddColumn("Commit")
+            .AddColumn("Date");
+
+        if (stat.CommitActivities.Count == 0)
+        {
+            _ = table.AddRow("No follow-up commits", "-", "-", "-");
+            AnsiConsole.Write(table);
+            return;
+        }
+
+        foreach (var activity in stat.CommitActivities
+            .OrderByDescending(static activity => activity.Date))
+        {
+            _ = table.AddRow(
+                activity.Repository,
+                activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture),
+                $"[link={BuildCommitUrl(workspace, activity.RepositorySlug, activity.CommitHash)}]{EscapeMarkup(ShortCommitHash(activity.CommitHash))}[/]",
+                activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
+        }
+
+        AnsiConsole.Write(table);
+    }
+
+    private static string ShortCommitHash(string commitHash) =>
+        commitHash.Length <= 12
+            ? commitHash
+            : commitHash[..12];
+
+    private static string BuildCommitUrl(string workspace, string repositorySlug, string commitHash) =>
+        $"https://bitbucket.org/{Uri.EscapeDataString(workspace)}/{Uri.EscapeDataString(repositorySlug)}/commits/{Uri.EscapeDataString(commitHash)}";
+
+    private static string EscapeMarkup(string value) => Markup.Escape(value);
 
     private readonly record struct MetricCandidate(PullRequestReport Report, double Value);
 }

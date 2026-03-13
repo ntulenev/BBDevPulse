@@ -115,7 +115,8 @@ public sealed class ReportParametersTests
             excludedDays: excludedDays,
             pullRequestSizeMode: PullRequestSizeMode.Files,
             teamFilter: "Core",
-            showDeveloperUuidInStats: true);
+            showDeveloperUuidInStats: true,
+            showAllDetailsForDevelopers: true);
 
         // Assert
         parameters.FilterDate.Should().Be(filterDate);
@@ -131,6 +132,7 @@ public sealed class ReportParametersTests
         parameters.TeamFilter.Should().Be("Core");
         parameters.HasTeamFilter.Should().BeTrue();
         parameters.ShowDeveloperUuidInStats.Should().BeTrue();
+        parameters.ShowAllDetailsForDevelopers.Should().BeTrue();
         parameters.ToDateExclusive.Should().BeNull();
         parameters.HasUpperBound.Should().BeFalse();
         parameters.GetDateWindowLabel().Should().Be("since 2026-02-21");

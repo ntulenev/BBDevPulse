@@ -142,17 +142,18 @@ public sealed class TransportDtosTests
         dto.Destination!.Branch!.Name.Should().Be("develop");
     }
 
-    [Fact(DisplayName = "PullRequestCommitDto deserializes commit date")]
+    [Fact(DisplayName = "PullRequestCommitDto deserializes commit hash and date")]
     [Trait("Category", "Unit")]
-    public void PullRequestCommitDtoWhenDeserializedMapsDate()
+    public void PullRequestCommitDtoWhenDeserializedMapsHashAndDate()
     {
         // Arrange
-        var json = """{"date":"2026-02-20T10:00:00Z"}""";
+        var json = """{"hash":"abcdef123456","date":"2026-02-20T10:00:00Z"}""";
 
         // Act
         var dto = JsonSerializer.Deserialize<PullRequestCommitDto>(json)!;
 
         // Assert
+        dto.Hash.Should().Be("abcdef123456");
         dto.Date.Should().Be(new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero));
     }
 

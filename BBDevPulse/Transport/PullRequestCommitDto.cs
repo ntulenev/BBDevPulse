@@ -8,6 +8,12 @@ namespace BBDevPulse.Transport;
 internal sealed class PullRequestCommitDto
 {
     /// <summary>
+    /// Commit hash.
+    /// </summary>
+    [JsonPropertyName("hash")]
+    public string? Hash { get; init; }
+
+    /// <summary>
     /// Commit timestamp.
     /// </summary>
     [JsonPropertyName("date")]

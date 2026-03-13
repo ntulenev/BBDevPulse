@@ -342,6 +342,42 @@ public sealed class SpectreReportPresenterTests
         renderDeveloperStatsCalls.Should().Be(1);
     }
 
+    [Fact(DisplayName = "RenderReport renders developer details when the option is enabled")]
+    [Trait("Category", "Unit")]
+    public void RenderReportWhenDetailedDeveloperOptionEnabledDelegatesDeveloperDetails()
+    {
+        // Arrange
+        var parameters = new ReportParameters(
+            filterDate: new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero),
+            workspace: new Workspace("workspace"),
+            repoNameFilter: new RepoNameFilter("filter"),
+            repoNameList: [new RepoName("RepoA")],
+            repoSearchMode: RepoSearchMode.FilterFromTheList,
+            prTimeFilterMode: PrTimeFilterMode.CreatedOnOnly,
+            branchNameList: [new BranchName("develop")],
+            showAllDetailsForDevelopers: true);
+        var reportData = new ReportData(parameters);
+
+        var pullRequestReportPresenter = new Mock<IPullRequestReportPresenter>(MockBehavior.Strict);
+        pullRequestReportPresenter.Setup(x => x.RenderPullRequestTable(reportData, parameters.FilterDate));
+
+        var statisticsPresenter = new Mock<IStatisticsPresenter>(MockBehavior.Strict);
+        statisticsPresenter.Setup(x => x.RenderMergeTimeStats(reportData));
+        statisticsPresenter.Setup(x => x.RenderTtfrStats(reportData));
+        statisticsPresenter.Setup(x => x.RenderCorrectionsStats(reportData));
+        statisticsPresenter.Setup(x => x.RenderPullRequestSizeStats(reportData));
+        statisticsPresenter.Setup(x => x.RenderWorstPullRequestsTable(reportData));
+        statisticsPresenter.Setup(x => x.RenderDeveloperStatsTable(reportData));
+        statisticsPresenter.Setup(x => x.RenderDeveloperDetails(reportData));
+
+        var sut = CreateSut(
+            pullRequestReportPresenter: pullRequestReportPresenter.Object,
+            statisticsPresenter: statisticsPresenter.Object);
+
+        // Act
+        sut.RenderReport(reportData);
+    }
+
     private static SpectreReportPresenter CreateSut(
         IAuthPresenter? authPresenter = null,
         IRepositoryListPresenter? repositoryListPresenter = null,

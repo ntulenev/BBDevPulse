@@ -22,6 +22,7 @@ public sealed class ReportParameters
     /// <param name="pullRequestSizeMode">Pull request size mode.</param>
     /// <param name="teamFilter">Optional team filter resolved from people CSV.</param>
     /// <param name="showDeveloperUuidInStats">Whether to show Bitbucket UUIDs in developer stats.</param>
+    /// <param name="showAllDetailsForDevelopers">Whether to append detailed per-developer activity sections after summary reports.</param>
     /// <param name="toDateExclusive">Optional exclusive upper bound for the report range.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
@@ -36,6 +37,7 @@ public sealed class ReportParameters
         PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines,
         string? teamFilter = null,
         bool showDeveloperUuidInStats = false,
+        bool showAllDetailsForDevelopers = false,
         DateTimeOffset? toDateExclusive = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
@@ -56,6 +58,7 @@ public sealed class ReportParameters
             ? null
             : teamFilter.Trim();
         ShowDeveloperUuidInStats = showDeveloperUuidInStats;
+        ShowAllDetailsForDevelopers = showAllDetailsForDevelopers;
         ToDateExclusive = toDateExclusive;
         ExcludedDays = excludedDays is null
             ? new HashSet<DateOnly>().ToFrozenSet()
@@ -121,6 +124,11 @@ public sealed class ReportParameters
     /// Gets a value indicating whether Bitbucket UUIDs should be shown in developer stats.
     /// </summary>
     public bool ShowDeveloperUuidInStats { get; }
+
+    /// <summary>
+    /// Gets a value indicating whether detailed per-developer activity sections should be rendered.
+    /// </summary>
+    public bool ShowAllDetailsForDevelopers { get; }
 
     /// <summary>
     /// Gets optional exclusive upper bound for the report range.

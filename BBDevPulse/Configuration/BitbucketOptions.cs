@@ -115,6 +115,11 @@ public sealed class BitbucketOptions
     public bool ShowDeveloperUuidInStats { get; init; }
 
     /// <summary>
+    /// Whether to append detailed per-developer activity sections after the summary reports.
+    /// </summary>
+    public bool ShowAllDetailsForDevelopers { get; init; }
+
+    /// <summary>
     /// PDF report output options.
     /// </summary>
     public PdfOptions Pdf { get; init; } = new();
@@ -155,6 +160,7 @@ public sealed class BitbucketOptions
             PullRequestSizeMode,
             TeamFilter,
             ShowDeveloperUuidInStats,
+            ShowAllDetailsForDevelopers,
             toDateExclusive);
     }
 

@@ -685,9 +685,9 @@ public sealed class BitbucketClientTests
         mapCalls.Should().Be(0);
     }
 
-    [Fact(DisplayName = "GetPullRequestCommitDatesAsync throws when workspace is null")]
+    [Fact(DisplayName = "GetPullRequestCommitsAsync throws when workspace is null")]
     [Trait("Category", "Unit")]
-    public async Task GetPullRequestCommitDatesAsyncWhenWorkspaceIsNullThrowsArgumentNullException()
+    public async Task GetPullRequestCommitsAsyncWhenWorkspaceIsNullThrowsArgumentNullException()
     {
         // Arrange
         var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
@@ -696,7 +696,7 @@ public sealed class BitbucketClientTests
         // Act
         Func<Task> act = async () =>
         {
-            await foreach (var _ in client.GetPullRequestCommitDatesAsync(
+            await foreach (var _ in client.GetPullRequestCommitsAsync(
                                workspace,
                                new RepoSlug("repo"),
                                new PullRequestId(1),
@@ -709,9 +709,9 @@ public sealed class BitbucketClientTests
         await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
-    [Fact(DisplayName = "GetPullRequestCommitDatesAsync throws when repository slug is null")]
+    [Fact(DisplayName = "GetPullRequestCommitsAsync throws when repository slug is null")]
     [Trait("Category", "Unit")]
-    public async Task GetPullRequestCommitDatesAsyncWhenRepositorySlugIsNullThrowsArgumentNullException()
+    public async Task GetPullRequestCommitsAsyncWhenRepositorySlugIsNullThrowsArgumentNullException()
     {
         // Arrange
         var client = CreateClient(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
@@ -720,7 +720,7 @@ public sealed class BitbucketClientTests
         // Act
         Func<Task> act = async () =>
         {
-            await foreach (var _ in client.GetPullRequestCommitDatesAsync(
+            await foreach (var _ in client.GetPullRequestCommitsAsync(
                                new Workspace("ws"),
                                repoSlug,
                                new PullRequestId(1),
@@ -733,9 +733,9 @@ public sealed class BitbucketClientTests
         await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
-    [Fact(DisplayName = "GetPullRequestCommitDatesAsync yields only commits that have date values")]
+    [Fact(DisplayName = "GetPullRequestCommitsAsync yields only commits that have hash and date values")]
     [Trait("Category", "Unit")]
-    public async Task GetPullRequestCommitDatesAsyncWhenCommitDatesExistReturnsOnlyDatedCommits()
+    public async Task GetPullRequestCommitsAsyncWhenCommitDatesExistReturnsOnlyCompleteCommits()
     {
         // Arrange
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
@@ -746,9 +746,10 @@ public sealed class BitbucketClientTests
             {
                 Values =
                 [
-                    new PullRequestCommitDto { Date = new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero) },
-                    new PullRequestCommitDto { Date = null },
-                    new PullRequestCommitDto { Date = new DateTimeOffset(2026, 2, 20, 9, 0, 0, TimeSpan.Zero) }
+                    new PullRequestCommitDto { Hash = "abcdef123456", Date = new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero) },
+                    new PullRequestCommitDto { Hash = "missing-date", Date = null },
+                    new PullRequestCommitDto { Hash = null, Date = new DateTimeOffset(2026, 2, 20, 9, 0, 0, TimeSpan.Zero) },
+                    new PullRequestCommitDto { Hash = "fedcba654321", Date = new DateTimeOffset(2026, 2, 19, 9, 0, 0, TimeSpan.Zero) }
                 ],
                 Next = null
             });
@@ -756,16 +757,19 @@ public sealed class BitbucketClientTests
         var client = CreateClient(transport.Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Act
-        var result = await ReadAllAsync(client.GetPullRequestCommitDatesAsync(
+        var result = await ReadAllAsync(client.GetPullRequestCommitsAsync(
             new Workspace("ws"),
             new RepoSlug("repo"),
             new PullRequestId(7),
             cancellationToken));
 
         // Assert
-        result.Should().Equal(
-            new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero),
-            new DateTimeOffset(2026, 2, 20, 9, 0, 0, TimeSpan.Zero));
+        result.Should().BeEquivalentTo(
+            [
+                new PullRequestCommitInfo("abcdef123456", new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero)),
+                new PullRequestCommitInfo("fedcba654321", new DateTimeOffset(2026, 2, 19, 9, 0, 0, TimeSpan.Zero))
+            ],
+            options => options.ComparingByMembers<PullRequestCommitInfo>());
     }
 
     [Fact(DisplayName = "GetPullRequestSizeAsync aggregates files and line counts from commit range diffstat")]

@@ -242,6 +242,52 @@ public sealed class QuestPdfReportRendererTests
         saveCalls.Should().Be(1);
     }
 
+    [Fact(DisplayName = "RenderReport saves populated report with developer details enabled")]
+    [Trait("Category", "Unit")]
+    public async Task RenderReportAsyncWhenDeveloperDetailsEnabledStillBuildsPdf()
+    {
+        // Arrange
+        var outputPath = Path.Combine(Path.GetTempPath(), "bbdevpulse-details.pdf");
+        var pdfOptions = new PdfOptions
+        {
+            Enabled = true,
+            OutputPath = outputPath
+        };
+        var dateFormatter = new Mock<IDateDiffFormatter>(MockBehavior.Strict);
+        dateFormatter.Setup(x => x.Format(
+                It.Is<DateTimeOffset>(start => start == DateTimeOffset.MinValue),
+                It.Is<DateTimeOffset>(end => end >= DateTimeOffset.MinValue)))
+            .Returns("formatted");
+
+        var statistics = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
+        statistics.Setup(x => x.Percentile(
+                It.Is<IReadOnlyList<double>>(values => values.Count > 0 && values.SequenceEqual(values.OrderBy(v => v))),
+                50))
+            .Returns(1.0);
+        statistics.Setup(x => x.Percentile(
+                It.Is<IReadOnlyList<double>>(values => values.Count > 0 && values.SequenceEqual(values.OrderBy(v => v))),
+                75))
+            .Returns(2.0);
+
+        var fileStore = new Mock<IPdfReportFileStore>(MockBehavior.Strict);
+        fileStore.Setup(x => x.SaveAsync(
+                It.Is<string>(path => Path.GetFileName(path).StartsWith("bbdevpulse-details_", StringComparison.OrdinalIgnoreCase)),
+                It.Is<QuestPDF.Infrastructure.IDocument>(document => document != null),
+                It.IsAny<CancellationToken>()))
+            .Callback<string, QuestPDF.Infrastructure.IDocument, CancellationToken>((_, document, _) => _ = document.GeneratePdf())
+            .Returns(Task.CompletedTask);
+
+        var renderer = new QuestPdfReportRenderer(
+            Options.Create(CreateOptions(pdfOptions)),
+            dateFormatter.Object,
+            statistics.Object,
+            fileStore.Object);
+        var reportData = CreateDetailedReportData();
+
+        // Act
+        await renderer.RenderReportAsync(reportData);
+    }
+
     [Fact(DisplayName = "BuildWorstMetricSelections chooses distinct pull requests across metrics")]
     [Trait("Category", "Unit")]
     public void BuildWorstMetricSelectionsWhenTopMetricsOverlapUsesDistinctPullRequests()
@@ -465,6 +511,51 @@ public sealed class QuestPdfReportRendererTests
         developer.CommentsAfter = 4;
         developer.ApprovalsAfter = 5;
 
+        return reportData;
+    }
+
+    private static ReportData CreateDetailedReportData()
+    {
+        var reportData = new ReportData(new ReportParameters(
+            new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero),
+            new Workspace("workspace with space"),
+            new RepoNameFilter(string.Empty),
+            repoNameList: [],
+            RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode.CreatedOnOnly,
+            branchNameList: [],
+            showAllDetailsForDevelopers: true));
+        var filterDate = reportData.Parameters.FilterDate;
+        var report = new PullRequestReport(
+            repository: "Repo One",
+            repositorySlug: "repo-one",
+            author: "Alice",
+            targetBranch: "develop",
+            createdOn: filterDate,
+            lastActivity: filterDate.AddDays(2),
+            mergedOn: filterDate.AddDays(3),
+            rejectedOn: null,
+            state: PullRequestState.Merged,
+            id: new PullRequestId(200),
+            comments: 2,
+            corrections: 2,
+            firstReactionOn: filterDate.AddHours(4),
+            filesChanged: 4,
+            linesAdded: 60,
+            linesRemoved: 20);
+        reportData.Reports.Add(report);
+        var developer = reportData.GetOrAddDeveloper(new DeveloperIdentity(
+            new UserUuid("{alice-1}"),
+            new DisplayName("Alice")));
+        developer.PrsOpenedSince = 1;
+        developer.PrsMergedAfter = 1;
+        developer.CommentsAfter = 1;
+        developer.ApprovalsAfter = 1;
+        developer.Corrections = 2;
+        developer.AuthoredPullRequests.Add(report);
+        developer.CommentActivities.Add(new DeveloperCommentActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(5)));
+        developer.ApprovalActivities.Add(new DeveloperApprovalActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(6)));
+        developer.CommitActivities.Add(new DeveloperCommitActivity("Repo One", "repo-one", new PullRequestId(200), "abcdef1234567890", filterDate.AddHours(7)));
         return reportData;
     }
 }

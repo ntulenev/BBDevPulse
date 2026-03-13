@@ -762,6 +762,42 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("Developer Stats (2026-02-20 to 2026-02-28)");
     }
 
+    [Fact(DisplayName = "RenderDeveloperDetails renders authored PRs comments approvals and follow-up commits")]
+    [Trait("Category", "Unit")]
+    public void RenderDeveloperDetailsWhenDetailsExistRendersAllSections()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        var reportData = CreateReportData(showAllDetailsForDevelopers: true);
+        var developer = new DeveloperStats(new DisplayName("Alice"));
+        var report = CreateReport(
+            id: 7,
+            mergedOn: BaseDate.AddDays(2),
+            firstReactionOn: BaseDate.AddDays(1),
+            corrections: 2,
+            filesChanged: 3,
+            linesAdded: 30,
+            linesRemoved: 20);
+        developer.AuthoredPullRequests.Add(report);
+        developer.CommentActivities.Add(new DeveloperCommentActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(3)));
+        developer.ApprovalActivities.Add(new DeveloperApprovalActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(4)));
+        developer.CommitActivities.Add(new DeveloperCommitActivity("RepoA", "repoa", new PullRequestId(7), "abcdef1234567890", BaseDate.AddHours(5)));
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] = developer;
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperDetails(reportData));
+
+        // Assert
+        output.Should().Contain("Developer Details");
+        output.Should().Contain("Authored PRs");
+        output.Should().Contain("Comments");
+        output.Should().Contain("Approvals");
+        output.Should().Contain("Follow-up Commits");
+        output.Should().Contain("Alice");
+        output.Should().Contain("RepoA");
+        output.Should().Contain("abcdef123456");
+    }
+
     private static SpectreStatisticsPresenter CreatePresenter()
     {
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict).Object;
@@ -773,7 +809,8 @@ public sealed class SpectreStatisticsPresenterTests
         bool excludeWeekend = false,
         IReadOnlyList<DateOnly>? excludedDays = null,
         PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines,
-        bool showDeveloperUuidInStats = false)
+        bool showDeveloperUuidInStats = false,
+        bool showAllDetailsForDevelopers = false)
     {
         return new ReportData(new ReportParameters(
             BaseDate,
@@ -786,7 +823,8 @@ public sealed class SpectreStatisticsPresenterTests
             excludeWeekend,
             excludedDays,
             pullRequestSizeMode,
-            showDeveloperUuidInStats: showDeveloperUuidInStats));
+            showDeveloperUuidInStats: showDeveloperUuidInStats,
+            showAllDetailsForDevelopers: showAllDetailsForDevelopers));
     }
 
     private static PullRequestReport CreateReport(

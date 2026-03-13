@@ -68,4 +68,24 @@ public sealed class DeveloperStats
     /// Corrections count across pull requests opened by the developer.
     /// </summary>
     public int Corrections { get; set; }
+
+    /// <summary>
+    /// Detailed list of pull requests authored by the developer.
+    /// </summary>
+    public List<PullRequestReport> AuthoredPullRequests { get; } = [];
+
+    /// <summary>
+    /// Detailed list of comments authored by the developer.
+    /// </summary>
+    public List<DeveloperCommentActivity> CommentActivities { get; } = [];
+
+    /// <summary>
+    /// Detailed list of approvals authored by the developer.
+    /// </summary>
+    public List<DeveloperApprovalActivity> ApprovalActivities { get; } = [];
+
+    /// <summary>
+    /// Detailed list of follow-up commits made on the developer's pull requests after creation.
+    /// </summary>
+    public List<DeveloperCommitActivity> CommitActivities { get; } = [];
 }
