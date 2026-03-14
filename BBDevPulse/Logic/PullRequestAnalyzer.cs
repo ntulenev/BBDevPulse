@@ -176,6 +176,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
 
         IReadOnlyList<PullRequestCommitInfo> correctionCommits = [];
+        IReadOnlyList<DeveloperCommitActivity> correctionCommitActivities = [];
         var sizeSummary = PullRequestSizeSummary.Empty;
         if (shouldDisplayPullRequest)
         {
@@ -183,6 +184,16 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 .ConfigureAwait(false);
             sizeSummary = await GetPullRequestSizeSafeAsync(workspace, repo.Slug, pr.Id, cancellationToken)
                 .ConfigureAwait(false);
+            if (collectDeveloperDetails && authorIdentity.HasValue && includeAuthoredPullRequest && correctionCommits.Count > 0)
+            {
+                correctionCommitActivities = await GetCommitActivitiesAsync(
+                    repositoryName: string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
+                    workspace,
+                    repo.Slug,
+                    pr.Id,
+                    correctionCommits,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
 
         var corrections = correctionCommits.Count;
@@ -228,14 +239,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 if (collectDeveloperDetails && reportEntry is not null)
                 {
                     authorStats.AuthoredPullRequests.Add(reportEntry);
-                    foreach (var commit in correctionCommits)
+                    foreach (var commit in correctionCommitActivities)
                     {
-                        authorStats.CommitActivities.Add(new DeveloperCommitActivity(
-                            repositoryName,
-                            repo.Slug.Value,
-                            pr.Id,
-                            commit.Hash,
-                            commit.Date));
+                        authorStats.CommitActivities.Add(commit);
                     }
                 }
             }
@@ -325,6 +331,33 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         return correctionCommits;
     }
 
+    private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(
+        string repositoryName,
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        IReadOnlyList<PullRequestCommitInfo> correctionCommits,
+        CancellationToken cancellationToken)
+    {
+        var activities = new List<DeveloperCommitActivity>(correctionCommits.Count);
+
+        foreach (var commit in correctionCommits)
+        {
+            var sizeSummary = await GetCommitSizeSafeAsync(workspace, repoSlug, commit.Hash, cancellationToken)
+                .ConfigureAwait(false);
+            activities.Add(new DeveloperCommitActivity(
+                repositoryName,
+                repoSlug.Value,
+                pullRequestId,
+                commit.Hash,
+                commit.Message,
+                commit.Date,
+                sizeSummary));
+        }
+
+        return activities;
+    }
+
     private static bool HasIncludedTeamActivity(PullRequestActivity activity, ReportData reportData)
     {
         if (activity.Actor.HasValue && reportData.IsDeveloperIncluded(activity.Actor.Value))
@@ -352,6 +385,26 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 workspace,
                 repoSlug,
                 pullRequestId,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            return PullRequestSizeSummary.Empty;
+        }
+    }
+
+    private async Task<PullRequestSizeSummary> GetCommitSizeSafeAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        string commitHash,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _client.GetCommitSizeAsync(
+                workspace,
+                repoSlug,
+                commitHash,
                 cancellationToken).ConfigureAwait(false);
         }
         catch (InvalidOperationException)

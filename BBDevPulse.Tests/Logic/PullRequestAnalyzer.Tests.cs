@@ -269,9 +269,9 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 42),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                new PullRequestCommitInfo("commit-42-3", filterDate.AddDays(6)),
-                new PullRequestCommitInfo("commit-42-2", filterDate.AddDays(2)),
-                new PullRequestCommitInfo("commit-42-1", filterDate.AddDays(1))
+                new PullRequestCommitInfo("commit-42-3", filterDate.AddDays(6), "Latest follow-up commit"),
+                new PullRequestCommitInfo("commit-42-2", filterDate.AddDays(2), "Relevant fix"),
+                new PullRequestCommitInfo("commit-42-1", filterDate.AddDays(1), "Initial commit")
             ]));
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
@@ -483,9 +483,9 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 5),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                new PullRequestCommitInfo("commit-5-2", filterDate.AddDays(2)),
-                new PullRequestCommitInfo("commit-5-1", filterDate.AddDays(1)),
-                new PullRequestCommitInfo("commit-5-0", filterDate.AddDays(-11))
+                new PullRequestCommitInfo("commit-5-2", filterDate.AddDays(2), "Recent change"),
+                new PullRequestCommitInfo("commit-5-1", filterDate.AddDays(1), "Another recent change"),
+                new PullRequestCommitInfo("commit-5-0", filterDate.AddDays(-11), "Old change")
             ]));
 
         var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
@@ -612,9 +612,9 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 11),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                new PullRequestCommitInfo("commit-11-3", filterDate.AddDays(5)),
-                new PullRequestCommitInfo("commit-11-2", filterDate.AddDays(3)),
-                new PullRequestCommitInfo("commit-11-1", filterDate.AddDays(2))
+                new PullRequestCommitInfo("commit-11-3", filterDate.AddDays(5), "Newest team fix"),
+                new PullRequestCommitInfo("commit-11-2", filterDate.AddDays(3), "In-range fix"),
+                new PullRequestCommitInfo("commit-11-1", filterDate.AddDays(2), "Oldest in-range fix")
             ]));
         client.Setup(x => x.GetPullRequestSizeAsync(
                 It.Is<Workspace>(workspace => workspace.Value == "ws"),
@@ -699,9 +699,9 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 77),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                new PullRequestCommitInfo("commit-77-3", new DateTimeOffset(2026, 3, 2, 10, 0, 0, TimeSpan.Zero)),
-                new PullRequestCommitInfo("commit-77-2", new DateTimeOffset(2026, 2, 25, 10, 0, 0, TimeSpan.Zero)),
-                new PullRequestCommitInfo("commit-77-1", new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero))
+                new PullRequestCommitInfo("commit-77-3", new DateTimeOffset(2026, 3, 2, 10, 0, 0, TimeSpan.Zero), "Newest correction"),
+                new PullRequestCommitInfo("commit-77-2", new DateTimeOffset(2026, 2, 25, 10, 0, 0, TimeSpan.Zero), "Middle correction"),
+                new PullRequestCommitInfo("commit-77-1", new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero), "Initial change")
             ]));
 
         var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer());
@@ -776,10 +776,22 @@ public sealed class PullRequestAnalyzerTests
                 It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 88),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Returns(ToAsyncEnumerable([
-                new PullRequestCommitInfo("commit-88-3", filterDate.AddDays(4)),
-                new PullRequestCommitInfo("commit-88-2", filterDate.AddDays(2)),
-                new PullRequestCommitInfo("commit-88-1", filterDate.AddDays(1))
+                new PullRequestCommitInfo("commit-88-3", filterDate.AddDays(4), "Add PR size details"),
+                new PullRequestCommitInfo("commit-88-2", filterDate.AddDays(2), "Fix reviewer aggregation"),
+                new PullRequestCommitInfo("commit-88-1", filterDate.AddDays(1), "Initial PR setup")
             ]));
+        client.Setup(x => x.GetCommitSizeAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                "commit-88-3",
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PullRequestSizeSummary(FilesChanged: 2, LinesAdded: 8, LinesRemoved: 2));
+        client.Setup(x => x.GetCommitSizeAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                "commit-88-2",
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PullRequestSizeSummary(FilesChanged: 1, LinesAdded: 3, LinesRemoved: 1));
 
         var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer());
 
@@ -793,6 +805,9 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats[authorKey].AuthoredPullRequests[0].Id.Value.Should().Be(88);
         reportData.DeveloperStats[authorKey].CommitActivities.Should().HaveCount(2);
         reportData.DeveloperStats[authorKey].CommitActivities[0].CommitHash.Should().Be("commit-88-3");
+        reportData.DeveloperStats[authorKey].CommitActivities[0].Message.Should().Be("Add PR size details");
+        reportData.DeveloperStats[authorKey].CommitActivities[0].SizeSummary.LineChurn.Should().Be(10);
+        reportData.DeveloperStats[authorKey].CommitActivities[1].SizeSummary.FilesChanged.Should().Be(1);
 
         var reviewerKey = new DeveloperKey(new UserUuid("{reviewer-1}"));
         reportData.DeveloperStats.Should().ContainKey(reviewerKey);

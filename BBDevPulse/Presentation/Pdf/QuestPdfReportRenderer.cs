@@ -412,6 +412,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         ReportData reportData,
         string workspace)
     {
+        var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var orderedDeveloperStats = reportData.DeveloperStats.Values
             .OrderByDescending(static stat => stat.PrsOpenedSince)
             .ThenBy(static stat => stat.DisplayName.Value, StringComparer.OrdinalIgnoreCase)
@@ -430,7 +431,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             ComposeAuthoredPullRequestDetails(column, stat, workspace);
             ComposeCommentDetails(column, stat, workspace);
             ComposeApprovalDetails(column, stat, workspace);
-            ComposeCommitDetails(column, stat, workspace);
+            ComposeCommitDetails(column, stat, workspace, pullRequestSizeMode);
         }
     }
 
@@ -863,7 +864,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private static void ComposeCommitDetails(
         ColumnDescriptor column,
         DeveloperStats stat,
-        string workspace)
+        string workspace,
+        PullRequestSizeMode pullRequestSizeMode)
     {
         _ = column.Item().Text("Follow-up Commits").Bold();
         if (stat.CommitActivities.Count == 0)
@@ -879,6 +881,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 columns.RelativeColumn(2);
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(75);
+                columns.RelativeColumn(3);
+                columns.ConstantColumn(50);
                 columns.ConstantColumn(85);
             });
 
@@ -887,6 +891,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = header.Cell().Element(HeaderCell).Text("Repository");
                 _ = header.Cell().Element(HeaderCell).Text("PR ID");
                 _ = header.Cell().Element(HeaderCell).Text("Commit");
+                _ = header.Cell().Element(HeaderCell).Text("Message");
+                _ = header.Cell().Element(HeaderCell).Text(GetPullRequestSizeMetricLabel(pullRequestSizeMode));
                 _ = header.Cell().Element(HeaderCell).Text("Date");
             });
 
@@ -896,10 +902,25 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 AddHyperlinkCell(table, BuildRepositoryUrl(workspace, activity.RepositorySlug), activity.Repository, highlight: false);
                 AddHyperlinkCell(table, BuildPullRequestUrl(workspace, activity.RepositorySlug, activity.PullRequestId.Value), activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture), highlight: false);
                 AddHyperlinkCell(table, BuildCommitUrl(workspace, activity.RepositorySlug, activity.CommitHash), ShortCommitHash(activity.CommitHash), highlight: false);
+                AddBodyTextCell(table, TrimCommitMessage(activity.Message), highlight: false);
+                AddBodyTextCell(table, FormatCommitActivitySize(activity, pullRequestSizeMode), highlight: false);
                 AddBodyTextCell(table, activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), highlight: false);
             }
         });
     }
+
+    private static string FormatCommitActivitySize(
+        DeveloperCommitActivity activity,
+        PullRequestSizeMode pullRequestSizeMode) =>
+        activity.HasSizeDataForMode(pullRequestSizeMode)
+            ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
+            : "-";
+
+    private static string TrimCommitMessage(string message) =>
+        message
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Trim();
 
     private static IContainer HeaderCell(IContainer container) =>
         container

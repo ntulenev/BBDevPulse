@@ -18,4 +18,19 @@ internal sealed class PullRequestCommitDto
     /// </summary>
     [JsonPropertyName("date")]
     public DateTimeOffset? Date { get; init; }
+
+    /// <summary>
+    /// Commit message summary.
+    /// </summary>
+    [JsonPropertyName("summary")]
+    public CommitSummaryDto? Summary { get; init; }
+
+    internal sealed class CommitSummaryDto
+    {
+        /// <summary>
+        /// Raw summary text.
+        /// </summary>
+        [JsonPropertyName("raw")]
+        public string? Raw { get; init; }
+    }
 }

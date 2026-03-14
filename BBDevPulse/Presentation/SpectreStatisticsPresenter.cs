@@ -331,6 +331,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     {
         ArgumentNullException.ThrowIfNull(reportData);
 
+        var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var orderedDeveloperStats = reportData.DeveloperStats.Values
             .OrderByDescending(static stat => stat.PrsOpenedSince)
             .ThenBy(static stat => stat.DisplayName.Value, StringComparer.OrdinalIgnoreCase)
@@ -351,7 +352,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             RenderAuthoredPullRequests(stat);
             RenderCommentActivities(stat);
             RenderApprovalActivities(stat);
-            RenderCommitActivities(stat, reportData.Parameters.Workspace.Value);
+            RenderCommitActivities(stat, reportData.Parameters.Workspace.Value, pullRequestSizeMode);
         }
     }
 
@@ -515,7 +516,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         AnsiConsole.Write(table);
     }
 
-    private static void RenderCommitActivities(DeveloperStats stat, string workspace)
+    private static void RenderCommitActivities(
+        DeveloperStats stat,
+        string workspace,
+        PullRequestSizeMode pullRequestSizeMode)
     {
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -523,11 +527,13 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .AddColumn("Repository")
             .AddColumn("PR ID")
             .AddColumn("Commit")
+            .AddColumn("Message")
+            .AddColumn(GetPullRequestSizeMetricLabel(pullRequestSizeMode))
             .AddColumn("Date");
 
         if (stat.CommitActivities.Count == 0)
         {
-            _ = table.AddRow("No follow-up commits", "-", "-", "-");
+            _ = table.AddRow("No follow-up commits", "-", "-", "-", "-", "-");
             AnsiConsole.Write(table);
             return;
         }
@@ -539,16 +545,31 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
                 activity.Repository,
                 activity.PullRequestId.Value.ToString(CultureInfo.InvariantCulture),
                 $"[link={BuildCommitUrl(workspace, activity.RepositorySlug, activity.CommitHash)}]{EscapeMarkup(ShortCommitHash(activity.CommitHash))}[/]",
+                EscapeMarkup(TrimCommitMessage(activity.Message)),
+                FormatCommitActivitySize(activity, pullRequestSizeMode),
                 activity.Date.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture));
         }
 
         AnsiConsole.Write(table);
     }
 
+    private static string FormatCommitActivitySize(
+        DeveloperCommitActivity activity,
+        PullRequestSizeMode pullRequestSizeMode) =>
+        activity.HasSizeDataForMode(pullRequestSizeMode)
+            ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
+            : "-";
+
     private static string ShortCommitHash(string commitHash) =>
         commitHash.Length <= 12
             ? commitHash
             : commitHash[..12];
+
+    private static string TrimCommitMessage(string message) =>
+        message
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Trim();
 
     private static string BuildCommitUrl(string workspace, string repositorySlug, string commitHash) =>
         $"https://bitbucket.org/{Uri.EscapeDataString(workspace)}/{Uri.EscapeDataString(repositorySlug)}/commits/{Uri.EscapeDataString(commitHash)}";

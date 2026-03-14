@@ -194,10 +194,39 @@ internal sealed class BitbucketClient : IBitbucketClient
             cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (commit.Date.HasValue && !string.IsNullOrWhiteSpace(commit.Hash))
+            var message = commit.Summary?.Raw;
+            if (commit.Date.HasValue &&
+                !string.IsNullOrWhiteSpace(commit.Hash) &&
+                !string.IsNullOrWhiteSpace(message))
             {
-                yield return new PullRequestCommitInfo(commit.Hash, commit.Date.Value);
+                yield return new PullRequestCommitInfo(commit.Hash, commit.Date.Value, message);
             }
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PullRequestSizeSummary> GetCommitSizeAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        string commitHash,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(repoSlug);
+        ArgumentException.ThrowIfNullOrWhiteSpace(commitHash);
+
+        try
+        {
+            var diffStatUri = new Uri(
+                $"repositories/{workspace.Value}/{repoSlug.Value}/diffstat/{commitHash}" +
+                $"?topic=true&pagelen={_options.PageLength}",
+                UriKind.Relative);
+
+            return await ReadPullRequestDiffStatAsync(diffStatUri, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            return PullRequestSizeSummary.Empty;
         }
     }
 

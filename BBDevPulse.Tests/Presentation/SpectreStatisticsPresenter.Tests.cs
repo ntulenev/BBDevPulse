@@ -781,7 +781,14 @@ public sealed class SpectreStatisticsPresenterTests
         developer.AuthoredPullRequests.Add(report);
         developer.CommentActivities.Add(new DeveloperCommentActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(3)));
         developer.ApprovalActivities.Add(new DeveloperApprovalActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(4)));
-        developer.CommitActivities.Add(new DeveloperCommitActivity("RepoA", "repoa", new PullRequestId(7), "abcdef1234567890", BaseDate.AddHours(5)));
+        developer.CommitActivities.Add(new DeveloperCommitActivity(
+            "RepoA",
+            "repoa",
+            new PullRequestId(7),
+            "abcdef1234567890",
+            "Add follow-up commit size and message",
+            BaseDate.AddHours(5),
+            new PullRequestSizeSummary(FilesChanged: 17, LinesAdded: 80, LinesRemoved: 43)));
         reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] = developer;
 
         // Act
@@ -795,6 +802,12 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("Follow-up Commits");
         output.Should().Contain("Alice");
         output.Should().Contain("RepoA");
+        output.Should().Contain("Message");
+        output.Should().Contain("Add follow-up");
+        output.Should().Contain("commit size and");
+        output.Should().Contain("message");
+        output.Should().Contain("Churn");
+        output.Should().Contain("123");
         output.Should().Contain("abcdef123456");
     }
 

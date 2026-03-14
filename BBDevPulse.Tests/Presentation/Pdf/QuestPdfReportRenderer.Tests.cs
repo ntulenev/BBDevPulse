@@ -555,7 +555,14 @@ public sealed class QuestPdfReportRendererTests
         developer.AuthoredPullRequests.Add(report);
         developer.CommentActivities.Add(new DeveloperCommentActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(5)));
         developer.ApprovalActivities.Add(new DeveloperApprovalActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(6)));
-        developer.CommitActivities.Add(new DeveloperCommitActivity("Repo One", "repo-one", new PullRequestId(200), "abcdef1234567890", filterDate.AddHours(7)));
+        developer.CommitActivities.Add(new DeveloperCommitActivity(
+            "Repo One",
+            "repo-one",
+            new PullRequestId(200),
+            "abcdef1234567890",
+            "Add follow-up commit size and message",
+            filterDate.AddHours(7),
+            new PullRequestSizeSummary(FilesChanged: 3, LinesAdded: 40, LinesRemoved: 10)));
         return reportData;
     }
 }

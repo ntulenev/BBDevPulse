@@ -733,9 +733,9 @@ public sealed class BitbucketClientTests
         await act.Should().ThrowAsync<ArgumentNullException>();
     }
 
-    [Fact(DisplayName = "GetPullRequestCommitsAsync yields only commits that have hash and date values")]
+    [Fact(DisplayName = "GetPullRequestCommitsAsync yields only commits that have hash date and message values")]
     [Trait("Category", "Unit")]
-    public async Task GetPullRequestCommitsAsyncWhenCommitDatesExistReturnsOnlyCompleteCommits()
+    public async Task GetPullRequestCommitsAsyncWhenCommitDetailsExistReturnsOnlyCompleteCommits()
     {
         // Arrange
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
@@ -746,10 +746,36 @@ public sealed class BitbucketClientTests
             {
                 Values =
                 [
-                    new PullRequestCommitDto { Hash = "abcdef123456", Date = new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero) },
-                    new PullRequestCommitDto { Hash = "missing-date", Date = null },
-                    new PullRequestCommitDto { Hash = null, Date = new DateTimeOffset(2026, 2, 20, 9, 0, 0, TimeSpan.Zero) },
-                    new PullRequestCommitDto { Hash = "fedcba654321", Date = new DateTimeOffset(2026, 2, 19, 9, 0, 0, TimeSpan.Zero) }
+                    new PullRequestCommitDto
+                    {
+                        Hash = "abcdef123456",
+                        Date = new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero),
+                        Summary = new PullRequestCommitDto.CommitSummaryDto { Raw = "Add follow-up metrics" }
+                    },
+                    new PullRequestCommitDto
+                    {
+                        Hash = "missing-date",
+                        Date = null,
+                        Summary = new PullRequestCommitDto.CommitSummaryDto { Raw = "Missing date" }
+                    },
+                    new PullRequestCommitDto
+                    {
+                        Hash = null,
+                        Date = new DateTimeOffset(2026, 2, 20, 9, 0, 0, TimeSpan.Zero),
+                        Summary = new PullRequestCommitDto.CommitSummaryDto { Raw = "Missing hash" }
+                    },
+                    new PullRequestCommitDto
+                    {
+                        Hash = "missing-message",
+                        Date = new DateTimeOffset(2026, 2, 20, 8, 0, 0, TimeSpan.Zero),
+                        Summary = null
+                    },
+                    new PullRequestCommitDto
+                    {
+                        Hash = "fedcba654321",
+                        Date = new DateTimeOffset(2026, 2, 19, 9, 0, 0, TimeSpan.Zero),
+                        Summary = new PullRequestCommitDto.CommitSummaryDto { Raw = "Fix router retry flow" }
+                    }
                 ],
                 Next = null
             });
@@ -766,10 +792,46 @@ public sealed class BitbucketClientTests
         // Assert
         result.Should().BeEquivalentTo(
             [
-                new PullRequestCommitInfo("abcdef123456", new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero)),
-                new PullRequestCommitInfo("fedcba654321", new DateTimeOffset(2026, 2, 19, 9, 0, 0, TimeSpan.Zero))
+                new PullRequestCommitInfo("abcdef123456", new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero), "Add follow-up metrics"),
+                new PullRequestCommitInfo("fedcba654321", new DateTimeOffset(2026, 2, 19, 9, 0, 0, TimeSpan.Zero), "Fix router retry flow")
             ],
             options => options.ComparingByMembers<PullRequestCommitInfo>());
+    }
+
+    [Fact(DisplayName = "GetCommitSizeAsync aggregates files and line counts from commit diffstat")]
+    [Trait("Category", "Unit")]
+    public async Task GetCommitSizeAsyncWhenCommitHashExistsReturnsAggregatedSummary()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    "repositories/ws/repo/diffstat/commit-hash-123?topic=true&pagelen=25"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDiffStatDto>
+            {
+                Values =
+                [
+                    new PullRequestDiffStatDto { LinesAdded = 12, LinesRemoved = 4 },
+                    new PullRequestDiffStatDto { LinesAdded = 3, LinesRemoved = 1 }
+                ],
+                Next = null
+            });
+
+        var client = CreateClient(transport.Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Act
+        var result = await client.GetCommitSizeAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            "commit-hash-123",
+            cancellationToken);
+
+        // Assert
+        result.FilesChanged.Should().Be(2);
+        result.LinesAdded.Should().Be(15);
+        result.LinesRemoved.Should().Be(5);
+        result.LineChurn.Should().Be(20);
     }
 
     [Fact(DisplayName = "GetPullRequestSizeAsync aggregates files and line counts from commit range diffstat")]
