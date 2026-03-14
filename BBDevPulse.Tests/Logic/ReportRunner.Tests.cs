@@ -27,6 +27,7 @@ public sealed class ReportRunnerTests
             client,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -47,6 +48,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             analyzer,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -67,6 +69,28 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             presenter,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            Options.Create(CreateOptions()));
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when HTML renderer is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenHtmlRendererIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IHtmlReportRenderer htmlReportRenderer = null!;
+
+        // Act
+        Action act = () => _ = new ReportRunner(
+            new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
+            new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
+            new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            htmlReportRenderer,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -87,6 +111,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             pdfReportRenderer,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -107,6 +132,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             peopleCsvProvider,
             Options.Create(CreateOptions()));
@@ -127,6 +153,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             options);
@@ -154,6 +181,7 @@ public sealed class ReportRunnerTests
         var renderBranchFilterInfoCalls = 0;
         var analyzeRepositoriesCalls = 0;
         var renderReportCalls = 0;
+        var renderHtmlCalls = 0;
         var renderPdfCalls = 0;
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
@@ -252,6 +280,13 @@ public sealed class ReportRunnerTests
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
 
+        var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
+        htmlRenderer.Setup(x => x.RenderReportAsync(
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => renderHtmlCalls++)
+            .Returns(Task.CompletedTask);
+
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
         pdfRenderer.Setup(x => x.RenderReportAsync(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
@@ -267,6 +302,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
+            htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
             Options.Create(options));
@@ -286,6 +322,7 @@ public sealed class ReportRunnerTests
         renderBranchFilterInfoCalls.Should().Be(1);
         analyzeRepositoriesCalls.Should().Be(1);
         renderReportCalls.Should().Be(1);
+        renderHtmlCalls.Should().Be(1);
         renderPdfCalls.Should().Be(1);
     }
 
@@ -305,6 +342,7 @@ public sealed class ReportRunnerTests
         var renderBranchFilterInfoCalls = 0;
         var analyzeRepositoriesCalls = 0;
         var renderReportCalls = 0;
+        var renderHtmlCalls = 0;
         var renderPdfCalls = 0;
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
@@ -359,6 +397,13 @@ public sealed class ReportRunnerTests
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
 
+        var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
+        htmlRenderer.Setup(x => x.RenderReportAsync(
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Callback(() => renderHtmlCalls++)
+            .Returns(Task.CompletedTask);
+
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
         pdfRenderer.Setup(x => x.RenderReportAsync(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
@@ -374,6 +419,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
+            htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
             Options.Create(options));
@@ -391,6 +437,7 @@ public sealed class ReportRunnerTests
         renderBranchFilterInfoCalls.Should().Be(1);
         analyzeRepositoriesCalls.Should().Be(1);
         renderReportCalls.Should().Be(1);
+        renderHtmlCalls.Should().Be(1);
         renderPdfCalls.Should().Be(1);
     }
 
@@ -462,6 +509,12 @@ public sealed class ReportRunnerTests
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback<ReportData>(reportData => capturedReportData = reportData);
 
+        var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
+        htmlRenderer.Setup(x => x.RenderReportAsync(
+                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(Task.CompletedTask);
+
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
         pdfRenderer.Setup(x => x.RenderReportAsync(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
@@ -479,6 +532,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
+            htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
             Options.Create(options));
@@ -563,6 +617,12 @@ public sealed class ReportRunnerTests
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core")));
 
+        var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
+        htmlRenderer.Setup(x => x.RenderReportAsync(
+                It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(Task.CompletedTask);
+
         var pdfRenderer = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
         pdfRenderer.Setup(x => x.RenderReportAsync(
                 It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core"),
@@ -580,6 +640,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
+            htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
             Options.Create(options));
@@ -610,6 +671,7 @@ public sealed class ReportRunnerTests
             PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
             PeopleCsvPath = peopleCsvPath,
             TeamFilter = teamFilter,
+            Html = new HtmlOptions(),
             Pdf = new PdfOptions()
         };
     }

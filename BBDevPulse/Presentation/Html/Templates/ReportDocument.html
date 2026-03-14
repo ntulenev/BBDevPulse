@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BBDevPulse Report - __WORKSPACE__</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --bg-alt: #0f172a;
+      --panel: rgba(15, 23, 42, 0.92);
+      --panel-soft: rgba(30, 41, 59, 0.82);
+      --border: rgba(148, 163, 184, 0.2);
+      --text: #e5eefb;
+      --muted: #9fb0c6;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, 0.15);
+      --warning: #f59e0b;
+      --warning-soft: rgba(245, 158, 11, 0.18);
+      --shadow: 0 24px 60px rgba(2, 6, 23, 0.45);
+      --font: "Segoe UI", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(96, 165, 250, 0.22), transparent 26%),
+        radial-gradient(circle at top right, rgba(245, 158, 11, 0.14), transparent 24%),
+        linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
+      font-family: var(--font);
+      line-height: 1.45;
+    }
+
+    a {
+      color: #93c5fd;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      width: min(1880px, calc(100vw - 28px));
+      margin: 10px auto 28px;
+    }
+
+    .hero {
+      padding: 18px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(15, 23, 42, 0.96));
+      box-shadow: var(--shadow);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 1.6vw, 2rem);
+      letter-spacing: -0.03em;
+    }
+
+    .hero-subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .summary-card {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .summary-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .summary-value {
+      display: block;
+      margin-top: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .report-section {
+      margin-top: 18px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .section-header h2,
+    .developer-card h3 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .table-panel {
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .nested-section .table-panel {
+      background: var(--panel-soft);
+      box-shadow: none;
+    }
+
+    .compact-section {
+      min-width: 0;
+    }
+
+    .table-controls {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.74);
+    }
+
+    .search,
+    .filter-input,
+    .button {
+      font: inherit;
+      border-radius: 10px;
+    }
+
+    .search,
+    .filter-input {
+      width: 100%;
+      color: var(--text);
+      background: rgba(2, 6, 23, 0.68);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .search:focus,
+    .filter-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+
+    .button {
+      border: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.9);
+      color: var(--text);
+      padding: 8px 12px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: rgba(51, 65, 85, 0.95);
+    }
+
+    .table-wrap {
+      overflow: hidden;
+    }
+
+    .scroll {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 780px;
+      border-collapse: collapse;
+    }
+
+    .compact-section table {
+      min-width: 420px;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+      font-size: 0.84rem;
+    }
+
+    th.repo-column,
+    td.repo-column {
+      min-width: 160px;
+      white-space: normal;
+    }
+
+    th.narrow,
+    td.narrow {
+      width: 76px;
+    }
+
+    thead tr:first-child th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: rgba(30, 41, 59, 0.98);
+    }
+
+    thead tr.filters th {
+      position: sticky;
+      top: 42px;
+      z-index: 2;
+      background: rgba(15, 23, 42, 0.96);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    tbody tr:hover {
+      background: rgba(96, 165, 250, 0.08);
+    }
+
+    tbody tr.activity-only {
+      background: var(--warning-soft);
+    }
+
+    tbody tr.activity-only td,
+    tbody tr.activity-only a {
+      color: #ffd58a;
+    }
+
+    .th-button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .sort-indicator {
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .section-note {
+      margin: 10px 12px 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .activity-note {
+      color: #ffd58a;
+    }
+
+    .empty-cell,
+    .empty-section {
+      padding: 18px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .developer-card {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    @media (max-width: 980px) {
+      .page {
+        width: calc(100vw - 14px);
+      }
+
+      .table-controls {
+        flex-direction: column;
+      }
+
+      thead tr:first-child th,
+      thead tr.filters th {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>BBDevPulse HTML Report</h1>
+      <div class="hero-subtitle">Interactive copy of the PDF report with per-table sorting and filtering.</div>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <span class="summary-label">Generated</span>
+          <span class="summary-value">__GENERATED_AT__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Workspace</span>
+          <span class="summary-value">__WORKSPACE__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Date Window</span>
+          <span class="summary-value">__DATE_WINDOW__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Repositories</span>
+          <span class="summary-value">__REPOSITORIES_ANALYZED__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">PRs In Report</span>
+          <span class="summary-value">__PULL_REQUEST_COUNT__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">PR Metrics Base</span>
+          <span class="summary-value">__METRIC_PULL_REQUEST_COUNT__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Developers</span>
+          <span class="summary-value">__DEVELOPER_COUNT__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">PR Size Metric</span>
+          <span class="summary-value">__SIZE_MODE__</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Team Filter</span>
+          <span class="summary-value">__TEAM_FILTER__</span>
+        </div>
+      </div>
+    </section>
+
+__CONTENT__
+  </div>
+
+  <script>
+    (() => {
+      const panels = Array.from(document.querySelectorAll('[data-table-panel]'));
+
+      function parseComparable(value, type) {
+        const raw = String(value ?? '').trim();
+        if (type !== 'number') {
+          return raw.toLowerCase();
+        }
+
+        if (!raw) {
+          return null;
+        }
+
+        const parsed = Number(raw);
+        return Number.isNaN(parsed) ? null : parsed;
+      }
+
+      function compareValues(left, right, type, direction) {
+        const leftValue = parseComparable(left, type);
+        const rightValue = parseComparable(right, type);
+
+        if (leftValue === null && rightValue === null) {
+          return 0;
+        }
+
+        if (leftValue === null) {
+          return 1;
+        }
+
+        if (rightValue === null) {
+          return -1;
+        }
+
+        if (type === 'number') {
+          return direction === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+        }
+
+        return direction === 'asc'
+          ? leftValue.localeCompare(rightValue)
+          : rightValue.localeCompare(leftValue);
+      }
+
+      for (const panel of panels) {
+        const table = panel.querySelector('table');
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => !row.classList.contains('empty'));
+        const search = panel.querySelector('[data-table-search]');
+        const reset = panel.querySelector('[data-table-reset]');
+        const sortButtons = Array.from(panel.querySelectorAll('[data-sort-column]'));
+        const filters = Array.from(panel.querySelectorAll('.filter-input'));
+        const sortState = {
+          column: table.dataset.defaultSortColumn === '' ? null : Number(table.dataset.defaultSortColumn),
+          direction: table.dataset.defaultSortDirection || 'asc'
+        };
+
+        filters.forEach((filter, index) => {
+          filter.dataset.filterColumn = String(index);
+        });
+
+        function applyFilters() {
+          const globalTerm = (search?.value || '').trim().toLowerCase();
+          const columnTerms = new Map(filters.map(filter => [Number(filter.dataset.filterColumn), filter.value.trim().toLowerCase()]));
+
+          for (const row of rows) {
+            const cells = Array.from(row.children);
+            const globalMatch = !globalTerm || cells.some(cell => (cell.dataset.filter || cell.textContent || '').toLowerCase().includes(globalTerm));
+            const columnsMatch = cells.every((cell, index) => {
+              const term = columnTerms.get(index);
+              return !term || (cell.dataset.filter || cell.textContent || '').toLowerCase().includes(term);
+            });
+
+            row.hidden = !(globalMatch && columnsMatch);
+          }
+        }
+
+        function applySort() {
+          if (sortState.column === null) {
+            return;
+          }
+
+          const button = sortButtons.find(item => Number(item.dataset.sortColumn) === sortState.column);
+          const type = button?.dataset.sortType || 'text';
+          const sortedRows = [...rows].sort((leftRow, rightRow) => {
+            const leftCell = leftRow.children[sortState.column];
+            const rightCell = rightRow.children[sortState.column];
+            return compareValues(leftCell?.dataset.sort, rightCell?.dataset.sort, type, sortState.direction);
+          });
+
+          for (const row of sortedRows) {
+            tbody.appendChild(row);
+          }
+        }
+
+        function updateSortIndicators() {
+          for (const button of sortButtons) {
+            const indicator = button.querySelector('.sort-indicator');
+            const column = Number(button.dataset.sortColumn);
+            indicator.textContent = sortState.column === column ? (sortState.direction === 'asc' ? '^' : 'v') : '';
+          }
+        }
+
+        search?.addEventListener('input', applyFilters);
+        reset?.addEventListener('click', () => {
+          if (search) {
+            search.value = '';
+          }
+
+          for (const filter of filters) {
+            filter.value = '';
+          }
+
+          applyFilters();
+        });
+
+        filters.forEach(filter => filter.addEventListener('input', applyFilters));
+
+        for (const button of sortButtons) {
+          button.addEventListener('click', () => {
+            const column = Number(button.dataset.sortColumn);
+            sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+            sortState.column = column;
+            applySort();
+            updateSortIndicators();
+            applyFilters();
+          });
+        }
+
+        applySort();
+        updateSortIndicators();
+        applyFilters();
+      }
+    })();
+  </script>
+</body>
+</html>

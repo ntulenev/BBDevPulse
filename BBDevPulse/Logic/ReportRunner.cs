@@ -17,6 +17,7 @@ internal sealed class ReportRunner : IReportRunner
     /// <param name="client">Bitbucket API client.</param>
     /// <param name="analyzer">Pull request analyzer.</param>
     /// <param name="presenter">Report presenter.</param>
+    /// <param name="htmlReportRenderer">HTML report renderer.</param>
     /// <param name="pdfReportRenderer">PDF report renderer.</param>
     /// <param name="peopleCsvProvider">People CSV provider.</param>
     /// <param name="options">Bitbucket options.</param>
@@ -24,6 +25,7 @@ internal sealed class ReportRunner : IReportRunner
         IBitbucketClient client,
         IPullRequestAnalyzer analyzer,
         IReportPresenter presenter,
+        IHtmlReportRenderer htmlReportRenderer,
         IPdfReportRenderer pdfReportRenderer,
         IPeopleCsvProvider peopleCsvProvider,
         IOptions<BitbucketOptions> options)
@@ -31,6 +33,7 @@ internal sealed class ReportRunner : IReportRunner
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(analyzer);
         ArgumentNullException.ThrowIfNull(presenter);
+        ArgumentNullException.ThrowIfNull(htmlReportRenderer);
         ArgumentNullException.ThrowIfNull(pdfReportRenderer);
         ArgumentNullException.ThrowIfNull(peopleCsvProvider);
         ArgumentNullException.ThrowIfNull(options);
@@ -38,6 +41,7 @@ internal sealed class ReportRunner : IReportRunner
         _client = client;
         _analyzer = analyzer;
         _presenter = presenter;
+        _htmlReportRenderer = htmlReportRenderer;
         _pdfReportRenderer = pdfReportRenderer;
         _peopleCsvProvider = peopleCsvProvider;
         _parameters = options.Value.CreateReportParameters();
@@ -89,6 +93,7 @@ internal sealed class ReportRunner : IReportRunner
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
         }
         _presenter.RenderReport(reportData);
+        await _htmlReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
         await _pdfReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
     }
 
@@ -117,6 +122,7 @@ internal sealed class ReportRunner : IReportRunner
     private readonly IBitbucketClient _client;
     private readonly IPullRequestAnalyzer _analyzer;
     private readonly IReportPresenter _presenter;
+    private readonly IHtmlReportRenderer _htmlReportRenderer;
     private readonly IPdfReportRenderer _pdfReportRenderer;
     private readonly IPeopleCsvProvider _peopleCsvProvider;
     private readonly ReportParameters _parameters;

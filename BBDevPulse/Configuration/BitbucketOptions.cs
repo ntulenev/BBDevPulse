@@ -120,6 +120,11 @@ public sealed class BitbucketOptions
     public bool ShowAllDetailsForDevelopers { get; init; }
 
     /// <summary>
+    /// HTML report output options.
+    /// </summary>
+    public HtmlOptions Html { get; init; } = new();
+
+    /// <summary>
     /// PDF report output options.
     /// </summary>
     public PdfOptions Pdf { get; init; } = new();
