@@ -24,7 +24,10 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - PR size statistics (smallest/biggest/median/75p by selected size mode)
    - Developer statistics (grade, department, PRs opened, merged, comments, approvals, corrections)
    - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
-10. Optionally generates a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
+10. Optionally generates an HTML report (`Bitbucket:Html` settings) and a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
+11. HTML report mirrors the PDF structure:
+   - Detailed tables support sorting and filtering (`Pull Requests`, `Worst PRs by Metric`, `Developer Stats`, developer detail tables).
+   - Summary stats tables (`Merge Time Stats`, `TTFR Stats`, `Corrections Stats`, `PR Size Stats`) are rendered as static read-only tables.
 
 When `TeamFilter` is configured:
 - All matching repositories and pull requests are still analyzed for activity.
@@ -106,6 +109,9 @@ All settings are under the `Bitbucket` object.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
+- `Html.Enabled` (`bool`): Enables/disables HTML generation after console output is rendered.
+- `Html.OutputPath` (`string`): Output file path for the HTML report. A date suffix (`dd_MM_yyyy`) is appended automatically.
+- `Html.OpenInBrowser` (`bool`): Opens the generated HTML report in the default browser after it is saved.
 - `Pdf.Enabled` (`bool`): Enables/disables PDF generation after console output is rendered.
 - `Pdf.OutputPath` (`string`): Output file path for the PDF. A date suffix (`dd_MM_yyyy`) is appended automatically.
 
@@ -141,6 +147,11 @@ All settings are under the `Bitbucket` object.
     "BranchNameList": [
       "develop"
     ],
+    "Html": {
+      "Enabled": true,
+      "OutputPath": "bbdevpulse-report.html",
+      "OpenInBrowser": false
+    },
     "Pdf": {
       "Enabled": true,
       "OutputPath": "bbdevpulse-report.pdf"
@@ -176,3 +187,8 @@ Bob Smith;Middle;Import
 ### PDF
 <img src="Page3.png" alt="BBDevPulse output part 3">
 <img src="Page4.png" alt="BBDevPulse output part 4">
+
+### HTML
+- Uses the same sections as the PDF report.
+- Detailed tables are interactive in the browser and support sorting/filtering.
+- Summary stats tables are intentionally static.
