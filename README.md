@@ -23,6 +23,11 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - Merge-time statistics (best/median/75p/longest)
    - PR size statistics (smallest/biggest/median/75p by selected size mode)
    - Developer statistics (grade, department, PRs opened, merged, comments, approvals, corrections)
+   - Optional developer detail sections when `ShowAllDetailsForDevelopers = true`:
+     - Authored PRs
+     - Comments
+     - Approvals
+     - Follow-up commits
    - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
 10. Optionally generates an HTML report (`Bitbucket:Html` settings) and a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
 11. HTML report mirrors the PDF structure:
@@ -106,6 +111,7 @@ All settings are under the `Bitbucket` object.
   Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
 - `TeamFilter` (`string`): Optional team name resolved from the `Department` column in `PeopleCsvPath`. When set, PR rows, PR metrics, and developer output are limited to that team, while team member review activity on other authors' PRs is still counted.
 - `ShowDeveloperUuidInStats` (`bool`): Optional flag to include Bitbucket user UUIDs in developer stats output. Default is `false`.
+- `ShowAllDetailsForDevelopers` (`bool`): Optional flag to append detailed per-developer sections after the summary report. When enabled, the report includes authored PRs, comments, approvals, and follow-up commits for each developer. Default is `false`.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
@@ -139,6 +145,7 @@ All settings are under the `Bitbucket` object.
     "PeopleCsvPath": "people.csv",
     "TeamFilter": "",
     "ShowDeveloperUuidInStats": false,
+    "ShowAllDetailsForDevelopers": false,
     "RepoNameFilter": "ABC.",
     "RepoNameList": [
       "Service.A",
