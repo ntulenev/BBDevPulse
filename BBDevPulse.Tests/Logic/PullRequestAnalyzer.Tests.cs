@@ -515,6 +515,62 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats[authorKey].Corrections.Should().Be(2);
     }
 
+    [Fact(DisplayName = "AnalyzeAsync ignores correction commit fetch failures and keeps report generation running")]
+    [Trait("Category", "Unit")]
+    public async Task AnalyzeAsyncWhenCorrectionCommitFetchFailsKeepsReportGenerationRunning()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateParameters(filterDate));
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var author = new User(new DisplayName("Author"), new UserUuid("{author-1}"));
+        var pullRequest = new PullRequest(
+            new PullRequestId(6),
+            PullRequestState.Merged,
+            closedOn: filterDate.AddDays(3),
+            createdOn: filterDate.AddDays(1),
+            updatedOn: filterDate.AddDays(2),
+            mergedOn: filterDate.AddDays(3),
+            author: author,
+            destination: new PullRequestDestination(new PullRequestBranch("develop")));
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        SetupPullRequestSize(client);
+        client.Setup(x => x.GetPullRequestsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([pullRequest]));
+        client.Setup(x => x.GetPullRequestActivityAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 6),
+                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable<PullRequestActivity>([]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 6),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Throws(new InvalidOperationException("Bitbucket API request failed (TooManyRequests): "));
+
+        var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer());
+
+        // Act
+        await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
+
+        // Assert
+        reportData.Reports.Should().ContainSingle();
+        reportData.Reports[0].Corrections.Should().Be(0);
+        var authorKey = new DeveloperKey(new UserUuid("{author-1}"));
+        reportData.DeveloperStats.Should().ContainKey(authorKey);
+        reportData.DeveloperStats[authorKey].PrsOpenedSince.Should().Be(1);
+        reportData.DeveloperStats[authorKey].PrsMergedAfter.Should().Be(1);
+        reportData.DeveloperStats[authorKey].Corrections.Should().Be(0);
+    }
+
     [Fact(DisplayName = "AnalyzeAsync with team filter reports team authored PRs and external PRs with team activity")]
     [Trait("Category", "Unit")]
     public async Task AnalyzeAsyncWhenTeamFilterConfiguredIncludesExternalPrsWithTeamActivityButExcludesThemFromMetrics()

@@ -50,6 +50,21 @@ public sealed class BitbucketOptions
     public int RepositoryConcurrency { get; init; } = 1;
 
     /// <summary>
+    /// Maximum number of retries for retryable Bitbucket API requests.
+    /// </summary>
+    public int MaxRetries { get; init; } = 5;
+
+    /// <summary>
+    /// Step in seconds used to increase retry delays.
+    /// </summary>
+    public int RetryDelayStepSeconds { get; init; } = 1;
+
+    /// <summary>
+    /// Maximum retry delay in seconds for Bitbucket API request backoff.
+    /// </summary>
+    public int MaxRetryDelaySeconds { get; init; } = 30;
+
+    /// <summary>
     /// Bitbucket username.
     /// </summary>
     public required string Username { get; init; }

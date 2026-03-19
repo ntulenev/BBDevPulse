@@ -84,13 +84,13 @@ public sealed class SpectreReportPresenter : IReportPresenter
         reportData.SortReportsByCreatedOn();
 
         _pullRequestReportPresenter.RenderPullRequestTable(reportData, reportData.Parameters.FilterDate);
-        _statisticsPresenter.RenderPrThroughputStats(reportData);
-        _statisticsPresenter.RenderPrsPerDeveloperStats(reportData);
-        _statisticsPresenter.RenderCommentsStats(reportData);
         _statisticsPresenter.RenderMergeTimeStats(reportData);
         _statisticsPresenter.RenderTtfrStats(reportData);
         _statisticsPresenter.RenderCorrectionsStats(reportData);
         _statisticsPresenter.RenderPullRequestSizeStats(reportData);
+        _statisticsPresenter.RenderPrThroughputStats(reportData);
+        _statisticsPresenter.RenderPrsPerDeveloperStats(reportData);
+        _statisticsPresenter.RenderCommentsStats(reportData);
         _statisticsPresenter.RenderWorstPullRequestsTable(reportData);
         _statisticsPresenter.RenderDeveloperStatsTable(reportData);
         if (reportData.Parameters.ShowAllDetailsForDevelopers)

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 
 using BBDevPulse.Abstractions;
@@ -10,37 +11,54 @@ namespace BBDevPulse.API;
 internal sealed class BitbucketTransport : IBitbucketTransport
 {
     private readonly HttpClient _httpClient;
+    private readonly IRetryPolicyHelper _retryPolicyHelper;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BitbucketTransport"/> class.
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
-    public BitbucketTransport(HttpClient httpClient)
+    /// <param name="retryPolicyHelper">Retry policy helper.</param>
+    public BitbucketTransport(HttpClient httpClient, IRetryPolicyHelper retryPolicyHelper)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(retryPolicyHelper);
         _httpClient = httpClient;
+        _retryPolicyHelper = retryPolicyHelper;
     }
 
     /// <inheritdoc />
     public async Task<T> GetAsync<T>(Uri url, CancellationToken cancellationToken)
     {
-        using var response = await _httpClient.GetAsync(url, cancellationToken)
-            .ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken)
-                .ConfigureAwait(false);
-            throw new InvalidOperationException(
-                $"Bitbucket API request failed ({response.StatusCode}): {body}");
-        }
+        return await _retryPolicyHelper.ExecuteAsync(
+            async token =>
+            {
+                using var response = await _httpClient.GetAsync(url, token)
+                    .ConfigureAwait(false);
+                if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                {
+                    var body = await response.Content.ReadAsStringAsync(token)
+                        .ConfigureAwait(false);
+                    throw new RetryableBitbucketException(response.StatusCode, body);
+                }
 
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
-            .ConfigureAwait(false);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync(token)
+                        .ConfigureAwait(false);
+                    throw new InvalidOperationException(
+                        $"Bitbucket API request failed ({response.StatusCode}): {body}");
+                }
 
-        var result = await JsonSerializer.DeserializeAsync<T>(stream, _jsonOptions, cancellationToken)
-            .ConfigureAwait(false);
+                using var stream = await response.Content.ReadAsStreamAsync(token)
+                    .ConfigureAwait(false);
 
-        return result == null ? throw new InvalidOperationException("Bitbucket API response was empty.") : result;
+                var result = await JsonSerializer.DeserializeAsync<T>(stream, _jsonOptions, token)
+                    .ConfigureAwait(false);
+
+                return result == null ? throw new InvalidOperationException("Bitbucket API response was empty.") : result;
+            },
+            static ex => ex is RetryableBitbucketException,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static readonly JsonSerializerOptions _jsonOptions = new()

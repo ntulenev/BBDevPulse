@@ -107,17 +107,6 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         excludeWeekend,
                         excludedDays,
                         pullRequestSizeMode);
-                    ComposePrThroughputSection(column, reportData);
-                    ComposePrsPerDeveloperSection(column, reportData);
-                    ComposeCountSection(
-                        column,
-                        "Comments Stats",
-                        metricReports
-                            .Select(static report => (double)report.Comments)
-                            .OrderBy(static value => value)
-                            .ToList(),
-                        "Min Comments",
-                        "Max Comments");
                     ComposeDurationSection(
                         column,
                         "Merge Time Stats",
@@ -158,6 +147,17 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         "Smallest PR",
                         "Biggest PR",
                         GetPullRequestSizeMetricLabel(pullRequestSizeMode));
+                    ComposePrThroughputSection(column, reportData);
+                    ComposePrsPerDeveloperSection(column, reportData);
+                    ComposeCountSection(
+                        column,
+                        "Comments Stats",
+                        metricReports
+                            .Select(static report => (double)report.Comments)
+                            .OrderBy(static value => value)
+                            .ToList(),
+                        "Min Comments",
+                        "Max Comments");
                     ComposeWorstPullRequestsSection(
                         column,
                         metricReports,

@@ -51,6 +51,9 @@ public sealed class BitbucketOptionsValidatorTests
             PageLength = 0,
             PullRequestConcurrency = 0,
             RepositoryConcurrency = 0,
+            MaxRetries = -1,
+            RetryDelayStepSeconds = 0,
+            MaxRetryDelaySeconds = 0,
             Username = "",
             AppPassword = " ",
             RepoNameFilter = string.Empty,
@@ -70,6 +73,9 @@ public sealed class BitbucketOptionsValidatorTests
         result.Failures.Should().Contain("Bitbucket:PageLength must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:PullRequestConcurrency must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:RepositoryConcurrency must be greater than 0.");
+        result.Failures.Should().Contain("Bitbucket:MaxRetries must be greater than or equal to 0.");
+        result.Failures.Should().Contain("Bitbucket:RetryDelayStepSeconds must be greater than 0.");
+        result.Failures.Should().Contain("Bitbucket:MaxRetryDelaySeconds must be greater than 0.");
         result.Failures.Should().Contain("Bitbucket:Workspace is required.");
         result.Failures.Should().Contain("Bitbucket:Username is required.");
         result.Failures.Should().Contain("Bitbucket:AppPassword is required.");

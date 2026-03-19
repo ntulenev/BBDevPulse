@@ -52,18 +52,6 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         var content = new StringBuilder(32 * 1024);
         _ = content.Append(BuildPullRequestTable(reportData, orderedReports));
         _ = content.AppendLine("<div class=\"stat-grid\">");
-        _ = content.Append(BuildPrThroughputStatsTable(reportData));
-        _ = content.Append(BuildPrsPerDeveloperStatsTable(reportData));
-        _ = content.Append(BuildCountStatsTable(
-            "comments-stats",
-            "Comments Stats",
-            metricReports
-                .Select(static report => (double)report.Comments)
-                .OrderBy(static value => value)
-                .ToList(),
-            "Min Comments",
-            "Max Comments",
-            "Count"));
         _ = content.Append(BuildDurationStatsTable(
             "merge-time-stats",
             "Merge Time Stats",
@@ -105,6 +93,18 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             "Smallest PR",
             "Biggest PR",
             GetPullRequestSizeMetricLabel(pullRequestSizeMode)));
+        _ = content.Append(BuildPrThroughputStatsTable(reportData));
+        _ = content.Append(BuildPrsPerDeveloperStatsTable(reportData));
+        _ = content.Append(BuildCountStatsTable(
+            "comments-stats",
+            "Comments Stats",
+            metricReports
+                .Select(static report => (double)report.Comments)
+                .OrderBy(static value => value)
+                .ToList(),
+            "Min Comments",
+            "Max Comments",
+            "Count"));
         _ = content.AppendLine("</div>");
         _ = content.Append(BuildWorstPullRequestsTable(metricReports, workspace, excludeWeekend, excludedDays, pullRequestSizeMode));
         _ = content.Append(BuildDeveloperStatsTable(reportData));

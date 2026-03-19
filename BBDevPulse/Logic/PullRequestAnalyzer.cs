@@ -308,27 +308,35 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         ReportParameters parameters,
         CancellationToken cancellationToken)
     {
-        var correctionCommits = new List<PullRequestCommitInfo>();
-        await foreach (var commit in _client.GetPullRequestCommitsAsync(
-                           workspace,
-                           repoSlug,
-                           pullRequestId,
-                           cancellationToken).ConfigureAwait(false))
+        try
         {
-            if (commit.Date > createdOn)
+            var correctionCommits = new List<PullRequestCommitInfo>();
+            await foreach (var commit in _client.GetPullRequestCommitsAsync(
+                               workspace,
+                               repoSlug,
+                               pullRequestId,
+                               cancellationToken).ConfigureAwait(false))
             {
-                if (parameters.IsInRange(commit.Date))
+                if (commit.Date > createdOn)
                 {
-                    correctionCommits.Add(commit);
+                    if (parameters.IsInRange(commit.Date))
+                    {
+                        correctionCommits.Add(commit);
+                    }
+
+                    continue;
                 }
 
-                continue;
+                break;
             }
 
-            break;
+            return correctionCommits;
         }
-
-        return correctionCommits;
+        catch (InvalidOperationException)
+        {
+            // Correction commits are supplemental data and should not fail the whole report.
+            return [];
+        }
     }
 
     private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(

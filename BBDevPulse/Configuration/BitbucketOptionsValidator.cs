@@ -46,6 +46,21 @@ internal sealed class BitbucketOptionsValidator : IValidateOptions<BitbucketOpti
             errors.Add("Bitbucket:RepositoryConcurrency must be greater than 0.");
         }
 
+        if (options.MaxRetries < 0)
+        {
+            errors.Add("Bitbucket:MaxRetries must be greater than or equal to 0.");
+        }
+
+        if (options.RetryDelayStepSeconds <= 0)
+        {
+            errors.Add("Bitbucket:RetryDelayStepSeconds must be greater than 0.");
+        }
+
+        if (options.MaxRetryDelaySeconds <= 0)
+        {
+            errors.Add("Bitbucket:MaxRetryDelaySeconds must be greater than 0.");
+        }
+
         if (string.IsNullOrWhiteSpace(options.Workspace))
         {
             errors.Add("Bitbucket:Workspace is required.");

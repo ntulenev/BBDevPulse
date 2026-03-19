@@ -19,6 +19,9 @@ public sealed class BitbucketOptionsTests
             PageLength = 25,
             PullRequestConcurrency = 3,
             RepositoryConcurrency = 2,
+            MaxRetries = 6,
+            RetryDelayStepSeconds = 2,
+            MaxRetryDelaySeconds = 30,
             Username = "user",
             AppPassword = "pass",
             RepoNameFilter = "pulse",
@@ -141,6 +144,9 @@ public sealed class BitbucketOptionsTests
             PageLength = 50,
             PullRequestConcurrency = 5,
             RepositoryConcurrency = 4,
+            MaxRetries = 7,
+            RetryDelayStepSeconds = 3,
+            MaxRetryDelaySeconds = 30,
             Username = "username",
             AppPassword = "password",
             RepoNameFilter = "filter",
@@ -164,6 +170,9 @@ public sealed class BitbucketOptionsTests
         var pageLength = options.PageLength;
         var pullRequestConcurrency = options.PullRequestConcurrency;
         var repositoryConcurrency = options.RepositoryConcurrency;
+        var maxRetries = options.MaxRetries;
+        var retryDelayStepSeconds = options.RetryDelayStepSeconds;
+        var maxRetryDelaySeconds = options.MaxRetryDelaySeconds;
         var username = options.Username;
         var appPassword = options.AppPassword;
         var repoNameFilter = options.RepoNameFilter;
@@ -186,6 +195,9 @@ public sealed class BitbucketOptionsTests
         pageLength.Should().Be(50);
         pullRequestConcurrency.Should().Be(5);
         repositoryConcurrency.Should().Be(4);
+        maxRetries.Should().Be(7);
+        retryDelayStepSeconds.Should().Be(3);
+        maxRetryDelaySeconds.Should().Be(30);
         username.Should().Be("username");
         appPassword.Should().Be("password");
         repoNameFilter.Should().Be("filter");

@@ -34,6 +34,7 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IBitbucketMapper, BBDevPulse.API.Mappers.BitbucketMapper>();
         _ = services.AddSingleton<IPullRequestActivityMapper, BBDevPulse.API.Mappers.PullRequestActivityMapper>();
         _ = services.AddSingleton<IPaginatorHelper, PaginatorHelper>();
+        _ = services.AddSingleton<IRetryPolicyHelper, RetryPolicyHelper>();
 
         _ = services.AddHttpClient<IBitbucketTransport, BitbucketTransport>((sp, client) =>
         {

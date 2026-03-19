@@ -4,7 +4,10 @@ using System.Text;
 
 using FluentAssertions;
 
+using BBDevPulse.Abstractions;
 using BBDevPulse.API;
+
+using Moq;
 
 namespace BBDevPulse.Tests.API;
 
@@ -18,9 +21,25 @@ public sealed class BitbucketTransportTests
     {
         // Arrange
         HttpClient httpClient = null!;
+        var retryPolicyHelper = new Mock<IRetryPolicyHelper>(MockBehavior.Strict).Object;
 
         // Act
-        Action act = () => _ = new BitbucketTransport(httpClient);
+        Action act = () => _ = new BitbucketTransport(httpClient, retryPolicyHelper);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when retry policy helper is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenRetryPolicyHelperIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IRetryPolicyHelper retryPolicyHelper = null!;
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        // Act
+        Action act = () => _ = new BitbucketTransport(httpClient, retryPolicyHelper);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -37,7 +56,7 @@ public sealed class BitbucketTransportTests
                 Content = new StringContent("""{"displayname":"Alice"}""", Encoding.UTF8, "application/json")
             });
         using var httpClient = new HttpClient(handler);
-        var transport = new BitbucketTransport(httpClient);
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
 
         // Act
         var result = await transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), cancellationToken);
@@ -57,7 +76,7 @@ public sealed class BitbucketTransportTests
                 Content = new StringContent("invalid request", Encoding.UTF8, "text/plain")
             });
         using var httpClient = new HttpClient(handler);
-        var transport = new BitbucketTransport(httpClient);
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
 
         // Act
         Func<Task> act = async () =>
@@ -80,7 +99,7 @@ public sealed class BitbucketTransportTests
                 Content = new StringContent("null", Encoding.UTF8, "application/json")
             });
         using var httpClient = new HttpClient(handler);
-        var transport = new BitbucketTransport(httpClient);
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
 
         // Act
         Func<Task> act = async () =>
@@ -89,6 +108,36 @@ public sealed class BitbucketTransportTests
         // Assert
         var exception = await act.Should().ThrowAsync<InvalidOperationException>();
         exception.Which.Message.Should().Contain("empty");
+    }
+
+    [Fact(DisplayName = "GetAsync retries when Bitbucket returns too many requests and eventually succeeds")]
+    [Trait("Category", "Unit")]
+    public async Task GetAsyncWhenTooManyRequestsReturnedRetriesAndSucceeds()
+    {
+        // Arrange
+        var callCount = 0;
+        var handler = new StubHttpMessageHandler(_ =>
+        {
+            callCount++;
+            return callCount == 1
+                ? new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+                {
+                    Content = new StringContent(string.Empty, Encoding.UTF8, "text/plain")
+                }
+                : new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{"displayname":"Alice"}""", Encoding.UTF8, "application/json")
+                };
+        });
+        using var httpClient = new HttpClient(handler);
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
+
+        // Act
+        var result = await transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), cancellationToken);
+
+        // Assert
+        callCount.Should().Be(2);
+        result.DisplayName.Should().Be("Alice");
     }
 
     private sealed class StubHttpMessageHandler(
@@ -106,5 +155,30 @@ public sealed class BitbucketTransportTests
     private sealed class SampleDto
     {
         public string? DisplayName { get; init; }
+    }
+
+    private static IRetryPolicyHelper CreatePassthroughRetryPolicyHelper()
+    {
+        var retryPolicyHelper = new Mock<IRetryPolicyHelper>(MockBehavior.Strict);
+        retryPolicyHelper
+            .Setup(x => x.ExecuteAsync(
+                It.IsAny<Func<CancellationToken, Task<SampleDto>>>(),
+                It.IsAny<Func<Exception, bool>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns<Func<CancellationToken, Task<SampleDto>>, Func<Exception, bool>, CancellationToken>(static async (operation, shouldRetry, token) =>
+            {
+                while (true)
+                {
+                    try
+                    {
+                        return await operation(token);
+                    }
+                    catch (Exception ex) when (shouldRetry(ex))
+                    {
+                    }
+                }
+            });
+
+        return retryPolicyHelper.Object;
     }
 }
