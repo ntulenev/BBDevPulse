@@ -157,6 +157,102 @@ public sealed class ReportDataTests
         reportData.Reports.Select(entry => entry.Id.Value).Should().Equal(1, 2);
     }
 
+    [Fact(DisplayName = "Throughput counters include only in-range metric pull requests")]
+    [Trait("Category", "Unit")]
+    public void ThroughputCountersWhenReportsExistCountOnlyMetricRowsInsideRange()
+    {
+        // Arrange
+        var reportData = new ReportData(new ReportParameters(
+            filterDate: new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero),
+            workspace: new Workspace("workspace"),
+            repoNameFilter: new RepoNameFilter(""),
+            repoNameList: [],
+            repoSearchMode: RepoSearchMode.FilterFromTheList,
+            prTimeFilterMode: PrTimeFilterMode.CreatedOnOnly,
+            branchNameList: [],
+            toDateExclusive: new DateTimeOffset(2026, 2, 25, 0, 0, 0, TimeSpan.Zero)));
+
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoA",
+            repositorySlug: "repoa",
+            author: "Alice",
+            targetBranch: "develop",
+            createdOn: new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero),
+            lastActivity: new DateTimeOffset(2026, 2, 21, 11, 0, 0, TimeSpan.Zero),
+            mergedOn: new DateTimeOffset(2026, 2, 24, 10, 0, 0, TimeSpan.Zero),
+            rejectedOn: new DateTimeOffset(2026, 2, 23, 10, 0, 0, TimeSpan.Zero),
+            state: PullRequestState.Merged,
+            id: new PullRequestId(1),
+            comments: 0));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoB",
+            repositorySlug: "repob",
+            author: "Bob",
+            targetBranch: "develop",
+            createdOn: new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero),
+            lastActivity: new DateTimeOffset(2026, 2, 24, 11, 0, 0, TimeSpan.Zero),
+            mergedOn: new DateTimeOffset(2026, 2, 24, 10, 0, 0, TimeSpan.Zero),
+            rejectedOn: new DateTimeOffset(2026, 2, 24, 12, 0, 0, TimeSpan.Zero),
+            state: PullRequestState.Merged,
+            id: new PullRequestId(2),
+            comments: 0));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoC",
+            repositorySlug: "repoc",
+            author: "Carol",
+            targetBranch: "develop",
+            createdOn: new DateTimeOffset(2026, 2, 22, 10, 0, 0, TimeSpan.Zero),
+            lastActivity: new DateTimeOffset(2026, 2, 22, 11, 0, 0, TimeSpan.Zero),
+            mergedOn: new DateTimeOffset(2026, 2, 26, 10, 0, 0, TimeSpan.Zero),
+            rejectedOn: new DateTimeOffset(2026, 2, 26, 10, 0, 0, TimeSpan.Zero),
+            state: PullRequestState.Merged,
+            id: new PullRequestId(3),
+            comments: 0));
+        reportData.Reports.Add(new PullRequestReport(
+            repository: "RepoD",
+            repositorySlug: "repod",
+            author: "External",
+            targetBranch: "develop",
+            createdOn: new DateTimeOffset(2026, 2, 23, 10, 0, 0, TimeSpan.Zero),
+            lastActivity: new DateTimeOffset(2026, 2, 23, 11, 0, 0, TimeSpan.Zero),
+            mergedOn: new DateTimeOffset(2026, 2, 24, 12, 0, 0, TimeSpan.Zero),
+            rejectedOn: new DateTimeOffset(2026, 2, 24, 12, 0, 0, TimeSpan.Zero),
+            state: PullRequestState.Merged,
+            id: new PullRequestId(4),
+            comments: 0,
+            isActivityOnlyMatch: true));
+
+        // Act
+        var created = reportData.PullRequestsCreatedInRange;
+        var merged = reportData.PullRequestsMergedInRange;
+        var rejected = reportData.PullRequestsRejectedInRange;
+
+        // Assert
+        created.Should().Be(2);
+        merged.Should().Be(2);
+        rejected.Should().Be(2);
+    }
+
+    [Fact(DisplayName = "GetOpenedPullRequestCountsPerDeveloper returns ordered authored counts and skips zeros")]
+    [Trait("Category", "Unit")]
+    public void GetOpenedPullRequestCountsPerDeveloperWhenDeveloperStatsExistReturnsOrderedNonZeroCounts()
+    {
+        // Arrange
+        var reportData = new ReportData(CreateReportParameters());
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
+            new DeveloperStats(new DisplayName("Alice")) { PrsOpenedSince = 3 };
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
+            new DeveloperStats(new DisplayName("Bob")) { PrsOpenedSince = 0 };
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Carol")))] =
+            new DeveloperStats(new DisplayName("Carol")) { PrsOpenedSince = 1 };
+
+        // Act
+        var counts = reportData.GetOpenedPullRequestCountsPerDeveloper();
+
+        // Assert
+        counts.Should().Equal(1d, 3d);
+    }
+
     private static PullRequestReport CreatePullRequestReport(int id, DateTimeOffset createdOn)
     {
         return new PullRequestReport(

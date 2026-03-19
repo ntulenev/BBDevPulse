@@ -8,6 +8,24 @@ namespace BBDevPulse.Abstractions;
 public interface IStatisticsPresenter
 {
     /// <summary>
+    /// Renders pull request throughput statistics.
+    /// </summary>
+    /// <param name="reportData">Report data.</param>
+    void RenderPrThroughputStats(ReportData reportData);
+
+    /// <summary>
+    /// Renders pull request distribution per developer.
+    /// </summary>
+    /// <param name="reportData">Report data.</param>
+    void RenderPrsPerDeveloperStats(ReportData reportData);
+
+    /// <summary>
+    /// Renders comments statistics.
+    /// </summary>
+    /// <param name="reportData">Report data.</param>
+    void RenderCommentsStats(ReportData reportData);
+
+    /// <summary>
     /// Renders merge time statistics.
     /// </summary>
     /// <param name="reportData">Report data.</param>

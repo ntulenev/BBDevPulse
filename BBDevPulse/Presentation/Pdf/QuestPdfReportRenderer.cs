@@ -107,6 +107,17 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         excludeWeekend,
                         excludedDays,
                         pullRequestSizeMode);
+                    ComposePrThroughputSection(column, reportData);
+                    ComposePrsPerDeveloperSection(column, reportData);
+                    ComposeCountSection(
+                        column,
+                        "Comments Stats",
+                        metricReports
+                            .Select(static report => (double)report.Comments)
+                            .OrderBy(static value => value)
+                            .ToList(),
+                        "Min Comments",
+                        "Max Comments");
                     ComposeDurationSection(
                         column,
                         "Merge Time Stats",
@@ -325,6 +336,67 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             AddMetricRow(table, longestLabel, FormatDuration(longest));
             AddMetricRow(table, "Median", FormatDuration(median));
             AddMetricRow(table, "75P", FormatDuration(p75));
+        });
+    }
+
+    private static void ComposePrThroughputSection(ColumnDescriptor column, ReportData reportData)
+    {
+        _ = column.Item().Text("PR Throughput").Bold().FontSize(12);
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Metric");
+                _ = header.Cell().Element(HeaderCell).Text("Count");
+            });
+
+            AddMetricRow(table, "PRs Created", reportData.PullRequestsCreatedInRange.ToString(CultureInfo.InvariantCulture));
+            AddMetricRow(table, "PRs Merged", reportData.PullRequestsMergedInRange.ToString(CultureInfo.InvariantCulture));
+            AddMetricRow(table, "PRs Rejected", reportData.PullRequestsRejectedInRange.ToString(CultureInfo.InvariantCulture));
+        });
+    }
+
+    private void ComposePrsPerDeveloperSection(ColumnDescriptor column, ReportData reportData)
+    {
+        _ = column.Item().Text("PRs per Developer").Bold().FontSize(12);
+
+        var openedPullRequestCounts = reportData.GetOpenedPullRequestCountsPerDeveloper();
+        if (openedPullRequestCounts.Count == 0)
+        {
+            _ = column.Item().Text("No authored pull request data available in the report.");
+            return;
+        }
+
+        var min = openedPullRequestCounts[0];
+        var max = openedPullRequestCounts[^1];
+        var median = _statisticsCalculator.Percentile(openedPullRequestCounts, 50);
+        var p75 = _statisticsCalculator.Percentile(openedPullRequestCounts, 75);
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Metric");
+                _ = header.Cell().Element(HeaderCell).Text("Count");
+            });
+
+            AddMetricRow(table, "Min PRs/Developer", min.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "Max PRs/Developer", max.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
         });
     }
 
@@ -601,6 +673,11 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
+        var commentCandidates = reports
+            .Select(static report => new MetricCandidate(report, report.Comments))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
         var sizeCandidates = reports
             .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
             .Select(report => new MetricCandidate(report, report.GetSizeMetricValue(pullRequestSizeMode)))
@@ -610,6 +687,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         var usedPrKeys = new HashSet<string>(StringComparer.Ordinal);
         var longestMerge = SelectDistinctWorst(mergeCandidates, usedPrKeys);
         var longestTtfr = SelectDistinctWorst(ttfrCandidates, usedPrKeys);
+        var mostComments = SelectDistinctWorst(commentCandidates, usedPrKeys);
         var mostCorrections = SelectDistinctWorst(correctionCandidates, usedPrKeys);
         var biggestPr = SelectDistinctWorst(sizeCandidates, usedPrKeys);
 
@@ -617,6 +695,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         [
             CreateSelection("Longest Merge Time", longestMerge, isDuration: true, isPullRequestSize: false),
             CreateSelection("Longest TTFR", longestTtfr, isDuration: true, isPullRequestSize: false),
+            CreateSelection("Most Comments", mostComments, isDuration: false, isPullRequestSize: false),
             CreateSelection("Most Corrections", mostCorrections, isDuration: false, isPullRequestSize: false),
             CreateSelection("Biggest PR", biggestPr, isDuration: false, isPullRequestSize: true)
         ];

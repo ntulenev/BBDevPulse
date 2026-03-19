@@ -363,7 +363,24 @@ public sealed class QuestPdfReportRendererTests
                 firstReactionOn: filterDate.AddDays(1),
                 filesChanged: 8,
                 linesAdded: 500,
-                linesRemoved: 100)
+                linesRemoved: 100),
+            new(
+                repository: "Repo E",
+                repositorySlug: "repo-e",
+                author: "Eve",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(3),
+                mergedOn: filterDate.AddDays(3),
+                rejectedOn: null,
+                state: PullRequestState.Merged,
+                id: new PullRequestId(5),
+                comments: 50,
+                corrections: 0,
+                firstReactionOn: filterDate.AddDays(2),
+                filesChanged: 1,
+                linesAdded: 10,
+                linesRemoved: 5)
         };
 
         // Act
@@ -375,12 +392,13 @@ public sealed class QuestPdfReportRendererTests
         // Assert
         selections.Select(selection => selection.MetricName)
             .Should()
-            .Equal("Longest Merge Time", "Longest TTFR", "Most Corrections", "Biggest PR");
+            .Equal("Longest Merge Time", "Longest TTFR", "Most Comments", "Most Corrections", "Biggest PR");
         selections[0].Report!.Id.Value.Should().Be(1);
         selections[1].Report!.Id.Value.Should().Be(3);
-        selections[2].Report!.Id.Value.Should().Be(2);
-        selections[3].Report!.Id.Value.Should().Be(4);
-        selections.Select(selection => selection.Report!.Id.Value).Distinct().Should().HaveCount(4);
+        selections[2].Report!.Id.Value.Should().Be(5);
+        selections[3].Report!.Id.Value.Should().Be(2);
+        selections[4].Report!.Id.Value.Should().Be(4);
+        selections.Select(selection => selection.Report!.Id.Value).Distinct().Should().HaveCount(5);
     }
 
     [Fact(DisplayName = "BuildWorstMetricSelections uses files metric for biggest PR in files mode")]
@@ -402,7 +420,7 @@ public sealed class QuestPdfReportRendererTests
                 rejectedOn: null,
                 state: PullRequestState.Open,
                 id: new PullRequestId(1),
-                comments: 1,
+                comments: 2,
                 corrections: 10,
                 firstReactionOn: null,
                 filesChanged: 2,
@@ -419,12 +437,29 @@ public sealed class QuestPdfReportRendererTests
                 rejectedOn: null,
                 state: PullRequestState.Open,
                 id: new PullRequestId(2),
-                comments: 1,
+                comments: 3,
                 corrections: 1,
                 firstReactionOn: null,
                 filesChanged: 12,
                 linesAdded: 50,
-                linesRemoved: 10)
+                linesRemoved: 10),
+            new(
+                repository: "Repo C",
+                repositorySlug: "repo-c",
+                author: "Carol",
+                targetBranch: "develop",
+                createdOn: filterDate,
+                lastActivity: filterDate.AddDays(1),
+                mergedOn: null,
+                rejectedOn: null,
+                state: PullRequestState.Open,
+                id: new PullRequestId(3),
+                comments: 20,
+                corrections: 0,
+                firstReactionOn: null,
+                filesChanged: 1,
+                linesAdded: 5,
+                linesRemoved: 1)
         };
 
         // Act
@@ -435,9 +470,13 @@ public sealed class QuestPdfReportRendererTests
             pullRequestSizeMode: PullRequestSizeMode.Files);
 
         // Assert
-        selections[3].MetricName.Should().Be("Biggest PR");
-        selections[3].Report!.Id.Value.Should().Be(2);
-        selections[3].Value.Should().Be(12);
+        selections[2].MetricName.Should().Be("Most Comments");
+        selections[2].Report!.Id.Value.Should().Be(3);
+        selections[3].MetricName.Should().Be("Most Corrections");
+        selections[3].Report!.Id.Value.Should().Be(1);
+        selections[4].MetricName.Should().Be("Biggest PR");
+        selections[4].Report!.Id.Value.Should().Be(2);
+        selections[4].Value.Should().Be(12);
     }
 
     private static BitbucketOptions CreateOptions(PdfOptions pdf)

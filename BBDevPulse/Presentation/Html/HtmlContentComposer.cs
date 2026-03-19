@@ -52,6 +52,18 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         var content = new StringBuilder(32 * 1024);
         _ = content.Append(BuildPullRequestTable(reportData, orderedReports));
         _ = content.AppendLine("<div class=\"stat-grid\">");
+        _ = content.Append(BuildPrThroughputStatsTable(reportData));
+        _ = content.Append(BuildPrsPerDeveloperStatsTable(reportData));
+        _ = content.Append(BuildCountStatsTable(
+            "comments-stats",
+            "Comments Stats",
+            metricReports
+                .Select(static report => (double)report.Comments)
+                .OrderBy(static value => value)
+                .ToList(),
+            "Min Comments",
+            "Max Comments",
+            "Count"));
         _ = content.Append(BuildDurationStatsTable(
             "merge-time-stats",
             "Merge Time Stats",
@@ -285,6 +297,73 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             title,
             emptyMessage: null,
             CreateMetricColumns(valueHeader),
+            rows,
+            defaultSortColumn: 1,
+            defaultSortDirection: "asc",
+            compact: true,
+            interactive: false);
+    }
+
+    private static string BuildPrThroughputStatsTable(ReportData reportData)
+    {
+        var rows = new List<TableRow>(3)
+        {
+            BuildMetricRow(
+                "PRs Created",
+                reportData.PullRequestsCreatedInRange.ToString(CultureInfo.InvariantCulture),
+                reportData.PullRequestsCreatedInRange),
+            BuildMetricRow(
+                "PRs Merged",
+                reportData.PullRequestsMergedInRange.ToString(CultureInfo.InvariantCulture),
+                reportData.PullRequestsMergedInRange),
+            BuildMetricRow(
+                "PRs Rejected",
+                reportData.PullRequestsRejectedInRange.ToString(CultureInfo.InvariantCulture),
+                reportData.PullRequestsRejectedInRange)
+        };
+
+        return BuildTableSection(
+            "pr-throughput-stats",
+            "PR Throughput",
+            emptyMessage: null,
+            CreateMetricColumns("Count"),
+            rows,
+            defaultSortColumn: 1,
+            defaultSortDirection: "desc",
+            compact: true,
+            interactive: false);
+    }
+
+    private string BuildPrsPerDeveloperStatsTable(ReportData reportData)
+    {
+        var openedPullRequestCounts = reportData.GetOpenedPullRequestCountsPerDeveloper();
+        if (openedPullRequestCounts.Count == 0)
+        {
+            return BuildTableSection(
+                "prs-per-developer-stats",
+                "PRs per Developer",
+                "No authored pull request data available in the report.",
+                CreateMetricColumns("Count"),
+                [],
+                defaultSortColumn: 1,
+                interactive: false);
+        }
+
+        var median = _statisticsCalculator.Percentile(openedPullRequestCounts, 50);
+        var p75 = _statisticsCalculator.Percentile(openedPullRequestCounts, 75);
+        var rows = new List<TableRow>(4)
+        {
+            BuildMetricRow("Min PRs/Developer", openedPullRequestCounts[0].ToString("0.##", CultureInfo.InvariantCulture), openedPullRequestCounts[0]),
+            BuildMetricRow("Max PRs/Developer", openedPullRequestCounts[^1].ToString("0.##", CultureInfo.InvariantCulture), openedPullRequestCounts[^1]),
+            BuildMetricRow("Median", median.ToString("0.##", CultureInfo.InvariantCulture), median),
+            BuildMetricRow("75P", p75.ToString("0.##", CultureInfo.InvariantCulture), p75)
+        };
+
+        return BuildTableSection(
+            "prs-per-developer-stats",
+            "PRs per Developer",
+            emptyMessage: null,
+            CreateMetricColumns("Count"),
             rows,
             defaultSortColumn: 1,
             defaultSortDirection: "asc",

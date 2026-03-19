@@ -32,6 +32,92 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
+    public void RenderPrThroughputStats(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Count");
+
+        _ = table.AddRow("PRs Created", reportData.PullRequestsCreatedInRange.ToString(CultureInfo.InvariantCulture));
+        _ = table.AddRow("PRs Merged", reportData.PullRequestsMergedInRange.ToString(CultureInfo.InvariantCulture));
+        _ = table.AddRow("PRs Rejected", reportData.PullRequestsRejectedInRange.ToString(CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(new Rule("PR Throughput").RuleStyle("grey"));
+        AnsiConsole.Write(table);
+    }
+
+    /// <inheritdoc />
+    public void RenderPrsPerDeveloperStats(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+
+        var openedPullRequestCounts = reportData.GetOpenedPullRequestCountsPerDeveloper();
+        if (openedPullRequestCounts.Count == 0)
+        {
+            AnsiConsole.Write(new Rule("PRs per Developer").RuleStyle("grey"));
+            AnsiConsole.MarkupLine("[yellow]No authored pull request data available in the report.[/]");
+            return;
+        }
+
+        var min = openedPullRequestCounts.First();
+        var max = openedPullRequestCounts.Last();
+        var median = _statisticsCalculator.Percentile(openedPullRequestCounts, 50);
+        var p75 = _statisticsCalculator.Percentile(openedPullRequestCounts, 75);
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Count");
+
+        _ = table.AddRow("Min PRs/Developer", min.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Max PRs/Developer", max.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(new Rule("PRs per Developer").RuleStyle("grey"));
+        AnsiConsole.Write(table);
+    }
+
+    /// <inheritdoc />
+    public void RenderCommentsStats(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+        var comments = reportData.Reports
+            .Where(static report => report.IncludeInMetrics)
+            .Select(static report => (double)report.Comments)
+            .OrderBy(static value => value)
+            .ToList();
+
+        if (comments.Count == 0)
+        {
+            AnsiConsole.Write(new Rule("Comments Stats").RuleStyle("grey"));
+            AnsiConsole.MarkupLine("[yellow]No comments data available in the report.[/]");
+            return;
+        }
+
+        var min = comments.First();
+        var max = comments.Last();
+        var median = _statisticsCalculator.Percentile(comments, 50);
+        var p75 = _statisticsCalculator.Percentile(comments, 75);
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Count");
+
+        _ = table.AddRow("Min Comments", min.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Max Comments", max.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(new Rule("Comments Stats").RuleStyle("grey"));
+        AnsiConsole.Write(table);
+    }
+
+    /// <inheritdoc />
     public void RenderMergeTimeStats(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
@@ -223,6 +309,11 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
+        var commentCandidates = metricReports
+            .Select(static report => new MetricCandidate(report, report.Comments))
+            .OrderByDescending(static candidate => candidate.Value)
+            .ToList();
+
         var sizeCandidates = metricReports
             .Where(report => report.HasSizeDataForMode(pullRequestSizeMode))
             .Select(report => new MetricCandidate(report, report.GetSizeMetricValue(pullRequestSizeMode)))
@@ -232,6 +323,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         var usedPrKeys = new HashSet<string>(StringComparer.Ordinal);
         var longestMerge = SelectDistinctWorst(mergeCandidates, usedPrKeys);
         var longestTtfr = SelectDistinctWorst(ttfrCandidates, usedPrKeys);
+        var mostComments = SelectDistinctWorst(commentCandidates, usedPrKeys);
         var mostCorrections = SelectDistinctWorst(correctionCandidates, usedPrKeys);
         var biggestPr = SelectDistinctWorst(sizeCandidates, usedPrKeys);
 
@@ -254,6 +346,12 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             "Longest TTFR",
             longestTtfr,
             candidate => FormatDurationFromDays(candidate.Value));
+
+        AddWorstMetricRow(
+            table,
+            "Most Comments",
+            mostComments,
+            candidate => candidate.Value.ToString("0.##", CultureInfo.InvariantCulture));
 
         AddWorstMetricRow(
             table,

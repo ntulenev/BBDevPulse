@@ -23,6 +23,10 @@ public sealed class HtmlContentComposerTests
         // Assert
         html.Should().Contain("BBDevPulse HTML Report");
         html.Should().Contain("Pull Requests");
+        html.Should().Contain("PR Throughput");
+        html.Should().Contain("PRs per Developer");
+        html.Should().Contain("Comments Stats");
+        html.Should().Contain("PRs Rejected");
         html.Should().Contain("Worst PRs by Metric");
         html.Should().Contain("Developer Stats");
         html.Should().Contain("Developer Details");
@@ -50,6 +54,12 @@ public sealed class HtmlContentComposerTests
 
         // Assert
         html.Should().Contain("No pull requests in the report.");
+        html.Should().Contain("PR Throughput");
+        html.Should().Contain("PRs per Developer");
+        html.Should().Contain("Comments Stats");
+        html.Should().Contain("PRs Created");
+        html.Should().Contain("PRs Merged");
+        html.Should().Contain("PRs Rejected");
         html.Should().Contain("No data available in the report.");
         html.Should().Contain("No developer activity found in the report.");
     }
@@ -108,6 +118,14 @@ public sealed class HtmlContentComposerTests
             "Add follow-up commit size and message",
             filterDate.AddHours(7),
             new PullRequestSizeSummary(FilesChanged: 3, LinesAdded: 40, LinesRemoved: 10)));
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(
+            new UserUuid("{bob-1}"),
+            new DisplayName("Bob")))] =
+            new DeveloperStats(new DisplayName("Bob"), new UserUuid("{bob-1}"))
+            {
+                PrsOpenedSince = 3,
+                PrsMergedAfter = 2
+            };
         return reportData;
     }
 }

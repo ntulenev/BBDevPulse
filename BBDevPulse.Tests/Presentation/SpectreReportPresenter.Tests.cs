@@ -305,12 +305,21 @@ public sealed class SpectreReportPresenterTests
             .Callback(() => renderPullRequestCalls++);
 
         var statisticsPresenter = new Mock<IStatisticsPresenter>(MockBehavior.Strict);
+        var renderPrThroughputStatsCalls = 0;
+        var renderPrsPerDeveloperStatsCalls = 0;
+        var renderCommentsStatsCalls = 0;
         var renderMergeTimeStatsCalls = 0;
         var renderTtfrStatsCalls = 0;
         var renderCorrectionsStatsCalls = 0;
         var renderPullRequestSizeStatsCalls = 0;
         var renderWorstPullRequestsCalls = 0;
         var renderDeveloperStatsCalls = 0;
+        statisticsPresenter.Setup(x => x.RenderPrThroughputStats(reportData))
+            .Callback(() => renderPrThroughputStatsCalls++);
+        statisticsPresenter.Setup(x => x.RenderPrsPerDeveloperStats(reportData))
+            .Callback(() => renderPrsPerDeveloperStatsCalls++);
+        statisticsPresenter.Setup(x => x.RenderCommentsStats(reportData))
+            .Callback(() => renderCommentsStatsCalls++);
         statisticsPresenter.Setup(x => x.RenderMergeTimeStats(reportData))
             .Callback(() => renderMergeTimeStatsCalls++);
         statisticsPresenter.Setup(x => x.RenderTtfrStats(reportData))
@@ -334,6 +343,9 @@ public sealed class SpectreReportPresenterTests
         // Assert
         reportData.Reports.Select(report => report.Id.Value).Should().Equal(1, 2);
         renderPullRequestCalls.Should().Be(1);
+        renderPrThroughputStatsCalls.Should().Be(1);
+        renderPrsPerDeveloperStatsCalls.Should().Be(1);
+        renderCommentsStatsCalls.Should().Be(1);
         renderMergeTimeStatsCalls.Should().Be(1);
         renderTtfrStatsCalls.Should().Be(1);
         renderCorrectionsStatsCalls.Should().Be(1);
@@ -362,6 +374,9 @@ public sealed class SpectreReportPresenterTests
         pullRequestReportPresenter.Setup(x => x.RenderPullRequestTable(reportData, parameters.FilterDate));
 
         var statisticsPresenter = new Mock<IStatisticsPresenter>(MockBehavior.Strict);
+        statisticsPresenter.Setup(x => x.RenderPrThroughputStats(reportData));
+        statisticsPresenter.Setup(x => x.RenderPrsPerDeveloperStats(reportData));
+        statisticsPresenter.Setup(x => x.RenderCommentsStats(reportData));
         statisticsPresenter.Setup(x => x.RenderMergeTimeStats(reportData));
         statisticsPresenter.Setup(x => x.RenderTtfrStats(reportData));
         statisticsPresenter.Setup(x => x.RenderCorrectionsStats(reportData));
