@@ -31,6 +31,7 @@ public sealed class BitbucketClientTests
             options,
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
@@ -52,6 +53,7 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             transport,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
@@ -73,6 +75,29 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             uriBuilder,
+            CreatePassThroughRepositoriesUriBuilder(),
+            CreatePassThroughPullRequestsUriBuilder(),
+            new PullRequestCommitRangeCache(),
+            new PaginatorHelper(),
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when repositories URI builder is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenRepositoriesUriBuilderIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IRepositoriesUriBuilder repositoriesUriBuilder = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            Options.Create(CreateOptions()),
+            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            CreatePassThroughUriBuilder(),
+            repositoriesUriBuilder,
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
@@ -94,6 +119,7 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughRepositoriesUriBuilder(),
             pullRequestsUriBuilder,
             new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
@@ -115,6 +141,7 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             pullRequestCommitRangeCache,
             new PaginatorHelper(),
@@ -136,6 +163,7 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
             paginatorHelper,
@@ -157,6 +185,7 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
@@ -283,18 +312,17 @@ public sealed class BitbucketClientTests
         mapCalls.Should().Be(2);
     }
 
-    [Fact(DisplayName = "GetRepositoriesAsync uses repository list field group when building URI")]
+    [Fact(DisplayName = "GetRepositoriesAsync uses repositories URI builder")]
     [Trait("Category", "Unit")]
-    public async Task GetRepositoriesAsyncWhenCalledUsesRepositoryListFieldGroup()
+    public async Task GetRepositoriesAsyncWhenCalledUsesRepositoriesUriBuilder()
     {
         // Arrange
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
-        var uriBuilder = new Mock<IBitbucketUriBuilder>(MockBehavior.Strict);
+        var repositoriesUriBuilder = new Mock<IRepositoriesUriBuilder>(MockBehavior.Strict);
 
-        uriBuilder.Setup(x => x.BuildRelativeUri(
-                It.Is<string>(path => path == "repositories/ws?pagelen=25"),
-                It.Is<BitbucketFieldGroup>(group => group == BitbucketFieldGroup.RepositoryList)))
+        repositoriesUriBuilder.Setup(x => x.Build(
+                It.Is<Workspace>(workspace => workspace.Value == "ws")))
             .Returns(new Uri("repositories/ws?pagelen=25", UriKind.Relative));
         transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
                 It.Is<Uri>(uri => uri.ToString() == "repositories/ws?pagelen=25"),
@@ -305,14 +333,17 @@ public sealed class BitbucketClientTests
                 Next = null
             });
 
-        var client = CreateClient(transport.Object, mapper.Object, uriBuilder: uriBuilder.Object);
+        var client = CreateClient(
+            transport.Object,
+            mapper.Object,
+            repositoriesUriBuilder: repositoriesUriBuilder.Object);
 
         // Act
         var result = await ReadAllAsync(client.GetRepositoriesAsync(new Workspace("ws"), null, cancellationToken));
 
         // Assert
         result.Should().BeEmpty();
-        uriBuilder.VerifyAll();
+        repositoriesUriBuilder.VerifyAll();
     }
 
     [Fact(DisplayName = "GetRepositoriesAsync checks cancellation while streaming results")]
@@ -1324,15 +1355,18 @@ public sealed class BitbucketClientTests
         IBitbucketMapper mapper,
         BitbucketOptions? options = null,
         IBitbucketUriBuilder? uriBuilder = null,
+        IRepositoriesUriBuilder? repositoriesUriBuilder = null,
         IPullRequestsUriBuilder? pullRequestsUriBuilder = null,
         IPullRequestCommitRangeCache? pullRequestCommitRangeCache = null)
     {
         var resolvedUriBuilder = uriBuilder ?? CreatePassThroughUriBuilder();
+        var resolvedOptions = options ?? CreateOptions();
         return new BitbucketClient(
-            Options.Create(options ?? CreateOptions()),
+            Options.Create(resolvedOptions),
             transport,
             resolvedUriBuilder,
-            pullRequestsUriBuilder ?? new PullRequestsUriBuilder(resolvedUriBuilder, Options.Create(options ?? CreateOptions())),
+            repositoriesUriBuilder ?? new RepositoriesUriBuilder(resolvedUriBuilder, Options.Create(resolvedOptions)),
+            pullRequestsUriBuilder ?? new PullRequestsUriBuilder(resolvedUriBuilder, Options.Create(resolvedOptions)),
             pullRequestCommitRangeCache ?? new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
             mapper);
@@ -1359,6 +1393,17 @@ public sealed class BitbucketClientTests
                     $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests?pagelen=25",
                     UriKind.Relative));
         return pullRequestsUriBuilder.Object;
+    }
+
+    private static IRepositoriesUriBuilder CreatePassThroughRepositoriesUriBuilder()
+    {
+        var repositoriesUriBuilder = new Mock<IRepositoriesUriBuilder>(MockBehavior.Strict);
+        repositoriesUriBuilder.Setup(x => x.Build(It.IsAny<Workspace>()))
+            .Returns((Workspace workspace) =>
+                new Uri(
+                    $"repositories/{workspace.Value}?pagelen=25",
+                    UriKind.Relative));
+        return repositoriesUriBuilder.Object;
     }
 
     private static BitbucketOptions CreateOptions(

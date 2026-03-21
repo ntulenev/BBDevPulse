@@ -33,6 +33,7 @@ using var host = Host.CreateDefaultBuilder(args)
 
         _ = services.AddSingleton<IBitbucketMapper, BBDevPulse.API.Mappers.BitbucketMapper>();
         _ = services.AddSingleton<IBitbucketUriBuilder, BitbucketUriBuilder>();
+        _ = services.AddSingleton<IRepositoriesUriBuilder, RepositoriesUriBuilder>();
         _ = services.AddSingleton<IPullRequestsUriBuilder, PullRequestsUriBuilder>();
         _ = services.AddSingleton<IPullRequestCommitRangeCache, PullRequestCommitRangeCache>();
         _ = services.AddSingleton<IPullRequestActivityMapper, BBDevPulse.API.Mappers.PullRequestActivityMapper>();

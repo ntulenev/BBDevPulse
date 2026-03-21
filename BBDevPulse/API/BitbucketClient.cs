@@ -25,6 +25,7 @@ internal sealed class BitbucketClient : IBitbucketClient
         IOptions<BitbucketOptions> options,
         IBitbucketTransport transport,
         IBitbucketUriBuilder uriBuilder,
+        IRepositoriesUriBuilder repositoriesUriBuilder,
         IPullRequestsUriBuilder pullRequestsUriBuilder,
         IPullRequestCommitRangeCache pullRequestCommitRangeCache,
         IPaginatorHelper paginatorHelper,
@@ -33,6 +34,7 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(uriBuilder);
+        ArgumentNullException.ThrowIfNull(repositoriesUriBuilder);
         ArgumentNullException.ThrowIfNull(pullRequestsUriBuilder);
         ArgumentNullException.ThrowIfNull(pullRequestCommitRangeCache);
         ArgumentNullException.ThrowIfNull(paginatorHelper);
@@ -41,6 +43,7 @@ internal sealed class BitbucketClient : IBitbucketClient
         _options = optionsValue;
         _transport = transport;
         _uriBuilder = uriBuilder;
+        _repositoriesUriBuilder = repositoriesUriBuilder;
         _pullRequestsUriBuilder = pullRequestsUriBuilder;
         _pullRequestCommitRangeCache = pullRequestCommitRangeCache;
         _paginatorHelper = paginatorHelper;
@@ -62,9 +65,7 @@ internal sealed class BitbucketClient : IBitbucketClient
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workspace);
-        var firstPage = _uriBuilder.BuildRelativeUri(
-            $"repositories/{workspace.Value}?pagelen={_options.PageLength}",
-            BitbucketFieldGroup.RepositoryList);
+        var firstPage = _repositoriesUriBuilder.Build(workspace);
 
         await foreach (var repo in _paginatorHelper.ReadAllAsync(
             firstPage,
@@ -377,6 +378,7 @@ internal sealed class BitbucketClient : IBitbucketClient
     private readonly BitbucketOptions _options;
     private readonly IBitbucketTransport _transport;
     private readonly IBitbucketUriBuilder _uriBuilder;
+    private readonly IRepositoriesUriBuilder _repositoriesUriBuilder;
     private readonly IPullRequestsUriBuilder _pullRequestsUriBuilder;
     private readonly IPullRequestCommitRangeCache _pullRequestCommitRangeCache;
     private readonly IPaginatorHelper _paginatorHelper;
