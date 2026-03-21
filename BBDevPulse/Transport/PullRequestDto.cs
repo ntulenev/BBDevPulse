@@ -44,6 +44,12 @@ internal sealed class PullRequestDto
     public DateTimeOffset? MergedOn { get; init; }
 
     /// <summary>
+    /// Pull request source metadata.
+    /// </summary>
+    [JsonPropertyName("source")]
+    public PullRequestDestinationDto? Source { get; init; }
+
+    /// <summary>
     /// Pull request author.
     /// </summary>
     [JsonPropertyName("author")]

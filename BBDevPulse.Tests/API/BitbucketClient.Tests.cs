@@ -871,6 +871,87 @@ public sealed class BitbucketClientTests
         result.LineChurn.Should().Be(20);
     }
 
+    [Fact(DisplayName = "GetPullRequestSizeAsync reuses commit hashes from pull request listing when available")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestSizeAsyncWhenListingWasReadSkipsPullRequestDetailsRequest()
+    {
+        // Arrange
+        var options = CreateOptions(fromDate: "2026-02-15", toDate: "2026-03-31");
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    CreatePullRequestRequestUri("created_on >= 2026-02-15T00:00:00+00:00 AND created_on < 2026-04-01T00:00:00+00:00")),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values =
+                [
+                    new PullRequestDto
+                    {
+                        Id = 7,
+                        State = "OPEN",
+                        CreatedOn = new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero),
+                        Source = new PullRequestDestinationDto
+                        {
+                            Commit = new PullRequestCommitHashDto { Hash = "source-hash" }
+                        },
+                        Destination = new PullRequestDestinationDto
+                        {
+                            Commit = new PullRequestCommitHashDto { Hash = "destination-hash" },
+                            Branch = new PullRequestBranchDto { Name = "develop" }
+                        }
+                    }
+                ],
+                Next = null
+            });
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    "repositories/ws/repo/diffstat/ws/repo:source-hash..destination-hash?topic=true&pagelen=25"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDiffStatDto>
+            {
+                Values =
+                [
+                    new PullRequestDiffStatDto { LinesAdded = 10, LinesRemoved = 3 },
+                    new PullRequestDiffStatDto { LinesAdded = 5, LinesRemoved = 2 }
+                ],
+                Next = null
+            });
+
+        mapper.Setup(x => x.Map(It.Is<PullRequestDto>(dto => dto.Id == 7)))
+            .Returns((PullRequestDto dto) => new PullRequest(
+                new PullRequestId(dto.Id),
+                PullRequestState.Open,
+                closedOn: null,
+                createdOn: dto.CreatedOn,
+                updatedOn: null,
+                mergedOn: null,
+                author: null,
+                destination: new PullRequestDestination(new PullRequestBranch("develop"))));
+
+        var client = CreateClient(transport.Object, mapper.Object, options);
+
+        // Act
+        _ = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            _ => false,
+            cancellationToken));
+        var result = await client.GetPullRequestSizeAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            new PullRequestId(7),
+            cancellationToken);
+
+        // Assert
+        result.FilesChanged.Should().Be(2);
+        result.LinesAdded.Should().Be(15);
+        result.LinesRemoved.Should().Be(5);
+        result.LineChurn.Should().Be(20);
+    }
+
     [Fact(DisplayName = "GetPullRequestSizeAsync aggregates files and line counts from commit range diffstat")]
     [Trait("Category", "Unit")]
     public async Task GetPullRequestSizeAsyncWhenCommitHashesExistReturnsAggregatedSummary()

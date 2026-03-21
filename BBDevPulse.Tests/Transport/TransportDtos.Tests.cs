@@ -89,7 +89,7 @@ public sealed class TransportDtosTests
     public void PullRequestDestinationDtoWhenDeserializedMapsBranch()
     {
         // Arrange
-        var json = """{"branch":{"name":"main"}}""";
+        var json = """{"branch":{"name":"main"},"commit":{"hash":"dest-123"}}""";
 
         // Act
         var dto = JsonSerializer.Deserialize<PullRequestDestinationDto>(json)!;
@@ -97,6 +97,8 @@ public sealed class TransportDtosTests
         // Assert
         dto.Branch.Should().NotBeNull();
         dto.Branch!.Name.Should().Be("main");
+        dto.Commit.Should().NotBeNull();
+        dto.Commit!.Hash.Should().Be("dest-123");
     }
 
     [Fact(DisplayName = "PullRequestDto deserializes all supported fields")]
@@ -112,11 +114,19 @@ public sealed class TransportDtosTests
               "created_on": "2026-02-20T10:00:00Z",
               "updated_on": "2026-02-20T11:00:00Z",
               "merged_on": "2026-02-20T12:00:00Z",
+              "source": {
+                "commit": {
+                  "hash": "source-123"
+                }
+              },
               "author": {
                 "display_name": "Alice",
                 "uuid": "{alice-1}"
               },
               "destination": {
+                "commit": {
+                  "hash": "dest-456"
+                },
                 "branch": {
                   "name": "develop"
                 }
@@ -134,10 +144,15 @@ public sealed class TransportDtosTests
         dto.CreatedOn.Should().Be(new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero));
         dto.UpdatedOn.Should().Be(new DateTimeOffset(2026, 2, 20, 11, 0, 0, TimeSpan.Zero));
         dto.MergedOn.Should().Be(new DateTimeOffset(2026, 2, 20, 12, 0, 0, TimeSpan.Zero));
+        dto.Source.Should().NotBeNull();
+        dto.Source!.Commit.Should().NotBeNull();
+        dto.Source!.Commit!.Hash.Should().Be("source-123");
         dto.Author.Should().NotBeNull();
         dto.Author!.DisplayName.Should().Be("Alice");
         dto.Author!.Uuid.Should().Be("{alice-1}");
         dto.Destination.Should().NotBeNull();
+        dto.Destination!.Commit.Should().NotBeNull();
+        dto.Destination!.Commit!.Hash.Should().Be("dest-456");
         dto.Destination!.Branch.Should().NotBeNull();
         dto.Destination!.Branch!.Name.Should().Be("develop");
     }

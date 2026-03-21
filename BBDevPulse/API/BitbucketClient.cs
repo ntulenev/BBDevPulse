@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Globalization;
+using System.Collections.Concurrent;
 
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
@@ -107,6 +108,7 @@ internal sealed class BitbucketClient : IBitbucketClient
             cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            CachePullRequestCommitRange(workspace, repoSlug, pr);
             var model = _mapper.Map(pr);
             if (shouldStop(model))
             {
@@ -243,14 +245,35 @@ internal sealed class BitbucketClient : IBitbucketClient
 
         try
         {
-            var pullRequestUri = new Uri(
-                $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}",
-                UriKind.Relative);
-            var pullRequestReference = await GetAsync<PullRequestSizeReferenceDto>(pullRequestUri, cancellationToken)
-                .ConfigureAwait(false);
+            var cacheKey = BuildPullRequestCacheKey(workspace, repoSlug, pullRequestId.Value);
+            var sourceCommitHash = default(string);
+            var destinationCommitHash = default(string);
 
-            var sourceCommitHash = pullRequestReference.Source?.Commit?.Hash;
-            var destinationCommitHash = pullRequestReference.Destination?.Commit?.Hash;
+            if (_pullRequestCommitRanges.TryGetValue(cacheKey, out var cachedCommitRange))
+            {
+                sourceCommitHash = cachedCommitRange.SourceCommitHash;
+                destinationCommitHash = cachedCommitRange.DestinationCommitHash;
+            }
+
+            if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
+                string.IsNullOrWhiteSpace(destinationCommitHash))
+            {
+                var pullRequestUri = new Uri(
+                    $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}",
+                    UriKind.Relative);
+                var pullRequestReference = await GetAsync<PullRequestSizeReferenceDto>(pullRequestUri, cancellationToken)
+                    .ConfigureAwait(false);
+
+                sourceCommitHash = pullRequestReference.Source?.Commit?.Hash;
+                destinationCommitHash = pullRequestReference.Destination?.Commit?.Hash;
+
+                CachePullRequestCommitRange(
+                    workspace,
+                    repoSlug,
+                    pullRequestId.Value,
+                    sourceCommitHash,
+                    destinationCommitHash);
+            }
 
             if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
                 string.IsNullOrWhiteSpace(destinationCommitHash))
@@ -305,6 +328,43 @@ internal sealed class BitbucketClient : IBitbucketClient
     private Task<T> GetAsync<T>(Uri url, CancellationToken cancellationToken) =>
         _transport.GetAsync<T>(url, cancellationToken);
 
+    private void CachePullRequestCommitRange(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestDto pullRequest)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(repoSlug);
+        ArgumentNullException.ThrowIfNull(pullRequest);
+
+        CachePullRequestCommitRange(
+            workspace,
+            repoSlug,
+            pullRequest.Id,
+            pullRequest.Source?.Commit?.Hash,
+            pullRequest.Destination?.Commit?.Hash);
+    }
+
+    private void CachePullRequestCommitRange(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        int pullRequestId,
+        string? sourceCommitHash,
+        string? destinationCommitHash)
+    {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(repoSlug);
+
+        if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
+            string.IsNullOrWhiteSpace(destinationCommitHash))
+        {
+            return;
+        }
+
+        var cacheKey = BuildPullRequestCacheKey(workspace, repoSlug, pullRequestId);
+        _pullRequestCommitRanges[cacheKey] = new PullRequestCommitRange(sourceCommitHash, destinationCommitHash);
+    }
+
     private Uri BuildPullRequestsUri(Workspace workspace, RepoSlug repoSlug)
     {
         var query = BuildPullRequestQuery();
@@ -350,6 +410,9 @@ internal sealed class BitbucketClient : IBitbucketClient
     private static string FormatQueryDate(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
 
+    private static string BuildPullRequestCacheKey(Workspace workspace, RepoSlug repoSlug, int pullRequestId) =>
+        $"{workspace.Value}/{repoSlug.Value}/{pullRequestId.ToString(CultureInfo.InvariantCulture)}";
+
     private static Uri? GetNextUri(string? next) => string.IsNullOrWhiteSpace(next) ? null : new Uri(next, UriKind.RelativeOrAbsolute);
 
     private readonly BitbucketOptions _options;
@@ -357,4 +420,7 @@ internal sealed class BitbucketClient : IBitbucketClient
     private readonly IBitbucketTransport _transport;
     private readonly IPaginatorHelper _paginatorHelper;
     private readonly IBitbucketMapper _mapper;
+    private readonly ConcurrentDictionary<string, PullRequestCommitRange> _pullRequestCommitRanges = new(StringComparer.Ordinal);
+
+    private readonly record struct PullRequestCommitRange(string SourceCommitHash, string DestinationCommitHash);
 }

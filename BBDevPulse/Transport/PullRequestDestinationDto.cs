@@ -8,6 +8,12 @@ namespace BBDevPulse.Transport;
 internal sealed class PullRequestDestinationDto
 {
     /// <summary>
+    /// Endpoint commit metadata.
+    /// </summary>
+    [JsonPropertyName("commit")]
+    public PullRequestCommitHashDto? Commit { get; init; }
+
+    /// <summary>
     /// Destination branch.
     /// </summary>
     [JsonPropertyName("branch")]
