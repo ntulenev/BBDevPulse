@@ -27,17 +27,20 @@ internal sealed class BitbucketClient : IBitbucketClient
     public BitbucketClient(
         IOptions<BitbucketOptions> options,
         IBitbucketTransport transport,
+        IBitbucketUriBuilder uriBuilder,
         IPaginatorHelper paginatorHelper,
         IBitbucketMapper mapper)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(transport);
+        ArgumentNullException.ThrowIfNull(uriBuilder);
         ArgumentNullException.ThrowIfNull(paginatorHelper);
         ArgumentNullException.ThrowIfNull(mapper);
         var optionsValue = options.Value;
         _options = optionsValue;
         _reportParameters = optionsValue.CreateReportParameters();
         _transport = transport;
+        _uriBuilder = uriBuilder;
         _paginatorHelper = paginatorHelper;
         _mapper = mapper;
     }
@@ -57,9 +60,9 @@ internal sealed class BitbucketClient : IBitbucketClient
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(workspace);
-        var firstPage = new Uri(
+        var firstPage = _uriBuilder.BuildRelativeUri(
             $"repositories/{workspace.Value}?pagelen={_options.PageLength}",
-            UriKind.Relative);
+            BitbucketFieldGroup.RepositoryList);
 
         await foreach (var repo in _paginatorHelper.ReadAllAsync(
             firstPage,
@@ -133,10 +136,10 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(repoSlug);
         ArgumentNullException.ThrowIfNull(pullRequestId);
         ArgumentNullException.ThrowIfNull(shouldStop);
-        var firstPage = new Uri(
+        var firstPage = _uriBuilder.BuildRelativeUri(
             $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}/activity" +
             $"?pagelen={_options.PageLength}&sort=-created_on",
-            UriKind.Relative);
+            BitbucketFieldGroup.PullRequestActivity);
 #pragma warning disable CS0219 // Used in paginator
         var stop = false;
 #pragma warning restore CS0219
@@ -177,10 +180,10 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoSlug);
         ArgumentNullException.ThrowIfNull(pullRequestId);
-        var firstPage = new Uri(
+        var firstPage = _uriBuilder.BuildRelativeUri(
             $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}/commits" +
             $"?pagelen={_options.PageLength}&sort=-date",
-            UriKind.Relative);
+            BitbucketFieldGroup.PullRequestCommit);
 
         await foreach (var commit in _paginatorHelper.ReadAllAsync(
             firstPage,
@@ -219,10 +222,10 @@ internal sealed class BitbucketClient : IBitbucketClient
 
         try
         {
-            var diffStatUri = new Uri(
+            var diffStatUri = _uriBuilder.BuildRelativeUri(
                 $"repositories/{workspace.Value}/{repoSlug.Value}/diffstat/{commitHash}" +
                 $"?topic=true&pagelen={_options.PageLength}",
-                UriKind.Relative);
+                BitbucketFieldGroup.PullRequestDiffStat);
 
             return await ReadPullRequestDiffStatAsync(diffStatUri, cancellationToken).ConfigureAwait(false);
         }
@@ -258,9 +261,9 @@ internal sealed class BitbucketClient : IBitbucketClient
             if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
                 string.IsNullOrWhiteSpace(destinationCommitHash))
             {
-                var pullRequestUri = new Uri(
+                var pullRequestUri = _uriBuilder.BuildRelativeUri(
                     $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}",
-                    UriKind.Relative);
+                    BitbucketFieldGroup.PullRequestSizeReference);
                 var pullRequestReference = await GetAsync<PullRequestSizeReferenceDto>(pullRequestUri, cancellationToken)
                     .ConfigureAwait(false);
 
@@ -281,11 +284,11 @@ internal sealed class BitbucketClient : IBitbucketClient
                 return PullRequestSizeSummary.Empty;
             }
 
-            var diffStatUri = new Uri(
+            var diffStatUri = _uriBuilder.BuildRelativeUri(
                 $"repositories/{workspace.Value}/{repoSlug.Value}/diffstat/" +
                 $"{workspace.Value}/{repoSlug.Value}:{sourceCommitHash}..{destinationCommitHash}" +
                 $"?topic=true&pagelen={_options.PageLength}",
-                UriKind.Relative);
+                BitbucketFieldGroup.PullRequestDiffStat);
 
             return await ReadPullRequestDiffStatAsync(diffStatUri, cancellationToken).ConfigureAwait(false);
         }
@@ -377,7 +380,7 @@ internal sealed class BitbucketClient : IBitbucketClient
             path += $"&q={Uri.EscapeDataString(query)}";
         }
 
-        return new Uri(path, UriKind.Relative);
+        return _uriBuilder.BuildRelativeUri(path, BitbucketFieldGroup.PullRequestList);
     }
 
     private string? BuildPullRequestQuery()
@@ -418,6 +421,7 @@ internal sealed class BitbucketClient : IBitbucketClient
     private readonly BitbucketOptions _options;
     private readonly ReportParameters _reportParameters;
     private readonly IBitbucketTransport _transport;
+    private readonly IBitbucketUriBuilder _uriBuilder;
     private readonly IPaginatorHelper _paginatorHelper;
     private readonly IBitbucketMapper _mapper;
     private readonly ConcurrentDictionary<string, PullRequestCommitRange> _pullRequestCommitRanges = new(StringComparer.Ordinal);

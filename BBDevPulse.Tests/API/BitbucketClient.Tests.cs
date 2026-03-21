@@ -29,6 +29,7 @@ public sealed class BitbucketClientTests
         Action act = () => _ = new BitbucketClient(
             options,
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            CreatePassThroughUriBuilder(),
             new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
@@ -47,6 +48,26 @@ public sealed class BitbucketClientTests
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
             transport,
+            CreatePassThroughUriBuilder(),
+            new PaginatorHelper(),
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when URI builder is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenUriBuilderIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IBitbucketUriBuilder uriBuilder = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            Options.Create(CreateOptions()),
+            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            uriBuilder,
             new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
@@ -65,6 +86,7 @@ public sealed class BitbucketClientTests
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            CreatePassThroughUriBuilder(),
             paginatorHelper,
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
@@ -83,6 +105,7 @@ public sealed class BitbucketClientTests
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            CreatePassThroughUriBuilder(),
             new PaginatorHelper(),
             mapper);
 
@@ -205,6 +228,38 @@ public sealed class BitbucketClientTests
         pageIndexes.Should().Equal(1, 2);
         transportCalls.Should().Be(2);
         mapCalls.Should().Be(2);
+    }
+
+    [Fact(DisplayName = "GetRepositoriesAsync uses repository list field group when building URI")]
+    [Trait("Category", "Unit")]
+    public async Task GetRepositoriesAsyncWhenCalledUsesRepositoryListFieldGroup()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var uriBuilder = new Mock<IBitbucketUriBuilder>(MockBehavior.Strict);
+
+        uriBuilder.Setup(x => x.BuildRelativeUri(
+                It.Is<string>(path => path == "repositories/ws?pagelen=25"),
+                It.Is<BitbucketFieldGroup>(group => group == BitbucketFieldGroup.RepositoryList)))
+            .Returns(new Uri("repositories/ws?pagelen=25", UriKind.Relative));
+        transport.Setup(x => x.GetAsync<PaginatedResponse<RepositoryDto>>(
+                It.Is<Uri>(uri => uri.ToString() == "repositories/ws?pagelen=25"),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<RepositoryDto>
+            {
+                Values = [],
+                Next = null
+            });
+
+        var client = CreateClient(transport.Object, mapper.Object, uriBuilder: uriBuilder.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetRepositoriesAsync(new Workspace("ws"), null, cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
+        uriBuilder.VerifyAll();
     }
 
     [Fact(DisplayName = "GetRepositoriesAsync checks cancellation while streaming results")]
@@ -450,6 +505,45 @@ public sealed class BitbucketClientTests
 
         // Assert
         result.Select(pr => pr.Id.Value).Should().Equal(1, 2);
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync uses pull request list field group when building URI")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenCalledUsesPullRequestListFieldGroup()
+    {
+        // Arrange
+        var options = CreateOptions(fromDate: "2026-02-15", toDate: "2026-03-31");
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        var uriBuilder = new Mock<IBitbucketUriBuilder>(MockBehavior.Strict);
+        const string requestPath =
+            "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on&q=created_on%20%3E%3D%202026-02-15T00%3A00%3A00%2B00%3A00%20AND%20created_on%20%3C%202026-04-01T00%3A00%3A00%2B00%3A00";
+
+        uriBuilder.Setup(x => x.BuildRelativeUri(
+                It.Is<string>(path => path == requestPath),
+                It.Is<BitbucketFieldGroup>(group => group == BitbucketFieldGroup.PullRequestList)))
+            .Returns(new Uri(requestPath, UriKind.Relative));
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.Is<Uri>(uri => uri.ToString() == requestPath),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values = [],
+                Next = null
+            });
+
+        var client = CreateClient(transport.Object, mapper.Object, options, uriBuilder.Object);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            _ => false,
+            cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
+        uriBuilder.VerifyAll();
     }
 
     [Fact(DisplayName = "GetPullRequestsAsync treats null page values as empty")]
@@ -1002,6 +1096,65 @@ public sealed class BitbucketClientTests
         result.LineChurn.Should().Be(20);
     }
 
+    [Fact(DisplayName = "GetPullRequestSizeAsync uses size reference and diffstat field groups when building URIs")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestSizeAsyncWhenCalledUsesExpectedFieldGroups()
+    {
+        // Arrange
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var uriBuilder = new Mock<IBitbucketUriBuilder>(MockBehavior.Strict);
+        const string detailsPath = "repositories/ws/repo/pullrequests/7";
+        const string diffstatPath = "repositories/ws/repo/diffstat/ws/repo:source-hash..destination-hash?topic=true&pagelen=25";
+
+        uriBuilder.Setup(x => x.BuildRelativeUri(
+                It.Is<string>(path => path == detailsPath),
+                It.Is<BitbucketFieldGroup>(group => group == BitbucketFieldGroup.PullRequestSizeReference)))
+            .Returns(new Uri(detailsPath, UriKind.Relative));
+        uriBuilder.Setup(x => x.BuildRelativeUri(
+                It.Is<string>(path => path == diffstatPath),
+                It.Is<BitbucketFieldGroup>(group => group == BitbucketFieldGroup.PullRequestDiffStat)))
+            .Returns(new Uri(diffstatPath, UriKind.Relative));
+
+        transport.Setup(x => x.GetAsync<PullRequestSizeReferenceDto>(
+                It.Is<Uri>(uri => uri.ToString() == detailsPath),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PullRequestSizeReferenceDto
+            {
+                Source = new PullRequestEndpointDto
+                {
+                    Commit = new PullRequestCommitHashDto { Hash = "source-hash" }
+                },
+                Destination = new PullRequestEndpointDto
+                {
+                    Commit = new PullRequestCommitHashDto { Hash = "destination-hash" }
+                }
+            });
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(
+                It.Is<Uri>(uri => uri.ToString() == diffstatPath),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDiffStatDto>
+            {
+                Values = [],
+                Next = null
+            });
+
+        var client = CreateClient(
+            transport.Object,
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object,
+            uriBuilder: uriBuilder.Object);
+
+        // Act
+        var result = await client.GetPullRequestSizeAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            new PullRequestId(7),
+            cancellationToken);
+
+        // Assert
+        result.Should().Be(PullRequestSizeSummary.Empty);
+        uriBuilder.VerifyAll();
+    }
+
     [Fact(DisplayName = "GetPullRequestSizeAsync returns empty size when diffstat request fails")]
     [Trait("Category", "Unit")]
     public async Task GetPullRequestSizeAsyncWhenDiffStatFailsReturnsEmpty()
@@ -1044,13 +1197,25 @@ public sealed class BitbucketClientTests
     private static BitbucketClient CreateClient(
         IBitbucketTransport transport,
         IBitbucketMapper mapper,
-        BitbucketOptions? options = null)
+        BitbucketOptions? options = null,
+        IBitbucketUriBuilder? uriBuilder = null)
     {
         return new BitbucketClient(
             Options.Create(options ?? CreateOptions()),
             transport,
+            uriBuilder ?? CreatePassThroughUriBuilder(),
             new PaginatorHelper(),
             mapper);
+    }
+
+    private static IBitbucketUriBuilder CreatePassThroughUriBuilder()
+    {
+        var uriBuilder = new Mock<IBitbucketUriBuilder>(MockBehavior.Strict);
+        uriBuilder.Setup(x => x.BuildRelativeUri(
+                It.IsAny<string>(),
+                It.IsAny<BitbucketFieldGroup>()))
+            .Returns((string path, BitbucketFieldGroup _) => new Uri(path, UriKind.Relative));
+        return uriBuilder.Object;
     }
 
     private static BitbucketOptions CreateOptions(
