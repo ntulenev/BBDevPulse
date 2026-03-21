@@ -61,6 +61,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 continue;
             }
 
+            if (parameters.HasUpperBound &&
+                pr.CreatedOn >= parameters.ToDateExclusive!.Value)
+            {
+                continue;
+            }
+
             await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
             analysisTasks.Add(AnalyzePullRequestWithSemaphoreAsync(
                 repo,

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Globalization;
 
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
@@ -32,7 +33,9 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(paginatorHelper);
         ArgumentNullException.ThrowIfNull(mapper);
-        _options = options.Value;
+        var optionsValue = options.Value;
+        _options = optionsValue;
+        _reportParameters = optionsValue.CreateReportParameters();
         _transport = transport;
         _paginatorHelper = paginatorHelper;
         _mapper = mapper;
@@ -85,10 +88,7 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoSlug);
         ArgumentNullException.ThrowIfNull(shouldStop);
-        var firstPage = new Uri(
-            $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests?pagelen={_options.PageLength}" +
-            $"&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on",
-            UriKind.Relative);
+        var firstPage = BuildPullRequestsUri(workspace, repoSlug);
 #pragma warning disable CS0219 // Used in paginator
         var stop = false;
 #pragma warning restore CS0219
@@ -305,9 +305,55 @@ internal sealed class BitbucketClient : IBitbucketClient
     private Task<T> GetAsync<T>(Uri url, CancellationToken cancellationToken) =>
         _transport.GetAsync<T>(url, cancellationToken);
 
+    private Uri BuildPullRequestsUri(Workspace workspace, RepoSlug repoSlug)
+    {
+        var query = BuildPullRequestQuery();
+        var path =
+            $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests?pagelen={_options.PageLength}" +
+            $"&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on";
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            path += $"&q={Uri.EscapeDataString(query)}";
+        }
+
+        return new Uri(path, UriKind.Relative);
+    }
+
+    private string? BuildPullRequestQuery()
+    {
+        var clauses = new List<string>(capacity: 2);
+        var filterDate = FormatQueryDate(_reportParameters.FilterDate);
+
+        switch (_reportParameters.PrTimeFilterMode)
+        {
+            case PrTimeFilterMode.CreatedOnOnly:
+                clauses.Add($"created_on >= {filterDate}");
+                break;
+            case PrTimeFilterMode.LastKnownUpdateAndCreated:
+                clauses.Add($"(created_on >= {filterDate} OR updated_on >= {filterDate})");
+                break;
+            default:
+                throw new NotImplementedException();
+        }
+
+        if (_reportParameters.ToDateExclusive.HasValue)
+        {
+            clauses.Add($"created_on < {FormatQueryDate(_reportParameters.ToDateExclusive.Value)}");
+        }
+
+        return clauses.Count == 0
+            ? null
+            : string.Join(" AND ", clauses);
+    }
+
+    private static string FormatQueryDate(DateTimeOffset value) =>
+        value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
+
     private static Uri? GetNextUri(string? next) => string.IsNullOrWhiteSpace(next) ? null : new Uri(next, UriKind.RelativeOrAbsolute);
 
     private readonly BitbucketOptions _options;
+    private readonly ReportParameters _reportParameters;
     private readonly IBitbucketTransport _transport;
     private readonly IPaginatorHelper _paginatorHelper;
     private readonly IBitbucketMapper _mapper;

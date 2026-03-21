@@ -779,6 +779,43 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats[authorKey].Corrections.Should().Be(1);
     }
 
+    [Fact(DisplayName = "AnalyzeAsync skips PR enrichment when pull request was created on upper bound")]
+    [Trait("Category", "Unit")]
+    public async Task AnalyzeAsyncWhenPullRequestCreatedAtUpperBoundSkipsHistoricalEnrichment()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+        var toDateExclusive = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
+        var reportData = new ReportData(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var pullRequest = new PullRequest(
+            new PullRequestId(78),
+            PullRequestState.Open,
+            closedOn: null,
+            createdOn: toDateExclusive,
+            updatedOn: toDateExclusive.AddDays(1),
+            mergedOn: null,
+            author: new User(new DisplayName("Alice"), new UserUuid("{alice-1}")),
+            destination: null);
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([pullRequest]));
+
+        var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+
+        // Act
+        await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
+
+        // Assert
+        reportData.Reports.Should().BeEmpty();
+        reportData.DeveloperStats.Should().BeEmpty();
+    }
+
     [Fact(DisplayName = "AnalyzeAsync collects detailed per-developer activities when configured")]
     [Trait("Category", "Unit")]
     public async Task AnalyzeAsyncWhenDetailedDeveloperOptionEnabledCollectsDetails()

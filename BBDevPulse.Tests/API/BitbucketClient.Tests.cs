@@ -359,12 +359,13 @@ public sealed class BitbucketClientTests
     public async Task GetPullRequestsAsyncWhenStopPredicateReturnsTrueBreaksIteration()
     {
         // Arrange
+        var options = CreateOptions(fromDate: "2026-02-15", toDate: "2026-03-31");
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
                 It.Is<Uri>(uri => uri.ToString() ==
-                    "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on"),
+                    CreatePullRequestRequestUri("created_on >= 2026-02-15T00:00:00+00:00 AND created_on < 2026-04-01T00:00:00+00:00")),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestDto>
             {
@@ -389,7 +390,7 @@ public sealed class BitbucketClientTests
                 author: null,
                 destination: null));
 
-        var client = CreateClient(transport.Object, mapper.Object);
+        var client = CreateClient(transport.Object, mapper.Object, options);
 
         // Act
         var result = await ReadAllAsync(client.GetPullRequestsAsync(
@@ -407,12 +408,13 @@ public sealed class BitbucketClientTests
     public async Task GetPullRequestsAsyncWhenStopPredicateNeverMatchesReturnsAllItems()
     {
         // Arrange
+        var options = CreateOptions(fromDate: "2026-02-15", toDate: "2026-03-31");
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
                 It.Is<Uri>(uri => uri.ToString() ==
-                    "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on"),
+                    CreatePullRequestRequestUri("created_on >= 2026-02-15T00:00:00+00:00 AND created_on < 2026-04-01T00:00:00+00:00")),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestDto>
             {
@@ -437,7 +439,7 @@ public sealed class BitbucketClientTests
                 author: null,
                 destination: null));
 
-        var client = CreateClient(transport.Object, mapper.Object);
+        var client = CreateClient(transport.Object, mapper.Object, options);
 
         // Act
         var result = await ReadAllAsync(client.GetPullRequestsAsync(
@@ -455,13 +457,14 @@ public sealed class BitbucketClientTests
     public async Task GetPullRequestsAsyncWhenPageValuesAreNullReturnsEmptySequence()
     {
         // Arrange
+        var options = CreateOptions(fromDate: "2026-02-15", toDate: "2026-03-31");
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
         var mapCalls = 0;
 
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
                 It.Is<Uri>(uri => uri.ToString() ==
-                    "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on"),
+                    CreatePullRequestRequestUri("created_on >= 2026-02-15T00:00:00+00:00 AND created_on < 2026-04-01T00:00:00+00:00")),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestDto>
             {
@@ -480,7 +483,7 @@ public sealed class BitbucketClientTests
                 author: null,
                 destination: null));
 
-        var client = CreateClient(transport.Object, mapper.Object);
+        var client = CreateClient(transport.Object, mapper.Object, options);
 
         // Act
         var result = await ReadAllAsync(client.GetPullRequestsAsync(
@@ -492,6 +495,40 @@ public sealed class BitbucketClientTests
         // Assert
         result.Should().BeEmpty();
         mapCalls.Should().Be(0);
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync filters by created or updated date for historical activity mode")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenLastKnownUpdateModeConfiguredAddsServerSideDateQuery()
+    {
+        // Arrange
+        var options = CreateOptions(
+            prTimeFilterMode: PrTimeFilterMode.LastKnownUpdateAndCreated,
+            fromDate: "2026-02-15",
+            toDate: "2026-03-31");
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    CreatePullRequestRequestUri("(created_on >= 2026-02-15T00:00:00+00:00 OR updated_on >= 2026-02-15T00:00:00+00:00) AND created_on < 2026-04-01T00:00:00+00:00")),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values = [],
+                Next = null
+            });
+
+        var client = CreateClient(transport.Object, mapper.Object, options);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            _ => false,
+            cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
     }
 
     [Fact(DisplayName = "GetPullRequestActivityAsync throws when workspace is null")]
@@ -925,21 +962,29 @@ public sealed class BitbucketClientTests
 
     private static BitbucketClient CreateClient(
         IBitbucketTransport transport,
-        IBitbucketMapper mapper)
+        IBitbucketMapper mapper,
+        BitbucketOptions? options = null)
     {
         return new BitbucketClient(
-            Options.Create(CreateOptions()),
+            Options.Create(options ?? CreateOptions()),
             transport,
             new PaginatorHelper(),
             mapper);
     }
 
-    private static BitbucketOptions CreateOptions()
+    private static BitbucketOptions CreateOptions(
+        PrTimeFilterMode prTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
+        string? fromDate = null,
+        string? toDate = null)
     {
         return new BitbucketOptions
         {
-            Days = 7,
+            Days = string.IsNullOrWhiteSpace(fromDate) && string.IsNullOrWhiteSpace(toDate)
+                ? 7
+                : null,
             Workspace = "ws",
+            FromDate = fromDate,
+            ToDate = toDate,
             PageLength = 25,
             Username = "user",
             AppPassword = "pass",
@@ -947,10 +992,14 @@ public sealed class BitbucketClientTests
             RepoNameList = [],
             BranchNameList = [],
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
-            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
+            PrTimeFilterMode = prTimeFilterMode,
             Pdf = new PdfOptions()
         };
     }
+
+    private static string CreatePullRequestRequestUri(string query) =>
+        "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on" +
+        $"&q={Uri.EscapeDataString(query)}";
 
     private static JsonElement ParseJson(string json)
     {
