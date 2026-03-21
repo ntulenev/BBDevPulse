@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Globalization;
 
 using FluentAssertions;
 
@@ -30,6 +31,8 @@ public sealed class BitbucketClientTests
             options,
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughPullRequestsUriBuilder(),
+            new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
@@ -49,6 +52,8 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             transport,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughPullRequestsUriBuilder(),
+            new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
@@ -68,6 +73,50 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             uriBuilder,
+            CreatePassThroughPullRequestsUriBuilder(),
+            new PullRequestCommitRangeCache(),
+            new PaginatorHelper(),
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when pull requests URI builder is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenPullRequestsUriBuilderIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IPullRequestsUriBuilder pullRequestsUriBuilder = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            Options.Create(CreateOptions()),
+            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            CreatePassThroughUriBuilder(),
+            pullRequestsUriBuilder,
+            new PullRequestCommitRangeCache(),
+            new PaginatorHelper(),
+            new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when pull request commit range cache is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenPullRequestCommitRangeCacheIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IPullRequestCommitRangeCache pullRequestCommitRangeCache = null!;
+
+        // Act
+        Action act = () => _ = new BitbucketClient(
+            Options.Create(CreateOptions()),
+            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            CreatePassThroughUriBuilder(),
+            CreatePassThroughPullRequestsUriBuilder(),
+            pullRequestCommitRangeCache,
             new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
@@ -87,6 +136,8 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughPullRequestsUriBuilder(),
+            new PullRequestCommitRangeCache(),
             paginatorHelper,
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
@@ -106,6 +157,8 @@ public sealed class BitbucketClientTests
             Options.Create(CreateOptions()),
             new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
             CreatePassThroughUriBuilder(),
+            CreatePassThroughPullRequestsUriBuilder(),
+            new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
             mapper);
 
@@ -507,21 +560,21 @@ public sealed class BitbucketClientTests
         result.Select(pr => pr.Id.Value).Should().Equal(1, 2);
     }
 
-    [Fact(DisplayName = "GetPullRequestsAsync uses pull request list field group when building URI")]
+    [Fact(DisplayName = "GetPullRequestsAsync uses pull requests URI builder")]
     [Trait("Category", "Unit")]
-    public async Task GetPullRequestsAsyncWhenCalledUsesPullRequestListFieldGroup()
+    public async Task GetPullRequestsAsyncWhenCalledUsesPullRequestsUriBuilder()
     {
         // Arrange
         var options = CreateOptions(fromDate: "2026-02-15", toDate: "2026-03-31");
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
         var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
-        var uriBuilder = new Mock<IBitbucketUriBuilder>(MockBehavior.Strict);
+        var pullRequestsUriBuilder = new Mock<IPullRequestsUriBuilder>(MockBehavior.Strict);
         const string requestPath =
             "repositories/ws/repo/pullrequests?pagelen=25&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on&q=created_on%20%3E%3D%202026-02-15T00%3A00%3A00%2B00%3A00%20AND%20created_on%20%3C%202026-04-01T00%3A00%3A00%2B00%3A00";
 
-        uriBuilder.Setup(x => x.BuildRelativeUri(
-                It.Is<string>(path => path == requestPath),
-                It.Is<BitbucketFieldGroup>(group => group == BitbucketFieldGroup.PullRequestList)))
+        pullRequestsUriBuilder.Setup(x => x.Build(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo")))
             .Returns(new Uri(requestPath, UriKind.Relative));
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
                 It.Is<Uri>(uri => uri.ToString() == requestPath),
@@ -532,7 +585,7 @@ public sealed class BitbucketClientTests
                 Next = null
             });
 
-        var client = CreateClient(transport.Object, mapper.Object, options, uriBuilder.Object);
+        var client = CreateClient(transport.Object, mapper.Object, options, pullRequestsUriBuilder: pullRequestsUriBuilder.Object);
 
         // Act
         var result = await ReadAllAsync(client.GetPullRequestsAsync(
@@ -543,7 +596,7 @@ public sealed class BitbucketClientTests
 
         // Assert
         result.Should().BeEmpty();
-        uriBuilder.VerifyAll();
+        pullRequestsUriBuilder.VerifyAll();
     }
 
     [Fact(DisplayName = "GetPullRequestsAsync treats null page values as empty")]
@@ -605,6 +658,78 @@ public sealed class BitbucketClientTests
         transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
                 It.Is<Uri>(uri => uri.ToString() ==
                     CreatePullRequestRequestUri("(created_on >= 2026-02-15T00:00:00+00:00 OR updated_on >= 2026-02-15T00:00:00+00:00) AND created_on < 2026-04-01T00:00:00+00:00")),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values = [],
+                Next = null
+            });
+
+        var client = CreateClient(transport.Object, mapper.Object, options);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            _ => false,
+            cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync adds single branch filter to server-side query")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenSingleBranchFilterConfiguredAddsBranchClause()
+    {
+        // Arrange
+        var options = CreateOptions(
+            fromDate: "2026-02-15",
+            toDate: "2026-03-31",
+            branchNameList: [new("develop")]);
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    CreatePullRequestRequestUri(
+                        "created_on >= 2026-02-15T00:00:00+00:00 AND destination.branch.name = \"develop\" AND created_on < 2026-04-01T00:00:00+00:00")),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDto>
+            {
+                Values = [],
+                Next = null
+            });
+
+        var client = CreateClient(transport.Object, mapper.Object, options);
+
+        // Act
+        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+            new Workspace("ws"),
+            new RepoSlug("repo"),
+            _ => false,
+            cancellationToken));
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "GetPullRequestsAsync adds multiple branch filters to server-side query")]
+    [Trait("Category", "Unit")]
+    public async Task GetPullRequestsAsyncWhenMultipleBranchFiltersConfiguredAddsOrBranchClause()
+    {
+        // Arrange
+        var options = CreateOptions(
+            fromDate: "2026-02-15",
+            toDate: "2026-03-31",
+            branchNameList: [new("develop"), new("master")]);
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        var mapper = new Mock<IBitbucketMapper>(MockBehavior.Strict);
+
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDto>>(
+                It.Is<Uri>(uri => uri.ToString() ==
+                    CreatePullRequestRequestUri(
+                        "created_on >= 2026-02-15T00:00:00+00:00 AND (destination.branch.name = \"develop\" OR destination.branch.name = \"master\") AND created_on < 2026-04-01T00:00:00+00:00")),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new PaginatedResponse<PullRequestDto>
             {
@@ -1198,12 +1323,17 @@ public sealed class BitbucketClientTests
         IBitbucketTransport transport,
         IBitbucketMapper mapper,
         BitbucketOptions? options = null,
-        IBitbucketUriBuilder? uriBuilder = null)
+        IBitbucketUriBuilder? uriBuilder = null,
+        IPullRequestsUriBuilder? pullRequestsUriBuilder = null,
+        IPullRequestCommitRangeCache? pullRequestCommitRangeCache = null)
     {
+        var resolvedUriBuilder = uriBuilder ?? CreatePassThroughUriBuilder();
         return new BitbucketClient(
             Options.Create(options ?? CreateOptions()),
             transport,
-            uriBuilder ?? CreatePassThroughUriBuilder(),
+            resolvedUriBuilder,
+            pullRequestsUriBuilder ?? new PullRequestsUriBuilder(resolvedUriBuilder, Options.Create(options ?? CreateOptions())),
+            pullRequestCommitRangeCache ?? new PullRequestCommitRangeCache(),
             new PaginatorHelper(),
             mapper);
     }
@@ -1218,10 +1348,24 @@ public sealed class BitbucketClientTests
         return uriBuilder.Object;
     }
 
+    private static IPullRequestsUriBuilder CreatePassThroughPullRequestsUriBuilder()
+    {
+        var pullRequestsUriBuilder = new Mock<IPullRequestsUriBuilder>(MockBehavior.Strict);
+        pullRequestsUriBuilder.Setup(x => x.Build(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>()))
+            .Returns((Workspace workspace, RepoSlug repoSlug) =>
+                new Uri(
+                    $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests?pagelen=25",
+                    UriKind.Relative));
+        return pullRequestsUriBuilder.Object;
+    }
+
     private static BitbucketOptions CreateOptions(
         PrTimeFilterMode prTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
         string? fromDate = null,
-        string? toDate = null)
+        string? toDate = null,
+        IReadOnlyList<BranchName>? branchNameList = null)
     {
         return new BitbucketOptions
         {
@@ -1236,7 +1380,7 @@ public sealed class BitbucketClientTests
             AppPassword = "pass",
             RepoNameFilter = string.Empty,
             RepoNameList = [],
-            BranchNameList = [],
+            BranchNameList = branchNameList?.Select(static branch => branch.Value).ToArray() ?? [],
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode = prTimeFilterMode,
             Pdf = new PdfOptions()

@@ -1,7 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Globalization;
-using System.Collections.Concurrent;
-
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
 using BBDevPulse.Models;
@@ -28,19 +25,24 @@ internal sealed class BitbucketClient : IBitbucketClient
         IOptions<BitbucketOptions> options,
         IBitbucketTransport transport,
         IBitbucketUriBuilder uriBuilder,
+        IPullRequestsUriBuilder pullRequestsUriBuilder,
+        IPullRequestCommitRangeCache pullRequestCommitRangeCache,
         IPaginatorHelper paginatorHelper,
         IBitbucketMapper mapper)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(transport);
         ArgumentNullException.ThrowIfNull(uriBuilder);
+        ArgumentNullException.ThrowIfNull(pullRequestsUriBuilder);
+        ArgumentNullException.ThrowIfNull(pullRequestCommitRangeCache);
         ArgumentNullException.ThrowIfNull(paginatorHelper);
         ArgumentNullException.ThrowIfNull(mapper);
         var optionsValue = options.Value;
         _options = optionsValue;
-        _reportParameters = optionsValue.CreateReportParameters();
         _transport = transport;
         _uriBuilder = uriBuilder;
+        _pullRequestsUriBuilder = pullRequestsUriBuilder;
+        _pullRequestCommitRangeCache = pullRequestCommitRangeCache;
         _paginatorHelper = paginatorHelper;
         _mapper = mapper;
     }
@@ -92,7 +94,7 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoSlug);
         ArgumentNullException.ThrowIfNull(shouldStop);
-        var firstPage = BuildPullRequestsUri(workspace, repoSlug);
+        var firstPage = _pullRequestsUriBuilder.Build(workspace, repoSlug);
 #pragma warning disable CS0219 // Used in paginator
         var stop = false;
 #pragma warning restore CS0219
@@ -248,15 +250,15 @@ internal sealed class BitbucketClient : IBitbucketClient
 
         try
         {
-            var cacheKey = BuildPullRequestCacheKey(workspace, repoSlug, pullRequestId.Value);
             var sourceCommitHash = default(string);
             var destinationCommitHash = default(string);
 
-            if (_pullRequestCommitRanges.TryGetValue(cacheKey, out var cachedCommitRange))
-            {
-                sourceCommitHash = cachedCommitRange.SourceCommitHash;
-                destinationCommitHash = cachedCommitRange.DestinationCommitHash;
-            }
+            _ = _pullRequestCommitRangeCache.TryGet(
+                workspace,
+                repoSlug,
+                pullRequestId.Value,
+                out sourceCommitHash,
+                out destinationCommitHash);
 
             if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
                 string.IsNullOrWhiteSpace(destinationCommitHash))
@@ -355,76 +357,28 @@ internal sealed class BitbucketClient : IBitbucketClient
         string? sourceCommitHash,
         string? destinationCommitHash)
     {
-        ArgumentNullException.ThrowIfNull(workspace);
-        ArgumentNullException.ThrowIfNull(repoSlug);
-
         if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
             string.IsNullOrWhiteSpace(destinationCommitHash))
         {
             return;
         }
 
-        var cacheKey = BuildPullRequestCacheKey(workspace, repoSlug, pullRequestId);
-        _pullRequestCommitRanges[cacheKey] = new PullRequestCommitRange(sourceCommitHash, destinationCommitHash);
+        _pullRequestCommitRangeCache.Store(
+            workspace,
+            repoSlug,
+            pullRequestId,
+            sourceCommitHash,
+            destinationCommitHash);
     }
 
-    private Uri BuildPullRequestsUri(Workspace workspace, RepoSlug repoSlug)
-    {
-        var query = BuildPullRequestQuery();
-        var path =
-            $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests?pagelen={_options.PageLength}" +
-            $"&state=OPEN&state=MERGED&state=DECLINED&state=SUPERSEDED&sort=-updated_on";
-
-        if (!string.IsNullOrWhiteSpace(query))
-        {
-            path += $"&q={Uri.EscapeDataString(query)}";
-        }
-
-        return _uriBuilder.BuildRelativeUri(path, BitbucketFieldGroup.PullRequestList);
-    }
-
-    private string? BuildPullRequestQuery()
-    {
-        var clauses = new List<string>(capacity: 2);
-        var filterDate = FormatQueryDate(_reportParameters.FilterDate);
-
-        switch (_reportParameters.PrTimeFilterMode)
-        {
-            case PrTimeFilterMode.CreatedOnOnly:
-                clauses.Add($"created_on >= {filterDate}");
-                break;
-            case PrTimeFilterMode.LastKnownUpdateAndCreated:
-                clauses.Add($"(created_on >= {filterDate} OR updated_on >= {filterDate})");
-                break;
-            default:
-                throw new NotImplementedException();
-        }
-
-        if (_reportParameters.ToDateExclusive.HasValue)
-        {
-            clauses.Add($"created_on < {FormatQueryDate(_reportParameters.ToDateExclusive.Value)}");
-        }
-
-        return clauses.Count == 0
-            ? null
-            : string.Join(" AND ", clauses);
-    }
-
-    private static string FormatQueryDate(DateTimeOffset value) =>
-        value.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture);
-
-    private static string BuildPullRequestCacheKey(Workspace workspace, RepoSlug repoSlug, int pullRequestId) =>
-        $"{workspace.Value}/{repoSlug.Value}/{pullRequestId.ToString(CultureInfo.InvariantCulture)}";
-
-    private static Uri? GetNextUri(string? next) => string.IsNullOrWhiteSpace(next) ? null : new Uri(next, UriKind.RelativeOrAbsolute);
+    private static Uri? GetNextUri(string? next) =>
+        string.IsNullOrWhiteSpace(next) ? null : new Uri(next, UriKind.RelativeOrAbsolute);
 
     private readonly BitbucketOptions _options;
-    private readonly ReportParameters _reportParameters;
     private readonly IBitbucketTransport _transport;
     private readonly IBitbucketUriBuilder _uriBuilder;
+    private readonly IPullRequestsUriBuilder _pullRequestsUriBuilder;
+    private readonly IPullRequestCommitRangeCache _pullRequestCommitRangeCache;
     private readonly IPaginatorHelper _paginatorHelper;
     private readonly IBitbucketMapper _mapper;
-    private readonly ConcurrentDictionary<string, PullRequestCommitRange> _pullRequestCommitRanges = new(StringComparer.Ordinal);
-
-    private readonly record struct PullRequestCommitRange(string SourceCommitHash, string DestinationCommitHash);
 }
