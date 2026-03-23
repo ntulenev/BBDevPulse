@@ -13,11 +13,13 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - `FilterFromTheList` -> uses exact matches from `RepoNameList` (name or slug).
 5. Fetches pull requests for each selected repo (open, merged, declined, superseded), sorted by latest updates.
 6. Applies PR time-stop mode (`PrTimeFilterMode`) to stop reading older PR pages earlier.
-7. Fetches PR activity (comments/approvals/updates) and PR diffstat size (added/removed lines), then aggregates participation and timing stats.
-8. Applies the configured report window:
+7. For each matching pull request, first checks the local file cache for previously downloaded analysis data.
+8. On cache miss, fetches PR activity (comments/approvals/updates), correction commits, and PR diffstat size (added/removed lines), then saves the snapshot to the local cache.
+9. On cache hit, reuses the saved snapshot and skips repeated Bitbucket requests for already analyzed PRs.
+10. Applies the configured report window:
    - `Days` for a rolling lookback from now, or
    - `FromDate` + `ToDate` for an explicit inclusive date range.
-9. Renders output tables:
+11. Renders output tables:
    - Repositories included in analysis
    - Pull request report (includes `Size` T-shirt metric)
    - Merge-time statistics (best/median/75p/longest)
@@ -29,8 +31,14 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
      - Approvals
      - Follow-up commits
    - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
-10. Optionally generates an HTML report (`Bitbucket:Html` settings) and a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
-11. HTML report mirrors the PDF structure:
+   - Bitbucket telemetry summary:
+     - Real HTTP request count
+     - Analysis cache hits/misses/stores
+     - Estimated avoided requests
+     - Estimated cache efficiency
+     - Request breakdown by normalized Bitbucket API endpoint
+12. Optionally generates an HTML report (`Bitbucket:Html` settings) and a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
+13. HTML report mirrors the PDF structure:
    - Detailed tables support sorting and filtering (`Pull Requests`, `Worst PRs by Metric`, `Developer Stats`, developer detail tables).
    - Summary stats tables (`Merge Time Stats`, `TTFR Stats`, `Corrections Stats`, `PR Size Stats`) are rendered as static read-only tables.
 
@@ -41,6 +49,15 @@ When `TeamFilter` is configured:
 - PR-based metrics still include only pull requests whose author belongs to the selected team.
 - Developer output includes only developers from the selected team.
 - Team members still get comment/approval activity counted even on PRs authored by people outside the team.
+
+## Local cache and telemetry
+BBDevPulse stores pull request analysis snapshots on disk and reuses them on the next run if the PR fingerprint has not changed.
+This reduces repeated Bitbucket API calls for already analyzed pull requests.
+
+- Cache location: `AppContext.BaseDirectory/cache/pull-request-analysis`
+- Cache contents: PR activity, correction commits, PR size summary, and detailed follow-up commit activity
+- Cache cleanup: no automatic eviction is performed; remove old cache files manually when needed
+- Telemetry output: shown in console summary when `Bitbucket:Telemetry:Enabled = true`
 
 ## PR Size calculation
 PR size is based on Bitbucket `diffstat` between pull request source and destination commits.
@@ -92,6 +109,9 @@ All settings are under the `Bitbucket` object.
 - `PageLength` (`int`): API page size for repository/PR/activity requests.
 - `PullRequestConcurrency` (`int`): Maximum number of pull requests analyzed in parallel per repository.
 - `RepositoryConcurrency` (`int`): Maximum number of repositories analyzed in parallel.
+- `MaxRetries` (`int`): Maximum number of retries for retryable Bitbucket API requests such as `429 Too Many Requests`.
+- `RetryDelayStepSeconds` (`int`): Base retry backoff step in seconds.
+- `MaxRetryDelaySeconds` (`int`): Maximum retry backoff delay in seconds.
 - `Username` (`string`): Bitbucket account username/email used for authentication.
 - `AppPassword` (`string`): Bitbucket app password used for authentication.
 - `RepoSearchMode` (`string` enum):
@@ -112,6 +132,7 @@ All settings are under the `Bitbucket` object.
 - `TeamFilter` (`string`): Optional team name resolved from the `Department` column in `PeopleCsvPath`. When set, PR rows, PR metrics, and developer output are limited to that team, while team member review activity on other authors' PRs is still counted.
 - `ShowDeveloperUuidInStats` (`bool`): Optional flag to include Bitbucket user UUIDs in developer stats output. Default is `false`.
 - `ShowAllDetailsForDevelopers` (`bool`): Optional flag to append detailed per-developer sections after the summary report. When enabled, the report includes authored PRs, comments, approvals, and follow-up commits for each developer. Default is `false`.
+- `Telemetry.Enabled` (`bool`): Enables/disables Bitbucket request telemetry in the console output. Default is `true`.
 - `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
 - `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
 - `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
@@ -132,6 +153,9 @@ All settings are under the `Bitbucket` object.
     "PageLength": 50,
     "PullRequestConcurrency": 4,
     "RepositoryConcurrency": 4,
+    "MaxRetries": 10,
+    "RetryDelayStepSeconds": 2,
+    "MaxRetryDelaySeconds": 30,
     "Username": "your-email@company.com",
     "AppPassword": "your-app-password",
     "RepoSearchMode": "FilterFromTheList",
@@ -146,6 +170,9 @@ All settings are under the `Bitbucket` object.
     "TeamFilter": "",
     "ShowDeveloperUuidInStats": false,
     "ShowAllDetailsForDevelopers": false,
+    "Telemetry": {
+      "Enabled": true
+    },
     "RepoNameFilter": "ABC.",
     "RepoNameList": [
       "Service.A",
