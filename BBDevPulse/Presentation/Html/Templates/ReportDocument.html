@@ -192,7 +192,29 @@
     }
 
     .compact-section table {
-      min-width: 420px;
+      min-width: 100%;
+      table-layout: fixed;
+    }
+
+    .compact-section .scroll {
+      overflow-x: hidden;
+    }
+
+    .compact-section th,
+    .compact-section td {
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      white-space: normal;
+    }
+
+    .compact-section th:first-child,
+    .compact-section td:first-child {
+      width: 62%;
+    }
+
+    .compact-section th:last-child,
+    .compact-section td:last-child {
+      width: 38%;
     }
 
     th,
