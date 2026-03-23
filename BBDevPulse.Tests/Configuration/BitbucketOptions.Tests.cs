@@ -161,6 +161,7 @@ public sealed class BitbucketOptionsTests
             TeamFilter = "Import",
             ShowDeveloperUuidInStats = true,
             ShowAllDetailsForDevelopers = true,
+            Telemetry = new BitbucketTelemetryOptions { Enabled = false },
             Pdf = pdf
         };
 
@@ -187,6 +188,7 @@ public sealed class BitbucketOptionsTests
         var teamFilter = options.TeamFilter;
         var showDeveloperUuidInStats = options.ShowDeveloperUuidInStats;
         var showAllDetailsForDevelopers = options.ShowAllDetailsForDevelopers;
+        var telemetry = options.Telemetry;
         var pdfOptions = options.Pdf;
 
         // Assert
@@ -212,6 +214,7 @@ public sealed class BitbucketOptionsTests
         teamFilter.Should().Be("Import");
         showDeveloperUuidInStats.Should().BeTrue();
         showAllDetailsForDevelopers.Should().BeTrue();
+        telemetry.Enabled.Should().BeFalse();
         pdfOptions.Should().BeSameAs(pdf);
     }
 

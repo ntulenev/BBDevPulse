@@ -99,6 +99,13 @@ public sealed class SpectreReportPresenter : IReportPresenter
         }
     }
 
+    /// <inheritdoc />
+    public void RenderTelemetrySummary(BitbucketTelemetrySnapshot telemetrySnapshot)
+    {
+        ArgumentNullException.ThrowIfNull(telemetrySnapshot);
+        _statisticsPresenter.RenderBitbucketTelemetry(telemetrySnapshot);
+    }
+
     private readonly IAuthPresenter _authPresenter;
     private readonly IRepositoryListPresenter _repositoryListPresenter;
     private readonly IRepositoryAnalysisPresenter _repositoryAnalysisPresenter;

@@ -1035,6 +1035,71 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("abcdef123456");
     }
 
+    [Fact(DisplayName = "RenderBitbucketTelemetry throws when snapshot is null")]
+    [Trait("Category", "Unit")]
+    public void RenderBitbucketTelemetryWhenSnapshotIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        BitbucketTelemetrySnapshot telemetrySnapshot = null!;
+
+        // Act
+        Action act = () => presenter.RenderBitbucketTelemetry(telemetrySnapshot);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "RenderBitbucketTelemetry writes nothing when telemetry is disabled")]
+    [Trait("Category", "Unit")]
+    public void RenderBitbucketTelemetryWhenTelemetryDisabledWritesNothing()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        var telemetrySnapshot = new BitbucketTelemetrySnapshot(false, 0, 0, 0, 0, 0, []);
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderBitbucketTelemetry(telemetrySnapshot));
+
+        // Assert
+        output.Should().BeEmpty();
+    }
+
+    [Fact(DisplayName = "RenderBitbucketTelemetry renders summary and request breakdown")]
+    [Trait("Category", "Unit")]
+    public void RenderBitbucketTelemetryWhenTelemetryEnabledRendersSummaryAndRequests()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        var telemetrySnapshot = new BitbucketTelemetrySnapshot(
+            true,
+            10,
+            3,
+            4,
+            2,
+            5,
+            [
+                new BitbucketApiRequestStatistic("GET /user", 4),
+                new BitbucketApiRequestStatistic("GET /repositories/{workspace}/{repository}/pullrequests/{pullRequestId}/activity", 2)
+            ]);
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderBitbucketTelemetry(telemetrySnapshot));
+
+        // Assert
+        output.Should().Contain("Bitbucket Telemetry");
+        output.Should().Contain("HTTP Requests");
+        output.Should().Contain("Analysis Cache Hits");
+        output.Should().Contain("Analysis Cache Misses");
+        output.Should().Contain("Analysis Cache Stores");
+        output.Should().Contain("Estimated Avoided Requests");
+        output.Should().Contain("Estimated Cache Efficiency");
+        output.Should().Contain("33.3 %");
+        output.Should().Contain("GET /user");
+        output.Should().Contain("/repositories/{workspace}/{repository}/pullrequests/{pullRequestI");
+        output.Should().Contain("d}/activity");
+    }
+
     private static SpectreStatisticsPresenter CreatePresenter()
     {
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict).Object;

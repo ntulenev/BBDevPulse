@@ -454,6 +454,57 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         }
     }
 
+    /// <inheritdoc />
+    public void RenderBitbucketTelemetry(BitbucketTelemetrySnapshot telemetrySnapshot)
+    {
+        ArgumentNullException.ThrowIfNull(telemetrySnapshot);
+
+        if (!telemetrySnapshot.IsEnabled)
+        {
+            return;
+        }
+
+        var summaryTable = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Value");
+
+        _ = summaryTable.AddRow("HTTP Requests", telemetrySnapshot.TotalRequests.ToString(CultureInfo.InvariantCulture));
+        _ = summaryTable.AddRow("Analysis Cache Hits", telemetrySnapshot.AnalysisSnapshotCacheHits.ToString(CultureInfo.InvariantCulture));
+        _ = summaryTable.AddRow("Analysis Cache Misses", telemetrySnapshot.AnalysisSnapshotCacheMisses.ToString(CultureInfo.InvariantCulture));
+        _ = summaryTable.AddRow("Analysis Cache Stores", telemetrySnapshot.AnalysisSnapshotCacheStores.ToString(CultureInfo.InvariantCulture));
+        _ = summaryTable.AddRow("Estimated Avoided Requests", telemetrySnapshot.EstimatedAvoidedRequests.ToString(CultureInfo.InvariantCulture));
+
+        var totalPotentialRequests = telemetrySnapshot.TotalRequests + telemetrySnapshot.EstimatedAvoidedRequests;
+        var cacheEfficiency = totalPotentialRequests == 0
+            ? "0%"
+            : ((double)telemetrySnapshot.EstimatedAvoidedRequests / totalPotentialRequests)
+                .ToString("P1", CultureInfo.InvariantCulture);
+        _ = summaryTable.AddRow("Estimated Cache Efficiency", cacheEfficiency);
+
+        AnsiConsole.Write(new Rule("Bitbucket Telemetry").RuleStyle("grey"));
+        AnsiConsole.Write(summaryTable);
+
+        if (telemetrySnapshot.RequestStatistics.Count == 0)
+        {
+            return;
+        }
+
+        var requestsTable = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("API")
+            .AddColumn("Requests");
+
+        foreach (var statistic in telemetrySnapshot.RequestStatistics)
+        {
+            _ = requestsTable.AddRow(
+                statistic.ApiName,
+                statistic.RequestCount.ToString(CultureInfo.InvariantCulture));
+        }
+
+        AnsiConsole.Write(requestsTable);
+    }
+
     private static MetricCandidate? SelectDistinctWorst(
         IEnumerable<MetricCandidate> orderedCandidates,
         HashSet<string> usedPrKeys)

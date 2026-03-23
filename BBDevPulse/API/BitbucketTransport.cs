@@ -12,18 +12,25 @@ internal sealed class BitbucketTransport : IBitbucketTransport
 {
     private readonly HttpClient _httpClient;
     private readonly IRetryPolicyHelper _retryPolicyHelper;
+    private readonly IBitbucketTelemetryService _telemetryService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="BitbucketTransport"/> class.
     /// </summary>
     /// <param name="httpClient">Configured HTTP client.</param>
     /// <param name="retryPolicyHelper">Retry policy helper.</param>
-    public BitbucketTransport(HttpClient httpClient, IRetryPolicyHelper retryPolicyHelper)
+    /// <param name="telemetryService">Telemetry service.</param>
+    public BitbucketTransport(
+        HttpClient httpClient,
+        IRetryPolicyHelper retryPolicyHelper,
+        IBitbucketTelemetryService telemetryService)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(retryPolicyHelper);
+        ArgumentNullException.ThrowIfNull(telemetryService);
         _httpClient = httpClient;
         _retryPolicyHelper = retryPolicyHelper;
+        _telemetryService = telemetryService;
     }
 
     /// <inheritdoc />
@@ -32,6 +39,7 @@ internal sealed class BitbucketTransport : IBitbucketTransport
         return await _retryPolicyHelper.ExecuteAsync(
             async token =>
             {
+                _telemetryService.TrackRequest(url);
                 using var response = await _httpClient.GetAsync(url, token)
                     .ConfigureAwait(false);
                 if (response.StatusCode == HttpStatusCode.TooManyRequests)

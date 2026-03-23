@@ -20,6 +20,7 @@ internal sealed class ReportRunner : IReportRunner
     /// <param name="htmlReportRenderer">HTML report renderer.</param>
     /// <param name="pdfReportRenderer">PDF report renderer.</param>
     /// <param name="peopleCsvProvider">People CSV provider.</param>
+    /// <param name="telemetryService">Telemetry service.</param>
     /// <param name="options">Bitbucket options.</param>
     public ReportRunner(
         IBitbucketClient client,
@@ -28,6 +29,7 @@ internal sealed class ReportRunner : IReportRunner
         IHtmlReportRenderer htmlReportRenderer,
         IPdfReportRenderer pdfReportRenderer,
         IPeopleCsvProvider peopleCsvProvider,
+        IBitbucketTelemetryService telemetryService,
         IOptions<BitbucketOptions> options)
     {
         ArgumentNullException.ThrowIfNull(client);
@@ -36,6 +38,7 @@ internal sealed class ReportRunner : IReportRunner
         ArgumentNullException.ThrowIfNull(htmlReportRenderer);
         ArgumentNullException.ThrowIfNull(pdfReportRenderer);
         ArgumentNullException.ThrowIfNull(peopleCsvProvider);
+        ArgumentNullException.ThrowIfNull(telemetryService);
         ArgumentNullException.ThrowIfNull(options);
 
         _client = client;
@@ -44,6 +47,7 @@ internal sealed class ReportRunner : IReportRunner
         _htmlReportRenderer = htmlReportRenderer;
         _pdfReportRenderer = pdfReportRenderer;
         _peopleCsvProvider = peopleCsvProvider;
+        _telemetryService = telemetryService;
         _parameters = options.Value.CreateReportParameters();
     }
 
@@ -93,6 +97,7 @@ internal sealed class ReportRunner : IReportRunner
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
         }
         _presenter.RenderReport(reportData);
+        _presenter.RenderTelemetrySummary(_telemetryService.GetSnapshot());
         await _htmlReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
         await _pdfReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
     }
@@ -125,5 +130,6 @@ internal sealed class ReportRunner : IReportRunner
     private readonly IHtmlReportRenderer _htmlReportRenderer;
     private readonly IPdfReportRenderer _pdfReportRenderer;
     private readonly IPeopleCsvProvider _peopleCsvProvider;
+    private readonly IBitbucketTelemetryService _telemetryService;
     private readonly ReportParameters _parameters;
 }

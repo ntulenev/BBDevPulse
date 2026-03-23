@@ -145,6 +145,11 @@ public sealed class BitbucketOptions
     public PdfOptions Pdf { get; init; } = new();
 
     /// <summary>
+    /// Bitbucket telemetry options.
+    /// </summary>
+    public BitbucketTelemetryOptions Telemetry { get; init; } = new();
+
+    /// <summary>
     /// Builds report parameters from the current options.
     /// </summary>
     public Models.ReportParameters CreateReportParameters()

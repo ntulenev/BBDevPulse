@@ -30,6 +30,7 @@ public sealed class ReportRunnerTests
             new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -51,6 +52,7 @@ public sealed class ReportRunnerTests
             new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -72,6 +74,7 @@ public sealed class ReportRunnerTests
             new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -93,6 +96,7 @@ public sealed class ReportRunnerTests
             htmlReportRenderer,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -114,6 +118,7 @@ public sealed class ReportRunnerTests
             new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             pdfReportRenderer,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -135,6 +140,29 @@ public sealed class ReportRunnerTests
             new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             peopleCsvProvider,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
+            Options.Create(CreateOptions()));
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when telemetry service is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenTelemetryServiceIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IBitbucketTelemetryService telemetryService = null!;
+
+        // Act
+        Action act = () => _ = new ReportRunner(
+            new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
+            new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
+            new Mock<IReportPresenter>(MockBehavior.Strict).Object,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            telemetryService,
             Options.Create(CreateOptions()));
 
         // Assert
@@ -156,6 +184,7 @@ public sealed class ReportRunnerTests
             new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             options);
 
         // Assert
@@ -181,6 +210,7 @@ public sealed class ReportRunnerTests
         var renderBranchFilterInfoCalls = 0;
         var analyzeRepositoriesCalls = 0;
         var renderReportCalls = 0;
+        var renderTelemetryCalls = 0;
         var renderHtmlCalls = 0;
         var renderPdfCalls = 0;
 
@@ -279,6 +309,9 @@ public sealed class ReportRunnerTests
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
+        presenter.Setup(x => x.RenderTelemetrySummary(
+                It.Is<BitbucketTelemetrySnapshot>(snapshot => snapshot.IsEnabled)))
+            .Callback(() => renderTelemetryCalls++);
 
         var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
         htmlRenderer.Setup(x => x.RenderReportAsync(
@@ -298,6 +331,10 @@ public sealed class ReportRunnerTests
         peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>());
 
+        var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict);
+        telemetryService.Setup(x => x.GetSnapshot())
+            .Returns(new BitbucketTelemetrySnapshot(true, 5, 2, 3, 1, 4, []));
+
         var runner = new ReportRunner(
             client.Object,
             analyzer.Object,
@@ -305,6 +342,7 @@ public sealed class ReportRunnerTests
             htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
+            telemetryService.Object,
             Options.Create(options));
 
         // Act
@@ -322,6 +360,7 @@ public sealed class ReportRunnerTests
         renderBranchFilterInfoCalls.Should().Be(1);
         analyzeRepositoriesCalls.Should().Be(1);
         renderReportCalls.Should().Be(1);
+        renderTelemetryCalls.Should().Be(1);
         renderHtmlCalls.Should().Be(1);
         renderPdfCalls.Should().Be(1);
     }
@@ -342,6 +381,7 @@ public sealed class ReportRunnerTests
         var renderBranchFilterInfoCalls = 0;
         var analyzeRepositoriesCalls = 0;
         var renderReportCalls = 0;
+        var renderTelemetryCalls = 0;
         var renderHtmlCalls = 0;
         var renderPdfCalls = 0;
 
@@ -396,6 +436,9 @@ public sealed class ReportRunnerTests
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
+        presenter.Setup(x => x.RenderTelemetrySummary(
+                It.Is<BitbucketTelemetrySnapshot>(snapshot => snapshot.IsEnabled)))
+            .Callback(() => renderTelemetryCalls++);
 
         var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
         htmlRenderer.Setup(x => x.RenderReportAsync(
@@ -415,6 +458,10 @@ public sealed class ReportRunnerTests
         peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>());
 
+        var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict);
+        telemetryService.Setup(x => x.GetSnapshot())
+            .Returns(new BitbucketTelemetrySnapshot(true, 1, 0, 1, 0, 0, []));
+
         var runner = new ReportRunner(
             client.Object,
             analyzer.Object,
@@ -422,6 +469,7 @@ public sealed class ReportRunnerTests
             htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
+            telemetryService.Object,
             Options.Create(options));
 
         // Act
@@ -437,6 +485,7 @@ public sealed class ReportRunnerTests
         renderBranchFilterInfoCalls.Should().Be(1);
         analyzeRepositoriesCalls.Should().Be(1);
         renderReportCalls.Should().Be(1);
+        renderTelemetryCalls.Should().Be(1);
         renderHtmlCalls.Should().Be(1);
         renderPdfCalls.Should().Be(1);
     }
@@ -508,6 +557,7 @@ public sealed class ReportRunnerTests
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback<ReportData>(reportData => capturedReportData = reportData);
+        presenter.Setup(x => x.RenderTelemetrySummary(It.IsAny<BitbucketTelemetrySnapshot>()));
 
         var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
         htmlRenderer.Setup(x => x.RenderReportAsync(
@@ -528,6 +578,10 @@ public sealed class ReportRunnerTests
                 [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core Platform")
             });
 
+        var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict);
+        telemetryService.Setup(x => x.GetSnapshot())
+            .Returns(new BitbucketTelemetrySnapshot(true, 1, 0, 1, 0, 0, []));
+
         var runner = new ReportRunner(
             client.Object,
             analyzer.Object,
@@ -535,6 +589,7 @@ public sealed class ReportRunnerTests
             htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
+            telemetryService.Object,
             Options.Create(options));
 
         // Act
@@ -616,6 +671,7 @@ public sealed class ReportRunnerTests
             });
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core")));
+        presenter.Setup(x => x.RenderTelemetrySummary(It.IsAny<BitbucketTelemetrySnapshot>()));
 
         var htmlRenderer = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
         htmlRenderer.Setup(x => x.RenderReportAsync(
@@ -636,6 +692,10 @@ public sealed class ReportRunnerTests
                 [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core")
             });
 
+        var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict);
+        telemetryService.Setup(x => x.GetSnapshot())
+            .Returns(new BitbucketTelemetrySnapshot(true, 1, 0, 1, 0, 0, []));
+
         var runner = new ReportRunner(
             client.Object,
             analyzer.Object,
@@ -643,6 +703,7 @@ public sealed class ReportRunnerTests
             htmlRenderer.Object,
             pdfRenderer.Object,
             peopleCsvProvider.Object,
+            telemetryService.Object,
             Options.Create(options));
 
         // Act

@@ -3,6 +3,8 @@ using System.Text;
 
 using BBDevPulse.Abstractions;
 using BBDevPulse.API;
+using BBDevPulse.Caching;
+using BBDevPulse.Caching.Mappers;
 using BBDevPulse.Configuration;
 using BBDevPulse.Logic;
 using BBDevPulse.Math;
@@ -10,6 +12,7 @@ using BBDevPulse.Presentation;
 using BBDevPulse.Presentation.Formatters;
 using BBDevPulse.Presentation.Html;
 using BBDevPulse.Presentation.Pdf;
+using BBDevPulse.Telemetry;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +42,7 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IPullRequestActivityMapper, BBDevPulse.API.Mappers.PullRequestActivityMapper>();
         _ = services.AddSingleton<IPaginatorHelper, PaginatorHelper>();
         _ = services.AddSingleton<IRetryPolicyHelper, RetryPolicyHelper>();
+        _ = services.AddSingleton<IBitbucketTelemetryService, BitbucketTelemetryService>();
 
         _ = services.AddHttpClient<IBitbucketTransport, BitbucketTransport>((sp, client) =>
         {
@@ -67,6 +71,8 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IHtmlReportRenderer, HtmlReportRenderer>();
         _ = services.AddSingleton<IPdfReportFileStore, PdfReportFileStore>();
         _ = services.AddSingleton<IPdfReportRenderer, QuestPdfReportRenderer>();
+        _ = services.AddSingleton<IPullRequestAnalysisCacheMapper, PullRequestAnalysisCacheMapper>();
+        _ = services.AddSingleton<IPullRequestAnalysisCache, FilePullRequestAnalysisCache>();
         _ = services.AddSingleton<IPeopleCsvProvider, PeopleCsvProvider>();
         _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
         _ = services.AddSingleton<IPullRequestAnalyzer, PullRequestAnalyzer>();

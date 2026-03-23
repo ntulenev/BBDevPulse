@@ -55,4 +55,10 @@ public interface IReportPresenter
     /// </summary>
     /// <param name="reportData">Report data.</param>
     void RenderReport(ReportData reportData);
+
+    /// <summary>
+    /// Renders Bitbucket telemetry summary.
+    /// </summary>
+    /// <param name="telemetrySnapshot">Telemetry snapshot.</param>
+    void RenderTelemetrySummary(BitbucketTelemetrySnapshot telemetrySnapshot);
 }

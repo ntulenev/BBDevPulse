@@ -26,7 +26,11 @@ public sealed class PullRequestAnalyzerTests
         var options = CreateBitbucketOptions();
 
         // Act
-        Action act = () => _ = new PullRequestAnalyzer(client, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object, options);
+        Action act = () => _ = new PullRequestAnalyzer(
+            client,
+            new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
+            new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            options);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -41,7 +45,30 @@ public sealed class PullRequestAnalyzerTests
         var options = CreateBitbucketOptions();
 
         // Act
-        Action act = () => _ = new PullRequestAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, activityAnalyzer, options);
+        Action act = () => _ = new PullRequestAnalyzer(
+            new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
+            activityAnalyzer,
+            new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            options);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when analysis cache is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenAnalysisCacheIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IPullRequestAnalysisCache analysisCache = null!;
+        var options = CreateBitbucketOptions();
+
+        // Act
+        Action act = () => _ = new PullRequestAnalyzer(
+            new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
+            new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
+            analysisCache,
+            options);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -57,7 +84,11 @@ public sealed class PullRequestAnalyzerTests
         IOptions<BitbucketOptions> options = null!;
 
         // Act
-        Action act = () => _ = new PullRequestAnalyzer(client, activityAnalyzer, options);
+        Action act = () => _ = new PullRequestAnalyzer(
+            client,
+            activityAnalyzer,
+            new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            options);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -910,6 +941,144 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats[reviewerKey].ApprovalActivities[0].PullRequestId.Value.Should().Be(88);
     }
 
+    [Fact(DisplayName = "AnalyzeAsync reuses cached snapshot and skips Bitbucket enrichment requests")]
+    [Trait("Category", "Unit")]
+    public async Task AnalyzeAsyncWhenSnapshotExistsUsesCache()
+    {
+        // Arrange
+        var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
+        var parameters = CreateParameters(filterDate, branchNameList: [new BranchName("develop")], showAllDetailsForDevelopers: true);
+        var reportData = new ReportData(parameters);
+        var repository = new Repository(new RepoName("Repo Name"), new RepoSlug("repo-slug"));
+        var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
+        var reviewerIdentity = new DeveloperIdentity(new UserUuid("{reviewer-1}"), new DisplayName("Reviewer"));
+        var pullRequest = new PullRequest(
+            new PullRequestId(42),
+            PullRequestState.Declined,
+            closedOn: filterDate.AddDays(3),
+            createdOn: filterDate.AddDays(1),
+            updatedOn: filterDate.AddDays(2),
+            mergedOn: null,
+            author: author,
+            destination: new PullRequestDestination(new PullRequestBranch("develop")));
+        var commentActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(2),
+            mergeDate: null,
+            actor: reviewerIdentity,
+            comment: new ActivityComment(reviewerIdentity, filterDate.AddDays(2)),
+            approval: null);
+        var approvalActivity = new PullRequestActivity(
+            activityDate: filterDate.AddDays(3),
+            mergeDate: null,
+            actor: reviewerIdentity,
+            comment: null,
+            approval: new ActivityApproval(reviewerIdentity, filterDate.AddDays(3)));
+        var snapshot = new PullRequestAnalysisSnapshot(
+            activities: [commentActivity, approvalActivity],
+            correctionCommits:
+            [
+                new PullRequestCommitInfo("commit-42-3", filterDate.AddDays(4), "Newest cached fix"),
+                new PullRequestCommitInfo("commit-42-2", filterDate.AddDays(2), "Cached in-range fix")
+            ],
+            sizeSummary: new PullRequestSizeSummary(FilesChanged: 5, LinesAdded: 40, LinesRemoved: 10),
+            commitActivities:
+            [
+                new DeveloperCommitActivity(
+                    "Repo Name",
+                    "repo-slug",
+                    new PullRequestId(42),
+                    "commit-42-3",
+                    "Newest cached fix",
+                    filterDate.AddDays(4),
+                    new PullRequestSizeSummary(FilesChanged: 2, LinesAdded: 7, LinesRemoved: 1))
+            ],
+            hasEnrichment: true);
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(),
+                It.Is<CancellationToken>(token => token == cancellationToken)))
+            .Returns(ToAsyncEnumerable([pullRequest]));
+
+        var activityAnalyzer = new Mock<IActivityAnalyzer>(MockBehavior.Strict);
+        activityAnalyzer.Setup(x => x.Analyze(
+                It.IsAny<ActivityAnalysisState>(),
+                commentActivity,
+                It.IsAny<ReportParameters>()))
+            .Callback<ActivityAnalysisState, PullRequestActivity, ReportParameters>((analysis, _, _) =>
+            {
+                analysis.HasActivityInRange = true;
+                analysis.LastActivity = filterDate.AddDays(2);
+                analysis.TotalComments = 1;
+                analysis.FirstReactionOn = filterDate.AddDays(2);
+                analysis.Participants[reviewerIdentity.ToKey()] = reviewerIdentity;
+                analysis.CommentCounts[reviewerIdentity.ToKey()] = 1;
+            });
+        activityAnalyzer.Setup(x => x.Analyze(
+                It.IsAny<ActivityAnalysisState>(),
+                approvalActivity,
+                It.IsAny<ReportParameters>()))
+            .Callback<ActivityAnalysisState, PullRequestActivity, ReportParameters>((analysis, _, _) =>
+            {
+                analysis.HasActivityInRange = true;
+                analysis.LastActivity = filterDate.AddDays(3);
+                analysis.Participants[reviewerIdentity.ToKey()] = reviewerIdentity;
+                analysis.ApprovalCounts[reviewerIdentity.ToKey()] = 1;
+            });
+
+        var analysisCache = new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict);
+        analysisCache.Setup(x => x.TryGet(
+                It.Is<Workspace>(workspace => workspace.Value == "ws"),
+                It.Is<RepoSlug>(repoSlug => repoSlug.Value == "repo-slug"),
+                It.Is<PullRequestId>(pullRequestId => pullRequestId.Value == 42),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                out snapshot))
+            .Returns(true);
+
+        var analyzer = CreateAnalyzer(client.Object, activityAnalyzer.Object, analysisCache: analysisCache.Object);
+
+        // Act
+        await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
+
+        // Assert
+        reportData.Reports.Should().ContainSingle();
+        reportData.Reports[0].Corrections.Should().Be(2);
+        reportData.Reports[0].FilesChanged.Should().Be(5);
+        reportData.Reports[0].LinesAdded.Should().Be(40);
+        reportData.Reports[0].LinesRemoved.Should().Be(10);
+
+        var authorKey = new DeveloperKey(new UserUuid("{alice-1}"));
+        reportData.DeveloperStats.Should().ContainKey(authorKey);
+        reportData.DeveloperStats[authorKey].CommitActivities.Should().ContainSingle();
+        reportData.DeveloperStats[authorKey].CommitActivities[0].CommitHash.Should().Be("commit-42-3");
+
+        client.Verify(
+            x => x.GetPullRequestActivityAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.IsAny<Func<PullRequestActivity, bool>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        client.Verify(
+            x => x.GetPullRequestCommitsAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+        client.Verify(
+            x => x.GetPullRequestSizeAsync(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
     private static ReportParameters CreateParameters(
         DateTimeOffset filterDate,
         IReadOnlyList<BranchName>? branchNameList = null,
@@ -964,12 +1133,40 @@ public sealed class PullRequestAnalyzerTests
     private static PullRequestAnalyzer CreateAnalyzer(
         IBitbucketClient client,
         IActivityAnalyzer activityAnalyzer,
-        int pullRequestConcurrency = 1)
+        int pullRequestConcurrency = 1,
+        IPullRequestAnalysisCache? analysisCache = null)
     {
+        var resolvedAnalysisCache = analysisCache ?? CreateCacheMissAnalysisCache();
+
         return new PullRequestAnalyzer(
             client,
             activityAnalyzer,
+            resolvedAnalysisCache,
             CreateBitbucketOptions(pullRequestConcurrency));
+    }
+
+    private static IPullRequestAnalysisCache CreateCacheMissAnalysisCache()
+    {
+        var cache = new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict);
+        PullRequestAnalysisSnapshot snapshot = null!;
+
+        cache.Setup(x => x.TryGet(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                out snapshot))
+            .Returns(false);
+        cache.Setup(x => x.Store(
+                It.IsAny<Workspace>(),
+                It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<PullRequestAnalysisSnapshot>()));
+
+        return cache.Object;
     }
 
     private static IOptions<BitbucketOptions> CreateBitbucketOptions(int pullRequestConcurrency = 1)

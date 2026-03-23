@@ -66,4 +66,10 @@ public interface IStatisticsPresenter
     /// </summary>
     /// <param name="reportData">Report data.</param>
     void RenderDeveloperDetails(ReportData reportData);
+
+    /// <summary>
+    /// Renders Bitbucket telemetry summary.
+    /// </summary>
+    /// <param name="telemetrySnapshot">Telemetry snapshot.</param>
+    void RenderBitbucketTelemetry(BitbucketTelemetrySnapshot telemetrySnapshot);
 }

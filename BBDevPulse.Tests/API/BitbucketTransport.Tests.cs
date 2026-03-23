@@ -22,9 +22,10 @@ public sealed class BitbucketTransportTests
         // Arrange
         HttpClient httpClient = null!;
         var retryPolicyHelper = new Mock<IRetryPolicyHelper>(MockBehavior.Strict).Object;
+        var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object;
 
         // Act
-        Action act = () => _ = new BitbucketTransport(httpClient, retryPolicyHelper);
+        Action act = () => _ = new BitbucketTransport(httpClient, retryPolicyHelper, telemetryService);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -37,9 +38,25 @@ public sealed class BitbucketTransportTests
         // Arrange
         IRetryPolicyHelper retryPolicyHelper = null!;
         using var httpClient = new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+        var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object;
 
         // Act
-        Action act = () => _ = new BitbucketTransport(httpClient, retryPolicyHelper);
+        Action act = () => _ = new BitbucketTransport(httpClient, retryPolicyHelper, telemetryService);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "Constructor throws when telemetry service is null")]
+    [Trait("Category", "Unit")]
+    public void ConstructorWhenTelemetryServiceIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        IBitbucketTelemetryService telemetryService = null!;
+        using var httpClient = new HttpClient(new StubHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)));
+
+        // Act
+        Action act = () => _ = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper(), telemetryService);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
@@ -56,7 +73,8 @@ public sealed class BitbucketTransportTests
                 Content = new StringContent("""{"displayname":"Alice"}""", Encoding.UTF8, "application/json")
             });
         using var httpClient = new HttpClient(handler);
-        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
+        var telemetryService = CreateTelemetryService();
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper(), telemetryService.Object);
 
         // Act
         var result = await transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), cancellationToken);
@@ -76,7 +94,8 @@ public sealed class BitbucketTransportTests
                 Content = new StringContent("invalid request", Encoding.UTF8, "text/plain")
             });
         using var httpClient = new HttpClient(handler);
-        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
+        var telemetryService = CreateTelemetryService();
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper(), telemetryService.Object);
 
         // Act
         Func<Task> act = async () =>
@@ -99,7 +118,8 @@ public sealed class BitbucketTransportTests
                 Content = new StringContent("null", Encoding.UTF8, "application/json")
             });
         using var httpClient = new HttpClient(handler);
-        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
+        var telemetryService = CreateTelemetryService();
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper(), telemetryService.Object);
 
         // Act
         Func<Task> act = async () =>
@@ -130,7 +150,8 @@ public sealed class BitbucketTransportTests
                 };
         });
         using var httpClient = new HttpClient(handler);
-        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper());
+        var telemetryService = CreateTelemetryService(expectedCalls: 2);
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper(), telemetryService.Object);
 
         // Act
         var result = await transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), cancellationToken);
@@ -138,6 +159,29 @@ public sealed class BitbucketTransportTests
         // Assert
         callCount.Should().Be(2);
         result.DisplayName.Should().Be("Alice");
+    }
+
+    [Fact(DisplayName = "GetAsync tracks telemetry for each request attempt")]
+    [Trait("Category", "Unit")]
+    public async Task GetAsyncWhenCalledTracksRequestTelemetry()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"displayname":"Alice"}""", Encoding.UTF8, "application/json")
+            });
+        using var httpClient = new HttpClient(handler);
+        var telemetryService = CreateTelemetryService();
+        var transport = new BitbucketTransport(httpClient, CreatePassthroughRetryPolicyHelper(), telemetryService.Object);
+        var url = new Uri("https://example.test/user");
+
+        // Act
+        var result = await transport.GetAsync<SampleDto>(url, cancellationToken);
+
+        // Assert
+        result.DisplayName.Should().Be("Alice");
+        telemetryService.Verify(x => x.TrackRequest(url), Times.Once);
     }
 
     private sealed class StubHttpMessageHandler(
@@ -180,5 +224,12 @@ public sealed class BitbucketTransportTests
             });
 
         return retryPolicyHelper.Object;
+    }
+
+    private static Mock<IBitbucketTelemetryService> CreateTelemetryService(int expectedCalls = 1)
+    {
+        var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict);
+        telemetryService.Setup(x => x.TrackRequest(It.IsAny<Uri>()));
+        return telemetryService;
     }
 }

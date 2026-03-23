@@ -393,6 +393,21 @@ public sealed class SpectreReportPresenterTests
         sut.RenderReport(reportData);
     }
 
+    [Fact(DisplayName = "RenderTelemetrySummary delegates to statistics presenter")]
+    [Trait("Category", "Unit")]
+    public void RenderTelemetrySummaryWhenCalledDelegatesToStatisticsPresenter()
+    {
+        // Arrange
+        var telemetrySnapshot = new BitbucketTelemetrySnapshot(true, 10, 2, 3, 1, 6, []);
+        var statisticsPresenter = new Mock<IStatisticsPresenter>(MockBehavior.Strict);
+        statisticsPresenter.Setup(x => x.RenderBitbucketTelemetry(telemetrySnapshot));
+
+        var sut = CreateSut(statisticsPresenter: statisticsPresenter.Object);
+
+        // Act
+        sut.RenderTelemetrySummary(telemetrySnapshot);
+    }
+
     private static SpectreReportPresenter CreateSut(
         IAuthPresenter? authPresenter = null,
         IRepositoryListPresenter? repositoryListPresenter = null,

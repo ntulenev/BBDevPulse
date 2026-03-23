@@ -1,3 +1,7 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
 using BBDevPulse.Models;
@@ -16,19 +20,23 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
     /// </summary>
     /// <param name="client">Bitbucket API client.</param>
     /// <param name="activityAnalyzer">Activity analyzer.</param>
+    /// <param name="analysisCache">Pull request analysis cache.</param>
     /// <param name="options">Bitbucket options.</param>
     public PullRequestAnalyzer(
         IBitbucketClient client,
         IActivityAnalyzer activityAnalyzer,
+        IPullRequestAnalysisCache analysisCache,
         IOptions<BitbucketOptions> options)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(activityAnalyzer);
+        ArgumentNullException.ThrowIfNull(analysisCache);
         ArgumentNullException.ThrowIfNull(options);
 
         var maxConcurrentPullRequests = options.Value.PullRequestConcurrency;
         _client = client;
         _activityAnalyzer = activityAnalyzer;
+        _analysisCache = analysisCache;
         _maxConcurrentPullRequests = maxConcurrentPullRequests;
     }
 
@@ -106,10 +114,29 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var filterDate = parameters.FilterDate;
         var workspace = parameters.Workspace;
         var collectDeveloperDetails = parameters.ShowAllDetailsForDevelopers;
+        var parametersFingerprint = BuildParametersFingerprint(parameters);
+        var pullRequestFingerprint = BuildPullRequestFingerprint(pr);
 
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
         var includeAuthoredPullRequest = !parameters.HasTeamFilter ||
             (authorIdentity.HasValue && reportData.IsDeveloperIncluded(authorIdentity.Value));
+        var cacheHit = TryReadAnalysisSnapshot(
+            workspace,
+            repo.Slug,
+            pr.Id,
+            pullRequestFingerprint,
+            parametersFingerprint,
+            out var snapshot);
+        if (!cacheHit)
+        {
+            snapshot = await BuildActivitySnapshotAsync(
+                workspace,
+                repo.Slug,
+                pr.Id,
+                filterDate,
+                cancellationToken).ConfigureAwait(false);
+        }
+
         var analysis = new ActivityAnalysisState(
             pr.CreatedOn,
             authorIdentity,
@@ -121,12 +148,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
             : null;
 
-        await foreach (var activity in _client.GetPullRequestActivityAsync(
-                           workspace,
-                           repo.Slug,
-                           pr.Id,
-                           pullRequestActivity => pullRequestActivity.IsBefore(filterDate),
-                           cancellationToken).ConfigureAwait(false))
+        foreach (var activity in snapshot.Activities)
         {
             if (parameters.HasTeamFilter &&
                 parameters.IsInRange(activity.ActivityDate) &&
@@ -161,7 +183,38 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var shouldDisplayPullRequest = includeAuthoredPullRequest || hasTeamActivity;
         if (!shouldDisplayPullRequest)
         {
+            if (!cacheHit)
+            {
+                _analysisCache.Store(
+                    workspace,
+                    repo.Slug,
+                    pr.Id,
+                    pullRequestFingerprint,
+                    parametersFingerprint,
+                    snapshot);
+            }
+
             return;
+        }
+
+        if (!snapshot.HasEnrichment)
+        {
+            snapshot = await EnrichAnalysisSnapshotAsync(
+                snapshot,
+                repo,
+                pr,
+                parameters,
+                authorIdentity.HasValue,
+                collectDeveloperDetails,
+                cancellationToken).ConfigureAwait(false);
+
+            _analysisCache.Store(
+                workspace,
+                repo.Slug,
+                pr.Id,
+                pullRequestFingerprint,
+                parametersFingerprint,
+                snapshot);
         }
 
         if (authorIdentity.HasValue)
@@ -181,24 +234,14 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             rejectedOn = null;
         }
 
-        IReadOnlyList<PullRequestCommitInfo> correctionCommits = [];
+        var correctionCommits = snapshot.CorrectionCommits;
         IReadOnlyList<DeveloperCommitActivity> correctionCommitActivities = [];
-        var sizeSummary = PullRequestSizeSummary.Empty;
+        var sizeSummary = snapshot.SizeSummary;
         if (shouldDisplayPullRequest)
         {
-            correctionCommits = await GetCorrectionCommitsAsync(workspace, repo.Slug, pr.Id, pr.CreatedOn, parameters, cancellationToken)
-                .ConfigureAwait(false);
-            sizeSummary = await GetPullRequestSizeSafeAsync(workspace, repo.Slug, pr.Id, cancellationToken)
-                .ConfigureAwait(false);
-            if (collectDeveloperDetails && authorIdentity.HasValue && includeAuthoredPullRequest && correctionCommits.Count > 0)
+            if (collectDeveloperDetails && authorIdentity.HasValue && includeAuthoredPullRequest && snapshot.CommitActivities.Count > 0)
             {
-                correctionCommitActivities = await GetCommitActivitiesAsync(
-                    repositoryName: string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value,
-                    workspace,
-                    repo.Slug,
-                    pr.Id,
-                    correctionCommits,
-                    cancellationToken).ConfigureAwait(false);
+                correctionCommitActivities = snapshot.CommitActivities;
             }
         }
 
@@ -345,6 +388,94 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
     }
 
+    private bool TryReadAnalysisSnapshot(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        string pullRequestFingerprint,
+        string parametersFingerprint,
+        out PullRequestAnalysisSnapshot snapshot)
+    {
+        return _analysisCache.TryGet(
+            workspace,
+            repoSlug,
+            pullRequestId,
+            pullRequestFingerprint,
+            parametersFingerprint,
+            out snapshot);
+    }
+
+    private async Task<PullRequestAnalysisSnapshot> BuildActivitySnapshotAsync(
+        Workspace workspace,
+        RepoSlug repoSlug,
+        PullRequestId pullRequestId,
+        DateTimeOffset filterDate,
+        CancellationToken cancellationToken)
+    {
+        var activities = new List<PullRequestActivity>();
+
+        await foreach (var activity in _client.GetPullRequestActivityAsync(
+                           workspace,
+                           repoSlug,
+                           pullRequestId,
+                           pullRequestActivity => pullRequestActivity.IsBefore(filterDate),
+                           cancellationToken).ConfigureAwait(false))
+        {
+            activities.Add(activity);
+        }
+
+        return new PullRequestAnalysisSnapshot(
+            activities,
+            correctionCommits: [],
+            sizeSummary: PullRequestSizeSummary.Empty,
+            commitActivities: [],
+            hasEnrichment: false);
+    }
+
+    private async Task<PullRequestAnalysisSnapshot> EnrichAnalysisSnapshotAsync(
+        PullRequestAnalysisSnapshot snapshot,
+        Repository repo,
+        PullRequest pr,
+        ReportParameters parameters,
+        bool hasAuthorIdentity,
+        bool collectDeveloperDetails,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var correctionCommits = await GetCorrectionCommitsAsync(
+            parameters.Workspace,
+            repo.Slug,
+            pr.Id,
+            pr.CreatedOn,
+            parameters,
+            cancellationToken).ConfigureAwait(false);
+        var sizeSummary = await GetPullRequestSizeSafeAsync(
+            parameters.Workspace,
+            repo.Slug,
+            pr.Id,
+            cancellationToken).ConfigureAwait(false);
+
+        IReadOnlyList<DeveloperCommitActivity> commitActivities = [];
+        if (collectDeveloperDetails && hasAuthorIdentity && correctionCommits.Count > 0)
+        {
+            commitActivities = await GetCommitActivitiesAsync(
+                repositoryName: repo.DisplayName,
+                parameters.Workspace,
+                repo.Slug,
+                pr.Id,
+                correctionCommits,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return new PullRequestAnalysisSnapshot(
+            snapshot.Activities,
+            correctionCommits,
+            sizeSummary,
+            commitActivities,
+            hasEnrichment: true);
+    }
+
     private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(
         string repositoryName,
         Workspace workspace,
@@ -427,7 +558,46 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
     }
 
+    private static string BuildParametersFingerprint(ReportParameters parameters)
+    {
+        ArgumentNullException.ThrowIfNull(parameters);
+
+        var rawFingerprint = string.Join(
+            '\n',
+            parameters.FilterDate.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
+            parameters.ToDateExclusive?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            parameters.ShowAllDetailsForDevelopers ? "1" : "0");
+
+        return ComputeFingerprint(rawFingerprint);
+    }
+
+    private static string BuildPullRequestFingerprint(PullRequest pullRequest)
+    {
+        ArgumentNullException.ThrowIfNull(pullRequest);
+
+        var rawFingerprint = string.Join(
+            '\n',
+            pullRequest.Id.Value.ToString(CultureInfo.InvariantCulture),
+            pullRequest.State.ToString(),
+            pullRequest.CreatedOn.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
+            pullRequest.UpdatedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            pullRequest.ClosedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            pullRequest.MergedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            pullRequest.Author?.DisplayName.Value ?? string.Empty,
+            pullRequest.Author?.Uuid?.Value ?? string.Empty,
+            pullRequest.Destination?.Branch?.Name ?? string.Empty);
+
+        return ComputeFingerprint(rawFingerprint);
+    }
+
+    private static string ComputeFingerprint(string value)
+    {
+        var fingerprintBytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(fingerprintBytes);
+    }
+
     private readonly IBitbucketClient _client;
     private readonly IActivityAnalyzer _activityAnalyzer;
+    private readonly IPullRequestAnalysisCache _analysisCache;
     private readonly int _maxConcurrentPullRequests;
 }
