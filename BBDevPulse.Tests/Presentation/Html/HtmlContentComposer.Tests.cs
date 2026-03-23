@@ -26,6 +26,7 @@ public sealed class HtmlContentComposerTests
         html.Should().Contain("PR Throughput");
         html.Should().Contain("PRs per Developer");
         html.Should().Contain("Comments Stats");
+        html.Should().Contain("Peer Comments Stats");
         html.Should().Contain("PRs Rejected");
         html.Should().Contain("Worst PRs by Metric");
         html.Should().Contain("Developer Stats");
@@ -39,6 +40,7 @@ public sealed class HtmlContentComposerTests
         html.Should().Contain("Orange rows indicate PRs authored outside the selected team");
         html.Should().Contain("pull-requests/200");
         html.Should().Contain("Follow-up Commits");
+        html.Should().Contain("Peer Comments");
     }
 
     [Fact(DisplayName = "Compose renders empty-state text when report has no data")]
@@ -105,6 +107,7 @@ public sealed class HtmlContentComposerTests
         developer.PrsOpenedSince = 1;
         developer.PrsMergedAfter = 1;
         developer.CommentsAfter = 1;
+        developer.PeerCommentsAfter = 1;
         developer.ApprovalsAfter = 1;
         developer.Corrections = 2;
         developer.AuthoredPullRequests.Add(report);

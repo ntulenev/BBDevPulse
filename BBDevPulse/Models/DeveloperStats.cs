@@ -60,6 +60,11 @@ public sealed class DeveloperStats
     public int CommentsAfter { get; set; }
 
     /// <summary>
+    /// Comments added after the filter date on pull requests authored by other developers.
+    /// </summary>
+    public int PeerCommentsAfter { get; set; }
+
+    /// <summary>
     /// Approvals added after the filter date.
     /// </summary>
     public int ApprovalsAfter { get; set; }

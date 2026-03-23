@@ -322,7 +322,11 @@ public sealed class PullRequestAnalyzerTests
                 analysis.FirstReactionOn = filterDate.AddHours(3);
 
                 var reviewerKey = reviewerIdentity.ToKey();
+                var authorIdentity = author.ToDeveloperIdentity();
+                var authorKey = authorIdentity.ToKey();
+                analysis.Participants[authorKey] = authorIdentity;
                 analysis.Participants[reviewerKey] = reviewerIdentity;
+                analysis.CommentCounts[authorKey] = 2;
                 analysis.CommentCounts[reviewerKey] = 3;
                 analysis.CommentCounts["missing-comment-participant"] = 9;
                 analysis.ApprovalCounts[reviewerKey] = 2;
@@ -357,11 +361,14 @@ public sealed class PullRequestAnalyzerTests
         reportData.DeveloperStats.Should().ContainKey(authorKey);
         reportData.DeveloperStats[authorKey].PrsOpenedSince.Should().Be(1);
         reportData.DeveloperStats[authorKey].PrsMergedAfter.Should().Be(1);
+        reportData.DeveloperStats[authorKey].CommentsAfter.Should().Be(2);
+        reportData.DeveloperStats[authorKey].PeerCommentsAfter.Should().Be(0);
         reportData.DeveloperStats[authorKey].Corrections.Should().Be(2);
 
         var reviewerKeyForStats = new DeveloperKey(new UserUuid("{reviewer-1}"));
         reportData.DeveloperStats.Should().ContainKey(reviewerKeyForStats);
         reportData.DeveloperStats[reviewerKeyForStats].CommentsAfter.Should().Be(3);
+        reportData.DeveloperStats[reviewerKeyForStats].PeerCommentsAfter.Should().Be(3);
         reportData.DeveloperStats[reviewerKeyForStats].ApprovalsAfter.Should().Be(2);
         pullRequestStopPredicateCalled.Should().BeTrue();
         activityStopPredicateCalled.Should().BeTrue();

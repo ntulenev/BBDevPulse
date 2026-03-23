@@ -253,6 +253,26 @@ public sealed class ReportDataTests
         counts.Should().Equal(1d, 3d);
     }
 
+    [Fact(DisplayName = "GetPeerCommentCountsPerDeveloper returns ordered counts including zeros")]
+    [Trait("Category", "Unit")]
+    public void GetPeerCommentCountsPerDeveloperWhenDeveloperStatsExistReturnsOrderedCounts()
+    {
+        // Arrange
+        var reportData = new ReportData(CreateReportParameters());
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
+            new DeveloperStats(new DisplayName("Alice")) { PeerCommentsAfter = 3 };
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
+            new DeveloperStats(new DisplayName("Bob")) { PeerCommentsAfter = 0 };
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Carol")))] =
+            new DeveloperStats(new DisplayName("Carol")) { PeerCommentsAfter = 1 };
+
+        // Act
+        var counts = reportData.GetPeerCommentCountsPerDeveloper();
+
+        // Assert
+        counts.Should().Equal(0d, 1d, 3d);
+    }
+
     private static PullRequestReport CreatePullRequestReport(int id, DateTimeOffset createdOn)
     {
         return new PullRequestReport(

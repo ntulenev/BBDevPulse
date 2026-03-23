@@ -105,6 +105,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             "Min Comments",
             "Max Comments",
             "Count"));
+        _ = content.Append(BuildPeerCommentsStatsTable(reportData));
         _ = content.AppendLine("</div>");
         _ = content.Append(BuildWorstPullRequestsTable(metricReports, workspace, excludeWeekend, excludedDays, pullRequestSizeMode));
         _ = content.Append(BuildDeveloperStatsTable(reportData));
@@ -371,6 +372,43 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             interactive: false);
     }
 
+    private string BuildPeerCommentsStatsTable(ReportData reportData)
+    {
+        var peerCommentCounts = reportData.GetPeerCommentCountsPerDeveloper();
+        if (peerCommentCounts.Count == 0)
+        {
+            return BuildTableSection(
+                "peer-comments-stats",
+                "Peer Comments Stats",
+                "No peer comment data available in the report.",
+                CreateMetricColumns("Count"),
+                [],
+                defaultSortColumn: 1,
+                interactive: false);
+        }
+
+        var median = _statisticsCalculator.Percentile(peerCommentCounts, 50);
+        var p75 = _statisticsCalculator.Percentile(peerCommentCounts, 75);
+        var rows = new List<TableRow>(4)
+        {
+            BuildMetricRow("Min Peer Comments", peerCommentCounts[0].ToString("0.##", CultureInfo.InvariantCulture), peerCommentCounts[0]),
+            BuildMetricRow("Max Peer Comments", peerCommentCounts[^1].ToString("0.##", CultureInfo.InvariantCulture), peerCommentCounts[^1]),
+            BuildMetricRow("Median", median.ToString("0.##", CultureInfo.InvariantCulture), median),
+            BuildMetricRow("75P", p75.ToString("0.##", CultureInfo.InvariantCulture), p75)
+        };
+
+        return BuildTableSection(
+            "peer-comments-stats",
+            "Peer Comments Stats",
+            emptyMessage: null,
+            CreateMetricColumns("Count"),
+            rows,
+            defaultSortColumn: 1,
+            defaultSortDirection: "asc",
+            compact: true,
+            interactive: false);
+    }
+
     private string BuildWorstPullRequestsTable(
         List<PullRequestReport> reports,
         string workspace,
@@ -474,6 +512,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             new TableColumn("PRs Opened", "number", "PRs opened"),
             new TableColumn("PRs Merged", "number", "PRs merged"),
             new TableColumn("Comments", "number", "Comments"),
+            new TableColumn("Peer Comments", "number", "Peer comments"),
             new TableColumn("Approvals", "number", "Approvals"),
             new TableColumn("Corrections", "number", "Corrections")
         ]);
@@ -499,6 +538,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture), stat.PrsOpenedSince),
                 BuildTextCell(stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture), stat.PrsMergedAfter),
                 BuildTextCell(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture), stat.CommentsAfter),
+                BuildTextCell(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture), stat.PeerCommentsAfter),
                 BuildTextCell(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture), stat.ApprovalsAfter),
                 BuildTextCell(stat.Corrections.ToString(CultureInfo.InvariantCulture), stat.Corrections)
             ]);

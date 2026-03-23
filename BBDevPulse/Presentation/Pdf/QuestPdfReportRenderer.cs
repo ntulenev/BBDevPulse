@@ -158,6 +158,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                             .ToList(),
                         "Min Comments",
                         "Max Comments");
+                    ComposePeerCommentsSection(column, reportData);
                     ComposeWorstPullRequestsSection(
                         column,
                         metricReports,
@@ -435,6 +436,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(45);
+                columns.ConstantColumn(60);
                 columns.ConstantColumn(45);
                 columns.ConstantColumn(45);
             });
@@ -453,6 +455,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = header.Cell().Element(HeaderCell).Text("PRs Opened");
                 _ = header.Cell().Element(HeaderCell).Text("PRs Merged");
                 _ = header.Cell().Element(HeaderCell).Text("Comments");
+                _ = header.Cell().Element(HeaderCell).Text("Peer Comments");
                 _ = header.Cell().Element(HeaderCell).Text("Approvals");
                 _ = header.Cell().Element(HeaderCell).Text("Corrections");
             });
@@ -472,6 +475,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
+                _ = table.Cell().Element(BodyCell).Text(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.Corrections.ToString(CultureInfo.InvariantCulture));
                 index++;
@@ -614,6 +618,43 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 
             AddMetricRow(table, minLabel, min.ToString("0.##", CultureInfo.InvariantCulture));
             AddMetricRow(table, maxLabel, max.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
+        });
+    }
+
+    private void ComposePeerCommentsSection(ColumnDescriptor column, ReportData reportData)
+    {
+        _ = column.Item().Text("Peer Comments Stats").Bold().FontSize(12);
+
+        var peerCommentCounts = reportData.GetPeerCommentCountsPerDeveloper();
+        if (peerCommentCounts.Count == 0)
+        {
+            _ = column.Item().Text("No peer comment data available in the report.");
+            return;
+        }
+
+        var min = peerCommentCounts[0];
+        var max = peerCommentCounts[^1];
+        var median = _statisticsCalculator.Percentile(peerCommentCounts, 50);
+        var p75 = _statisticsCalculator.Percentile(peerCommentCounts, 75);
+
+        column.Item().Table(table =>
+        {
+            table.ColumnsDefinition(columns =>
+            {
+                columns.RelativeColumn();
+                columns.RelativeColumn();
+            });
+
+            table.Header(header =>
+            {
+                _ = header.Cell().Element(HeaderCell).Text("Metric");
+                _ = header.Cell().Element(HeaderCell).Text("Count");
+            });
+
+            AddMetricRow(table, "Min Peer Comments", min.ToString("0.##", CultureInfo.InvariantCulture));
+            AddMetricRow(table, "Max Peer Comments", max.ToString("0.##", CultureInfo.InvariantCulture));
             AddMetricRow(table, "Median", median.ToString("0.##", CultureInfo.InvariantCulture));
             AddMetricRow(table, "75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
         });

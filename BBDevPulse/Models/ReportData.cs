@@ -69,6 +69,16 @@ public sealed class ReportData
             .ToList();
 
     /// <summary>
+    /// Gets peer comment counts per developer for the selected range.
+    /// </summary>
+    /// <returns>Ordered peer comment counts per developer.</returns>
+    public List<double> GetPeerCommentCountsPerDeveloper() =>
+        DeveloperStats.Values
+            .Select(static stats => (double)stats.PeerCommentsAfter)
+            .OrderBy(static count => count)
+            .ToList();
+
+    /// <summary>
     /// Sorts reports by creation time, ascending.
     /// </summary>
     public void SortReportsByCreatedOn() => Reports.Sort((left, right) => left.CreatedOn.CompareTo(right.CreatedOn));

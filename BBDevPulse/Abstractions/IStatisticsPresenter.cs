@@ -26,6 +26,12 @@ public interface IStatisticsPresenter
     void RenderCommentsStats(ReportData reportData);
 
     /// <summary>
+    /// Renders peer comments statistics.
+    /// </summary>
+    /// <param name="reportData">Report data.</param>
+    void RenderPeerCommentsStats(ReportData reportData);
+
+    /// <summary>
     /// Renders merge time statistics.
     /// </summary>
     /// <param name="reportData">Report data.</param>

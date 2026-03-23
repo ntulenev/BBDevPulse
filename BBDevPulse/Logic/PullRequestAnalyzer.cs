@@ -300,7 +300,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 if (analysis.Participants.TryGetValue(entry.Key, out var participant) &&
                     reportData.IsDeveloperIncluded(participant))
                 {
-                    reportData.GetOrAddDeveloper(participant).CommentsAfter += entry.Value;
+                    var participantStats = reportData.GetOrAddDeveloper(participant);
+                    participantStats.CommentsAfter += entry.Value;
+                    if (authorIdentity.HasValue && !participant.IsSameIdentity(authorIdentity.Value))
+                    {
+                        participantStats.PeerCommentsAfter += entry.Value;
+                    }
                 }
             }
 

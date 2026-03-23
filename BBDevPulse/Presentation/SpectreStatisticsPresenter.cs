@@ -118,6 +118,38 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     }
 
     /// <inheritdoc />
+    public void RenderPeerCommentsStats(ReportData reportData)
+    {
+        ArgumentNullException.ThrowIfNull(reportData);
+        var peerComments = reportData.GetPeerCommentCountsPerDeveloper();
+
+        if (peerComments.Count == 0)
+        {
+            AnsiConsole.Write(new Rule("Peer Comments Stats").RuleStyle("grey"));
+            AnsiConsole.MarkupLine("[yellow]No peer comment data available in the report.[/]");
+            return;
+        }
+
+        var min = peerComments.First();
+        var max = peerComments.Last();
+        var median = _statisticsCalculator.Percentile(peerComments, 50);
+        var p75 = _statisticsCalculator.Percentile(peerComments, 75);
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn("Count");
+
+        _ = table.AddRow("Min Peer Comments", min.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Max Peer Comments", max.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("Median", median.ToString("0.##", CultureInfo.InvariantCulture));
+        _ = table.AddRow("75P", p75.ToString("0.##", CultureInfo.InvariantCulture));
+
+        AnsiConsole.Write(new Rule("Peer Comments Stats").RuleStyle("grey"));
+        AnsiConsole.Write(table);
+    }
+
+    /// <inheritdoc />
     public void RenderMergeTimeStats(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
@@ -390,6 +422,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .AddColumn("PRs Opened")
             .AddColumn("PRs Merged")
             .AddColumn("Comments")
+            .AddColumn("Peer Comments")
             .AddColumn("Approvals")
             .AddColumn("Corrections");
 
@@ -414,6 +447,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             row.Add(stat.PrsOpenedSince.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.PrsMergedAfter.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
+            row.Add(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.Corrections.ToString(CultureInfo.InvariantCulture));
             _ = table.AddRow([.. row]);

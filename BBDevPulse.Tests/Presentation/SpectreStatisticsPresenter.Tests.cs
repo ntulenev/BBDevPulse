@@ -234,6 +234,56 @@ public sealed class SpectreStatisticsPresenterTests
         p75Calls.Should().Be(1);
     }
 
+    [Fact(DisplayName = "RenderPeerCommentsStats throws when report data is null")]
+    [Trait("Category", "Unit")]
+    public void RenderPeerCommentsStatsWhenReportDataIsNullThrowsArgumentNullException()
+    {
+        // Arrange
+        var presenter = CreatePresenter();
+        ReportData reportData = null!;
+
+        // Act
+        Action act = () => presenter.RenderPeerCommentsStats(reportData);
+
+        // Assert
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact(DisplayName = "RenderPeerCommentsStats calculates percentiles and renders peer comment metrics")]
+    [Trait("Category", "Unit")]
+    public void RenderPeerCommentsStatsWhenDataExistsCalculatesAndRendersMetrics()
+    {
+        // Arrange
+        var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
+        var p50Calls = 0;
+        var p75Calls = 0;
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
+            .Callback(() => p50Calls++)
+            .Returns(2.0);
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
+            .Callback(() => p75Calls++)
+            .Returns(3.0);
+
+        var presenter = new SpectreStatisticsPresenter(
+            statisticsCalculator.Object,
+            new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
+        var reportData = CreateReportData();
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
+            new DeveloperStats(new DisplayName("Alice")) { PeerCommentsAfter = 1 };
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
+            new DeveloperStats(new DisplayName("Bob")) { PeerCommentsAfter = 4 };
+
+        // Act
+        var output = TestConsoleRunner.Run(_ => presenter.RenderPeerCommentsStats(reportData));
+
+        // Assert
+        output.Should().Contain("Peer Comments Stats");
+        output.Should().Contain("Min Peer Comments");
+        output.Should().Contain("Max Peer Comments");
+        p50Calls.Should().Be(1);
+        p75Calls.Should().Be(1);
+    }
+
     [Fact(DisplayName = "RenderMergeTimeStats throws when report data is null")]
     [Trait("Category", "Unit")]
     public void RenderMergeTimeStatsWhenReportDataIsNullThrowsArgumentNullException()
@@ -923,6 +973,8 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("Alice");
         output.Should().Contain("Bob");
         output.Should().Contain("Grade");
+        output.Should().Contain("Peer");
+        output.Should().Contain("Comm");
         output.Should().Contain("Senior");
         output.Should().Contain(DeveloperStats.NOT_AVAILABLE);
         output.IndexOf("Alice", StringComparison.Ordinal).Should().BeLessThan(output.IndexOf("Bob", StringComparison.Ordinal));
@@ -941,7 +993,8 @@ public sealed class SpectreStatisticsPresenterTests
             {
                 Grade = "Senior",
                 Department = "Platform",
-                PrsOpenedSince = 1
+                PrsOpenedSince = 1,
+                PeerCommentsAfter = 2
             };
 
         reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
@@ -955,7 +1008,9 @@ public sealed class SpectreStatisticsPresenterTests
 
         // Assert
         output.Should().Contain("UUID");
-        output.Should().Contain("{alice");
+        output.Should().Contain("Peer");
+        output.Should().Contain("│ 2    │");
+        output.Should().Contain("{alic");
         output.Should().Contain("-1}");
         output.Should().Contain(DeveloperStats.NOT_AVAILABLE);
     }

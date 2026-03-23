@@ -35,6 +35,7 @@ public sealed class DeveloperStatsTests
         stats.PrsOpenedSince.Should().Be(0);
         stats.PrsMergedAfter.Should().Be(0);
         stats.CommentsAfter.Should().Be(0);
+        stats.PeerCommentsAfter.Should().Be(0);
         stats.ApprovalsAfter.Should().Be(0);
         stats.Corrections.Should().Be(0);
         stats.Grade.Should().Be(DeveloperStats.NOT_AVAILABLE);
@@ -54,8 +55,9 @@ public sealed class DeveloperStatsTests
         stats.PrsOpenedSince = 1;
         stats.PrsMergedAfter = 2;
         stats.CommentsAfter = 3;
-        stats.ApprovalsAfter = 4;
-        stats.Corrections = 5;
+        stats.PeerCommentsAfter = 4;
+        stats.ApprovalsAfter = 5;
+        stats.Corrections = 6;
         stats.Grade = "Senior";
         stats.BitbucketUuid = new UserUuid("{alice-1}");
         stats.Department = "Platform";
@@ -65,8 +67,9 @@ public sealed class DeveloperStatsTests
         stats.PrsOpenedSince.Should().Be(1);
         stats.PrsMergedAfter.Should().Be(2);
         stats.CommentsAfter.Should().Be(3);
-        stats.ApprovalsAfter.Should().Be(4);
-        stats.Corrections.Should().Be(5);
+        stats.PeerCommentsAfter.Should().Be(4);
+        stats.ApprovalsAfter.Should().Be(5);
+        stats.Corrections.Should().Be(6);
         stats.Grade.Should().Be("Senior");
         stats.BitbucketUuid!.Value.Should().Be("{alice-1}");
         stats.Department.Should().Be("Platform");

@@ -24,7 +24,9 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - Pull request report (includes `Size` T-shirt metric)
    - Merge-time statistics (best/median/75p/longest)
    - PR size statistics (smallest/biggest/median/75p by selected size mode)
-   - Developer statistics (grade, department, PRs opened, merged, comments, approvals, corrections)
+   - Comments statistics (based on PR-level `Comments` totals)
+   - Peer comments statistics (based on per-developer comments in other people's PRs)
+   - Developer statistics (grade, department, PRs opened, merged, comments, peer comments, approvals, corrections)
    - Optional developer detail sections when `ShowAllDetailsForDevelopers = true`:
      - Authored PRs
      - Comments
@@ -58,6 +60,31 @@ This reduces repeated Bitbucket API calls for already analyzed pull requests.
 - Cache contents: PR activity, correction commits, PR size summary, and detailed follow-up commit activity
 - Cache cleanup: no automatic eviction is performed; remove old cache files manually when needed
 - Telemetry output: shown in console summary when `Bitbucket:Telemetry:Enabled = true`
+
+## Comments and Peer Comments
+BBDevPulse exposes two different comment-related metrics:
+
+- `Comments`: total PR comment count on a pull request row. This is a PR-level metric and reflects all comments counted for that PR.
+- `Peer Comments`: a developer-level metric that counts only comments made in pull requests authored by other developers.
+
+How `Peer Comments` is calculated:
+
+- The report iterates over comment activities that fall inside the selected date window.
+- A comment is added to the comment author's `Comments` counter.
+- The same comment is added to the author's `Peer Comments` counter only when the PR author is known and the comment author is not the same person as the PR author.
+- Self-comments on your own pull requests are excluded from `Peer Comments`.
+- If the PR author is unknown, the comment is not counted as a peer comment because the report cannot reliably decide whether the PR is foreign.
+
+How `Peer Comments Stats` is calculated:
+
+- Take `Peer Comments` totals for all developers included in the report, including zero values.
+- Sort them ascending.
+- `Min Peer Comments` = minimum developer value.
+- `Max Peer Comments` = maximum developer value.
+- `Median` = 50th percentile across developers.
+- `75P` = 75th percentile across developers.
+
+This makes `Peer Comments` a more honest signal of review participation than raw PR comment totals, because it excludes comments people leave on their own pull requests.
 
 ## PR Size calculation
 PR size is based on Bitbucket `diffstat` between pull request source and destination commits.

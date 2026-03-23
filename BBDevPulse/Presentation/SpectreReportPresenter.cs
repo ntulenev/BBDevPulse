@@ -91,6 +91,7 @@ public sealed class SpectreReportPresenter : IReportPresenter
         _statisticsPresenter.RenderPrThroughputStats(reportData);
         _statisticsPresenter.RenderPrsPerDeveloperStats(reportData);
         _statisticsPresenter.RenderCommentsStats(reportData);
+        _statisticsPresenter.RenderPeerCommentsStats(reportData);
         _statisticsPresenter.RenderWorstPullRequestsTable(reportData);
         _statisticsPresenter.RenderDeveloperStatsTable(reportData);
         if (reportData.Parameters.ShowAllDetailsForDevelopers)
