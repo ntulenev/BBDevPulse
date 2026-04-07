@@ -17,6 +17,7 @@ public sealed class DateDiffFormatter : IDateDiffFormatter
             return hours < 1 ? "<1h" : $"{hours:0.0} hours";
         }
 
-        return $"{days:0.0} days";
+        var totalHours = days * 24;
+        return $"{days:0.0} days ({totalHours:0.0} hours)";
     }
 }

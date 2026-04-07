@@ -38,9 +38,9 @@ public sealed class DateDiffFormatterTests
         result.Should().Be("2.5 hours");
     }
 
-    [Fact(DisplayName = "Format returns days when period is one day or longer")]
+    [Fact(DisplayName = "Format returns days with hours in parentheses when period is one day or longer")]
     [Trait("Category", "Unit")]
-    public void FormatWhenPeriodIsOneDayOrLongerReturnsDays()
+    public void FormatWhenPeriodIsOneDayOrLongerReturnsDaysWithHoursInParentheses()
     {
         // Arrange
         var formatter = new DateDiffFormatter();
@@ -51,6 +51,6 @@ public sealed class DateDiffFormatterTests
         var result = formatter.Format(startPeriod, endPeriod);
 
         // Assert
-        result.Should().Be("1.5 days");
+        result.Should().Be("1.5 days (36.0 hours)");
     }
 }
