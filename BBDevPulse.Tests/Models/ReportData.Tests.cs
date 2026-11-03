@@ -1,11 +1,40 @@
 using FluentAssertions;
 
 using BBDevPulse.Models;
+using BBDevPulse.Math;
 
 namespace BBDevPulse.Tests.Models;
 
 public sealed class ReportDataTests
 {
+    [Fact]
+    public void GetTtfrStatisticsSharesThreeObservationSummary()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var created = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        data.Reports.Add(CreatePullRequestReport(1, created, created));
+        data.Reports.Add(CreatePullRequestReport(2, created, created.AddHours(2)));
+        data.Reports.Add(CreatePullRequestReport(3, created, created.AddHours(4)));
+        data.Reports.Add(CreatePullRequestReport(4, created));
+
+        var statistics = data.GetTtfrStatistics(new StatisticsCalculator());
+
+        statistics.Count.Should().Be(3);
+        statistics.MedianDays.Should().BeApproximately(2d / 24, 0.000001);
+        statistics.P75Days.Should().BeApproximately(3d / 24, 0.000001);
+        data.GetTtfrStatistics(new StatisticsCalculator()).Should().BeSameAs(statistics);
+    }
+
+    [Fact]
+    public void GetTtfrStatisticsReturnsEmptySummary()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var statistics = data.GetTtfrStatistics(new StatisticsCalculator());
+        statistics.Count.Should().Be(0);
+        statistics.MedianDays.Should().Be(0);
+        statistics.P75Days.Should().Be(0);
+    }
+
     [Fact(DisplayName = "Constructor throws when parameters are null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenParametersAreNullThrowsArgumentNullException()
@@ -273,7 +302,7 @@ public sealed class ReportDataTests
         counts.Should().Equal(0d, 1d, 3d);
     }
 
-    private static PullRequestReport CreatePullRequestReport(int id, DateTimeOffset createdOn)
+    private static PullRequestReport CreatePullRequestReport(int id, DateTimeOffset createdOn, DateTimeOffset? firstReactionOn = null)
     {
         return new PullRequestReport(
             repository: "BBDevPulse",
@@ -287,7 +316,7 @@ public sealed class ReportDataTests
             state: PullRequestState.Open,
             id: new PullRequestId(id),
             comments: 0,
-            firstReactionOn: null);
+            firstReactionOn: firstReactionOn);
     }
 
     private static ReportParameters CreateReportParameters(string? teamFilter = null)

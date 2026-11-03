@@ -65,13 +65,10 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         _ = content.Append(BuildDurationStatsTable(
             "ttfr-stats",
             "TTFR Stats",
-            metricReports
-                .Where(static report => report.FirstReactionOn.HasValue)
-                .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
-                .OrderBy(static days => days)
-                .ToList(),
+            reportData.GetTtfrStatistics(_statisticsCalculator).OrderedDays,
             "Best TTFR",
-            "Longest TTFR"));
+            "Longest TTFR",
+            reportData.GetTtfrStatistics(_statisticsCalculator)));
         _ = content.Append(BuildCountStatsTable(
             "correction-stats",
             "Corrections Stats",
@@ -226,9 +223,10 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
     private string BuildDurationStatsTable(
         string sectionId,
         string title,
-        List<double> orderedDays,
+        IReadOnlyList<double> orderedDays,
         string bestLabel,
-        string longestLabel)
+        string longestLabel,
+        TtfrStatistics? statistics = null)
     {
         if (orderedDays.Count == 0)
         {
@@ -242,8 +240,8 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 interactive: false);
         }
 
-        var median = _statisticsCalculator.Percentile(orderedDays, 50);
-        var p75 = _statisticsCalculator.Percentile(orderedDays, 75);
+        var median = statistics?.MedianDays ?? _statisticsCalculator.Percentile(orderedDays, 50);
+        var p75 = statistics?.P75Days ?? _statisticsCalculator.Percentile(orderedDays, 75);
         var rows = new List<TableRow>(4)
         {
             BuildMetricRow(bestLabel, FormatDuration(orderedDays[0]), orderedDays[0]),

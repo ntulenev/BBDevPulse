@@ -192,14 +192,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     public void RenderTtfrStats(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
-        var excludeWeekend = reportData.Parameters.ExcludeWeekend;
-        var excludedDays = reportData.Parameters.ExcludedDays;
-        var ttfrDays = reportData.Reports
-            .Where(static report => report.IncludeInMetrics)
-            .Where(r => r.FirstReactionOn.HasValue)
-            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
-            .OrderBy(days => days)
-            .ToList();
+        var statistics = reportData.GetTtfrStatistics(_statisticsCalculator);
+        var ttfrDays = statistics.OrderedDays;
 
         if (ttfrDays.Count == 0)
         {
@@ -208,10 +202,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             return;
         }
 
-        var best = ttfrDays.First();
-        var longest = ttfrDays.Last();
-        var median = _statisticsCalculator.Percentile(ttfrDays, 50);
-        var p75 = _statisticsCalculator.Percentile(ttfrDays, 75);
+        var best = ttfrDays[0];
+        var longest = ttfrDays[^1];
+        var median = statistics.MedianDays;
+        var p75 = statistics.P75Days;
 
         var table = new Table()
             .Border(TableBorder.Rounded)

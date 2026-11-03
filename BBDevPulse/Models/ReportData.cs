@@ -1,4 +1,7 @@
 
+using BBDevPulse.Abstractions;
+using BBDevPulse.Math;
+
 namespace BBDevPulse.Models;
 
 /// <summary>
@@ -33,6 +36,28 @@ public sealed class ReportData
     /// Gets the pull request reports.
     /// </summary>
     public List<PullRequestReport> Reports { get; } = [];
+
+    public TtfrStatistics GetTtfrStatistics(IStatisticsCalculator calculator)
+    {
+        ArgumentNullException.ThrowIfNull(calculator);
+        if (_ttfrStatistics is not null)
+        {
+            return _ttfrStatistics;
+        }
+
+        var days = Reports
+            .Where(static report => report.IncludeInMetrics && report.FirstReactionOn.HasValue)
+            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value,
+                Parameters.ExcludeWeekend, Parameters.ExcludedDays).TotalDays)
+            .OrderBy(static value => value)
+            .ToArray();
+        _ttfrStatistics = days.Length == 0
+            ? new TtfrStatistics(days, 0, 0)
+            : new TtfrStatistics(days, calculator.Percentile(days, 50), calculator.Percentile(days, 75));
+        return _ttfrStatistics;
+    }
+
+    private TtfrStatistics? _ttfrStatistics;
 
     /// <summary>
     /// Gets the developer statistics keyed by identity.

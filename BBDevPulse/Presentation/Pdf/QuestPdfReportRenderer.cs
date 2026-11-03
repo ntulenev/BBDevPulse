@@ -120,13 +120,10 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     ComposeDurationSection(
                         column,
                         "TTFR Stats",
-                        metricReports
-                            .Where(static report => report.FirstReactionOn.HasValue)
-                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
-                            .OrderBy(static days => days)
-                            .ToList(),
+                        reportData.GetTtfrStatistics(_statisticsCalculator).OrderedDays,
                         "Best TTFR",
-                        "Longest TTFR");
+                        "Longest TTFR",
+                        reportData.GetTtfrStatistics(_statisticsCalculator));
                     ComposeCountSection(
                         column,
                         "Corrections Stats",
@@ -304,9 +301,10 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private void ComposeDurationSection(
         ColumnDescriptor column,
         string title,
-        List<double> orderedDays,
+        IReadOnlyList<double> orderedDays,
         string bestLabel,
-        string longestLabel)
+        string longestLabel,
+        TtfrStatistics? statistics = null)
     {
         _ = column.Item().Text(title).Bold().FontSize(12);
         if (orderedDays.Count == 0)
@@ -317,8 +315,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 
         var best = orderedDays[0];
         var longest = orderedDays[^1];
-        var median = _statisticsCalculator.Percentile(orderedDays, 50);
-        var p75 = _statisticsCalculator.Percentile(orderedDays, 75);
+        var median = statistics?.MedianDays ?? _statisticsCalculator.Percentile(orderedDays, 50);
+        var p75 = statistics?.P75Days ?? _statisticsCalculator.Percentile(orderedDays, 75);
 
         column.Item().Table(table =>
         {
