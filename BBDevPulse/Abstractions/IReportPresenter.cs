@@ -8,6 +8,21 @@ namespace BBDevPulse.Abstractions;
 public interface IReportPresenter
 {
     /// <summary>
+    /// Shows the effective report settings before data collection starts.
+    /// </summary>
+    /// <param name="parameters">Resolved report parameters.</param>
+    /// <param name="username">Bitbucket account used for the run.</param>
+    /// <param name="htmlFileName">Planned HTML file name, or null when disabled.</param>
+    /// <param name="pdfFileName">Planned PDF file name, or null when disabled.</param>
+    void RenderRunSettings(ReportParameters parameters, string username, string? htmlFileName, string? pdfFileName);
+
+    /// <summary>
+    /// Waits for the user to approve starting Bitbucket data collection.
+    /// </summary>
+    /// <returns>True when the user confirms the run.</returns>
+    bool ConfirmStart();
+
+    /// <summary>
     /// Lets the user choose one of the teams found in the people CSV, or all teams.
     /// </summary>
     /// <param name="teams">Distinct team names.</param>

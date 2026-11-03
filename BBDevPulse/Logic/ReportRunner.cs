@@ -64,6 +64,16 @@ internal sealed class ReportRunner : IReportRunner
             .ToList();
         var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams);
         var parameters = _options.CreateReportParameters(teamFilter);
+        var htmlOptions = _options.Html ?? new HtmlOptions();
+        var pdfOptions = _options.Pdf ?? new PdfOptions();
+        var htmlFileName = htmlOptions.Enabled ? Path.GetFileName(htmlOptions.ResolveOutputPath(teamFilter)) : null;
+        var pdfFileName = pdfOptions.Enabled ? Path.GetFileName(pdfOptions.ResolveOutputPath(teamFilter)) : null;
+        _presenter.RenderRunSettings(parameters, _options.Username, htmlFileName, pdfFileName);
+        if (!_presenter.ConfirmStart())
+        {
+            return;
+        }
+
         await BuildAuthAsync(cancellationToken).ConfigureAwait(false);
         var filteredRepos = await BuildRepositoriesAsync(parameters, cancellationToken).ConfigureAwait(false);
         await BuildReportsAsync(filteredRepos, parameters, peopleByName, cancellationToken).ConfigureAwait(false);
