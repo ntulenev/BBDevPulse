@@ -72,7 +72,7 @@ Names must match Bitbucket display names exactly to enrich developer statistics.
 
 The console, HTML, and PDF show PR and developer tables, PR throughput, merge time, time to first reaction (TTFR), comments, peer comments, corrections, PR size, and worst PRs by metric. When enabled, developer detail sections include authored PRs, comments, approvals, and follow-up commits. HTML detailed tables support sorting and filtering; summary statistic tables are static.
 
-`Comments` on a PR is its total comment count. `Peer Comments` counts a developer's comments on other people's PRs; self-comments and comments on PRs with an unknown author do not count as peer comments. Duration metrics exclude weekends and explicit `ExcludedDays` only when configured. PRs and activity on excluded dates remain eligible for the report.
+`Comments` on a PR is its total comment count. `Peer Comments` counts a developer's comments on other people's PRs; self-comments and comments on PRs with an unknown author do not count as peer comments. Duration metrics exclude weekends and explicit `ExcludedDays` only when configured. `ForcedIncludeDates` overrides both rules for working weekends or rescheduled holidays. PRs and activity on excluded dates remain eligible for the report.
 
 PR size comes from Bitbucket diffstat. `PullRequestSizeMode = Lines` uses added plus removed lines; `Files` uses the count of changed files. The selected measure drives the PR `Size` tier, size statistics, and the biggest-PR selection:
 
@@ -105,6 +105,7 @@ All settings are inside the `Bitbucket` object in `BBDevPulse/appsettings.json`.
 | `PrTimeFilterMode` | `LastKnownUpdateAndCreated` or `CreatedOnOnly`; controls the PR paging cutoff. |
 | `PullRequestSizeMode` | `Lines` (default) or `Files`; controls size tiers and aggregates. |
 | `ExcludeWeekend`, `ExcludedDays` | Exclude Saturdays/Sundays and specified dates from duration calculations. Dates accept the same formats as `FromDate`. |
+| `ForcedIncludeDates` | Optional dates counted as working days even if they are weekends or appear in `ExcludedDays`. For example, add `"2026-11-07"` to count that Saturday while other weekends remain excluded. Dates accept `dd.MM.yyyy` or `yyyy-MM-dd`; leave `[]` if unused. Affects duration metrics only. |
 | `PeopleCsvPath` | Optional `Name;Grade;Department` file for live developer metadata and team choices. |
 | `ShowDeveloperUuidInStats` | Show Bitbucket UUIDs beside developers in statistics; default `false`. |
 | `ShowAllDetailsForDevelopers` | Include per-developer PR, comment, approval, and commit details; default `false`. May substantially increase generation time. |
