@@ -24,9 +24,12 @@ internal sealed class DemoReportRunner : IReportRunner
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var reportData = DemoReportData.Create();
-        var htmlName = Path.GetFileName(DemoReportOptions.Html.ResolveOutputPath());
-        var pdfName = Path.GetFileName(DemoReportOptions.Pdf.ResolveOutputPath());
+        var peopleByName = await DemoPeopleCsv.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var teams = TeamFilterCatalog.Create(peopleByName);
+        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams, peopleByName.Count);
+        var reportData = DemoReportData.Create(peopleByName, teamFilter);
+        var htmlName = Path.GetFileName(DemoReportOptions.Html.ResolveOutputPath(teamFilter));
+        var pdfName = Path.GetFileName(DemoReportOptions.Pdf.ResolveOutputPath(teamFilter));
         _presenter.RenderDemoSettings(reportData.Parameters, htmlName, pdfName);
         if (!_presenter.ConfirmDemoStart())
         {

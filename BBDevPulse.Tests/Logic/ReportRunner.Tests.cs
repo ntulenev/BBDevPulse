@@ -565,8 +565,10 @@ public sealed class ReportRunnerTests
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user", It.IsAny<string?>(), It.IsAny<string?>()));
         presenter.Setup(x => x.ConfirmStart()).Returns(true);
-        presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
-                teams.Count == 1 && teams[0] == "Core Platform")))
+        presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<TeamFilterOption>>(teams =>
+                teams.Count == 1 && teams[0].Name == "Core Platform" &&
+                teams[0].Members.Count == 1 && teams[0].Members[0].Name == "Alice" &&
+                teams[0].Members[0].Grade == "Senior"), 1))
             .Returns((string?)null);
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
@@ -691,8 +693,11 @@ public sealed class ReportRunnerTests
             It.Is<string>(name => name.StartsWith("core-bbdevpulse-report_", StringComparison.Ordinal) &&
                 name.EndsWith(".pdf", StringComparison.Ordinal) && Path.GetFileName(name) == name)));
         presenter.Setup(x => x.ConfirmStart()).Returns(true);
-        presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
-                teams.Count == 2 && teams[0] == "Core" && teams[1] == "Other")))
+        presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<TeamFilterOption>>(teams =>
+                teams.Count == 2 && teams[0].Name == "Core" && teams[1].Name == "Other" &&
+                teams[0].Members.Count == 2 && teams[0].Members[0].Name == "Alice" &&
+                teams[0].Members[0].Grade == "Senior" && teams[0].Members[1].Name == "Bob" &&
+                teams[1].Members.Count == 1 && teams[1].Members[0].Name == "Carol"), 3))
             .Returns("Core");
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),

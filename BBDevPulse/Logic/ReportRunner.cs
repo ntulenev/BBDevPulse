@@ -55,14 +55,8 @@ internal sealed class ReportRunner : IReportRunner
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
-        var teams = peopleByName.Values
-            .Select(static person => person.Department.Trim())
-            .Where(static team => !string.IsNullOrWhiteSpace(team) &&
-                !string.Equals(team, DeveloperStats.NOT_AVAILABLE, StringComparison.OrdinalIgnoreCase))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(static team => team, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams);
+        var teams = TeamFilterCatalog.Create(peopleByName);
+        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams, peopleByName.Count);
         var parameters = _options.CreateReportParameters(teamFilter);
         var htmlOptions = _options.Html ?? new HtmlOptions();
         var pdfOptions = _options.Pdf ?? new PdfOptions();

@@ -157,7 +157,7 @@ All settings are under the `Bitbucket` object.
   Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
 - `PeopleCsvPath` (`string`): Optional path to a CSV file with developer metadata in format `Name;Grade;Department`.
   Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
-- Team selection: When `PeopleCsvPath` contains departments, the startup menu offers those teams and an unfiltered option.
+- Team selection: When `PeopleCsvPath` contains departments, the startup menu shows each team with its member count and an unfiltered option. Selecting a team displays its members and grades in pages of 12 before report collection begins.
 - `ShowDeveloperUuidInStats` (`bool`): Optional flag to include Bitbucket user UUIDs in developer stats output. Default is `false`.
 - `ShowAllDetailsForDevelopers` (`bool`): Optional flag to append detailed per-developer sections after the summary report. When enabled, the report includes authored PRs, comments, approvals, and follow-up commits for each developer. Default is `false`.
 - `Telemetry.Enabled` (`bool`): Enables/disables Bitbucket request telemetry in the console output. Default is `true`.
@@ -172,9 +172,9 @@ All settings are under the `Bitbucket` object.
 
 ## Demo mode
 
-Set `Bitbucket:DemoMode` to `true` and run the application. The demo uses a built-in set of synthetic repositories, PRs, developers, and activity. It does not read Bitbucket credentials or `PeopleCsvPath`, and it does not call the Bitbucket API. The startup screen marks the run as synthetic and asks for confirmation before rendering.
+Set `Bitbucket:DemoMode` to `true` and run the application. The demo uses built-in synthetic repositories, PRs, activity, and an embedded people CSV. The same team picker shows synthetic people and grades, and selecting a team filters the report. It does not read Bitbucket credentials or the configured `PeopleCsvPath`, and it does not call the Bitbucket API. The startup screen marks the run as synthetic and asks for confirmation before rendering.
 
-Demo mode always creates `bbdevpulse-demo-report_<date>.html` and `bbdevpulse-demo-report_<date>.pdf` in the current directory. It ignores the normal HTML/PDF output paths and browser-launch setting so real paths cannot appear in a demo. Both reports are marked as synthetic. Set `DemoMode` to `false` for a live Bitbucket run and supply your local credentials.
+Demo mode creates `bbdevpulse-demo-report_<date>.html` and `bbdevpulse-demo-report_<date>.pdf` in the current directory. A selected team adds its normalized name as a prefix. It ignores the normal HTML/PDF output paths and browser-launch setting so real paths cannot appear in a demo. Both reports are marked as synthetic. Set `DemoMode` to `false` for a live Bitbucket run and supply your local credentials.
 
 ## Example configuration
 ```json

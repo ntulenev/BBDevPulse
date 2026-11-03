@@ -10,8 +10,6 @@ internal static class DemoReportData
     private static readonly string[] Developers = ["Avery Stone", "Jordan Lee", "Morgan Vale", "Taylor Quinn"];
     private static readonly string[] Repositories = ["Atlas API", "Northstar Web", "Orbit Worker"];
     private static readonly string[] RepositorySlugs = ["atlas-api", "northstar-web", "orbit-worker"];
-    private static readonly string[] Grades = ["Senior", "Middle", "Lead", "Middle"];
-    private static readonly string[] Teams = ["Platform", "Experience", "Platform", "Data"];
 
     private static readonly DemoPullRequest[] PullRequests =
     [
@@ -29,7 +27,7 @@ internal static class DemoReportData
         new(26, 2, 3, PullRequestState.Merged, 5, 2, 8, 220, 67, 38)
     ];
 
-    public static ReportData Create()
+    public static ReportData Create(IReadOnlyDictionary<DisplayName, PersonCsvRow> peopleByName, string? teamFilter = null)
     {
         var start = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero).AddDays(-30);
         var end = start.AddDays(31);
@@ -44,16 +42,26 @@ internal static class DemoReportData
             excludeWeekend: true,
             excludedDays: [DateOnly.FromDateTime(start.AddDays(11).Date)],
             pullRequestSizeMode: PullRequestSizeMode.Files,
+            teamFilter: teamFilter,
             showDeveloperUuidInStats: false,
             showAllDetailsForDevelopers: true,
             toDateExclusive: end,
             isDemo: true);
-        var reportData = new ReportData(parameters);
-        var stats = Developers.Select((name, index) =>
+        var reportData = new ReportData(parameters, peopleByName);
+        var stats = Developers.Select(name =>
         {
-            var developer = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName(name)));
-            developer.Grade = Grades[index];
-            developer.Department = Teams[index];
+            var identity = new DeveloperIdentity(null, new DisplayName(name));
+            if (!reportData.IsDeveloperIncluded(identity))
+            {
+                return null;
+            }
+
+            var developer = reportData.GetOrAddDeveloper(identity);
+            if (peopleByName.TryGetValue(identity.DisplayName, out var person))
+            {
+                developer.Grade = person.Grade;
+                developer.Department = person.Department;
+            }
             return developer;
         }).ToArray();
 
@@ -66,8 +74,15 @@ internal static class DemoReportData
     }
 
     private static void AddPullRequest(
-        ReportData reportData, DeveloperStats[] stats, DemoPullRequest item, int index, DateTimeOffset start)
+        ReportData reportData, DeveloperStats?[] stats, DemoPullRequest item, int index, DateTimeOffset start)
     {
+        var authorStats = stats[item.Author];
+        var reviewer = stats[(item.Author + 1) % stats.Length];
+        if (authorStats is null && reviewer is null)
+        {
+            return;
+        }
+
         var created = start.AddDays(item.Day).AddHours(9 + (index % 5));
         var closed = created.AddHours(item.DurationHours);
         var repo = Repositories[item.Repository];
@@ -82,40 +97,45 @@ internal static class DemoReportData
             firstReactionOn: created.AddHours(2 + (index % 5)),
             filesChanged: item.Files,
             linesAdded: item.Added,
-            linesRemoved: item.Removed);
+            linesRemoved: item.Removed,
+            isActivityOnlyMatch: authorStats is null);
         reportData.Reports.Add(report);
 
-        var authorStats = stats[item.Author];
-        authorStats.PrsOpenedSince++;
-        if (item.State == PullRequestState.Merged)
+        if (authorStats is not null)
         {
-            authorStats.PrsMergedAfter++;
+            authorStats.PrsOpenedSince++;
+            if (item.State == PullRequestState.Merged)
+            {
+                authorStats.PrsMergedAfter++;
+            }
+
+            authorStats.Corrections += item.Corrections;
+            authorStats.AuthoredPullRequests.Add(report);
+            if (item.Corrections > 0)
+            {
+                authorStats.CommitActivities.Add(new DeveloperCommitActivity(
+                    repo, slug, id,
+                    (101 + index).ToString("x40", System.Globalization.CultureInfo.InvariantCulture),
+                    "Refine synthetic implementation",
+                    created.AddHours(8),
+                    new PullRequestSizeSummary(item.Files, item.Added, item.Removed)));
+            }
         }
 
-        authorStats.Corrections += item.Corrections;
-        authorStats.AuthoredPullRequests.Add(report);
-        if (item.Corrections > 0)
+        if (reviewer is not null)
         {
-            authorStats.CommitActivities.Add(new DeveloperCommitActivity(
-                repo, slug, id,
-                (101 + index).ToString("x40", System.Globalization.CultureInfo.InvariantCulture),
-                "Refine synthetic implementation",
-                created.AddHours(8),
-                new PullRequestSizeSummary(item.Files, item.Added, item.Removed)));
-        }
+            reviewer.CommentsAfter += item.Comments;
+            reviewer.PeerCommentsAfter += item.Comments;
+            reviewer.ApprovalsAfter++;
+            for (var comment = 0; comment < item.Comments; comment++)
+            {
+                reviewer.CommentActivities.Add(new DeveloperCommentActivity(
+                    repo, slug, id, author, created.AddHours(3 + comment)));
+            }
 
-        var reviewer = stats[(item.Author + 1) % stats.Length];
-        reviewer.CommentsAfter += item.Comments;
-        reviewer.PeerCommentsAfter += item.Comments;
-        reviewer.ApprovalsAfter++;
-        for (var comment = 0; comment < item.Comments; comment++)
-        {
-            reviewer.CommentActivities.Add(new DeveloperCommentActivity(
-                repo, slug, id, author, created.AddHours(3 + comment)));
+            reviewer.ApprovalActivities.Add(new DeveloperApprovalActivity(
+                repo, slug, id, author, created.AddHours(5)));
         }
-
-        reviewer.ApprovalActivities.Add(new DeveloperApprovalActivity(
-            repo, slug, id, author, created.AddHours(5)));
     }
 
     private readonly record struct DemoPullRequest(
