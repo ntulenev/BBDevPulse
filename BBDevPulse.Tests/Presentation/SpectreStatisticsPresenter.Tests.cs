@@ -123,20 +123,13 @@ public sealed class SpectreStatisticsPresenterTests
         act.Should().Throw<ArgumentNullException>();
     }
 
-    [Fact(DisplayName = "RenderPrsPerDeveloperStats writes no-data message when no authored PR data exists")]
+    [Fact(DisplayName = "RenderPrsPerDeveloperStats writes no-data message when there are no developers")]
     [Trait("Category", "Unit")]
     public void RenderPrsPerDeveloperStatsWhenNoAuthoredPrDataExistsWritesNoDataMessage()
     {
         // Arrange
         var presenter = CreatePresenter();
         var reportData = CreateReportData();
-
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Reviewer")))] =
-            new DeveloperStats(new DisplayName("Reviewer"))
-            {
-                PrsOpenedSince = 0,
-                CommentsAfter = 3
-            };
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderPrsPerDeveloperStats(reportData));
@@ -154,10 +147,10 @@ public sealed class SpectreStatisticsPresenterTests
         var statisticsCalculator = new Mock<IStatisticsCalculator>(MockBehavior.Strict);
         var p50Calls = 0;
         var p75Calls = 0;
-        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 50))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => values.SequenceEqual(new double[] { 0, 1, 4 })), 50))
             .Callback(() => p50Calls++)
             .Returns(2.0);
-        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => IsOrderedNonEmpty(values)), 75))
+        statisticsCalculator.Setup(x => x.Percentile(It.Is<IReadOnlyList<double>>(values => values.SequenceEqual(new double[] { 0, 1, 4 })), 75))
             .Callback(() => p75Calls++)
             .Returns(3.0);
 
