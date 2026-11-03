@@ -11,7 +11,7 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 internal static class SpectreRunSettingsPresenter
 {
-    public static void Render(ReportParameters parameters, string username)
+    public static void Render(ReportParameters parameters, string username, string? htmlFileName, string? pdfFileName)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
@@ -56,6 +56,12 @@ internal static class SpectreRunSettingsPresenter
             ("Developer details", parameters.ShowAllDetailsForDevelopers
                 ? "On — include per-developer PR, commit, comment and approval details"
                 : "Off — summary statistics only")
+        ]);
+
+        AnsiConsole.WriteLine();
+        WriteSection("04  Output files", [
+            ("HTML", htmlFileName ?? "Disabled"),
+            ("PDF", pdfFileName ?? "Disabled")
         ]);
 
         if (parameters.ShowAllDetailsForDevelopers)

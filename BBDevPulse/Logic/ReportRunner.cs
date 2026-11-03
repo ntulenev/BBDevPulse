@@ -64,7 +64,11 @@ internal sealed class ReportRunner : IReportRunner
             .ToList();
         var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams);
         var parameters = _options.CreateReportParameters(teamFilter);
-        _presenter.RenderRunSettings(parameters, _options.Username);
+        var htmlOptions = _options.Html ?? new HtmlOptions();
+        var pdfOptions = _options.Pdf ?? new PdfOptions();
+        var htmlFileName = htmlOptions.Enabled ? Path.GetFileName(htmlOptions.ResolveOutputPath(teamFilter)) : null;
+        var pdfFileName = pdfOptions.Enabled ? Path.GetFileName(pdfOptions.ResolveOutputPath(teamFilter)) : null;
+        _presenter.RenderRunSettings(parameters, _options.Username, htmlFileName, pdfFileName);
         if (!_presenter.ConfirmStart())
         {
             return;

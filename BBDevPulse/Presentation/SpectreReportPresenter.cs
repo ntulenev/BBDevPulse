@@ -11,8 +11,8 @@ namespace BBDevPulse.Presentation;
 public sealed class SpectreReportPresenter : IReportPresenter
 {
     /// <inheritdoc />
-    public void RenderRunSettings(ReportParameters parameters, string username) =>
-        SpectreRunSettingsPresenter.Render(parameters, username);
+    public void RenderRunSettings(ReportParameters parameters, string username, string? htmlFileName, string? pdfFileName) =>
+        SpectreRunSettingsPresenter.Render(parameters, username, htmlFileName, pdfFileName);
 
     /// <inheritdoc />
     public bool ConfirmStart() => AnsiConsole.Confirm("Start loading data from Bitbucket?", defaultValue: false);

@@ -21,7 +21,7 @@ public sealed class ReportRunnerTests
     {
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         var settingsShown = false;
-        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user"))
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user", It.IsAny<string?>(), It.IsAny<string?>()))
             .Callback(() => settingsShown = true);
         presenter.Setup(x => x.ConfirmStart())
             .Returns(() =>
@@ -291,7 +291,7 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
-        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user"))
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user", It.IsAny<string?>(), It.IsAny<string?>()))
             .Callback(() => authRequests.Should().Be(0));
         presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.AnnounceAuthAsync(
@@ -445,7 +445,7 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
-        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user"));
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user", It.IsAny<string?>(), It.IsAny<string?>()));
         presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
@@ -563,7 +563,7 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
-        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user"));
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user", It.IsAny<string?>(), It.IsAny<string?>()));
         presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
                 teams.Count == 1 && teams[0] == "Core Platform")))
@@ -683,7 +683,13 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
-        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>(), "user"));
+        presenter.Setup(x => x.RenderRunSettings(
+            It.Is<ReportParameters>(parameters => parameters.TeamFilter == "Core"),
+            "user",
+            It.Is<string>(name => name.StartsWith("core-bbdevpulse-report_", StringComparison.Ordinal) &&
+                name.EndsWith(".html", StringComparison.Ordinal) && Path.GetFileName(name) == name),
+            It.Is<string>(name => name.StartsWith("core-bbdevpulse-report_", StringComparison.Ordinal) &&
+                name.EndsWith(".pdf", StringComparison.Ordinal) && Path.GetFileName(name) == name)));
         presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
                 teams.Count == 2 && teams[0] == "Core" && teams[1] == "Other")))

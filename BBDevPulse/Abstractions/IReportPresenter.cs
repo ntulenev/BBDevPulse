@@ -12,7 +12,9 @@ public interface IReportPresenter
     /// </summary>
     /// <param name="parameters">Resolved report parameters.</param>
     /// <param name="username">Bitbucket account used for the run.</param>
-    void RenderRunSettings(ReportParameters parameters, string username);
+    /// <param name="htmlFileName">Planned HTML file name, or null when disabled.</param>
+    /// <param name="pdfFileName">Planned PDF file name, or null when disabled.</param>
+    void RenderRunSettings(ReportParameters parameters, string username, string? htmlFileName, string? pdfFileName);
 
     /// <summary>
     /// Waits for the user to approve starting Bitbucket data collection.
