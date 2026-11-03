@@ -155,10 +155,11 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         ArgumentNullException.ThrowIfNull(reportData);
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
+        var forcedIncludeDates = reportData.Parameters.ForcedIncludeDates;
         var mergeDays = reportData.Reports
             .Where(static report => report.IncludeInMetrics)
             .Where(r => r.MergedOn.HasValue)
-            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays)
+            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.MergedOn!.Value, excludeWeekend, excludedDays, forcedIncludeDates).TotalDays)
             .OrderBy(days => days)
             .ToList();
 
@@ -314,12 +315,13 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
 
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
+        var forcedIncludeDates = reportData.Parameters.ForcedIncludeDates;
 
         var mergeCandidates = metricReports
             .Where(static report => report.MergedOn.HasValue)
             .Select(report => new MetricCandidate(
                 report,
-                WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays))
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays, forcedIncludeDates).TotalDays))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
@@ -327,7 +329,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .Where(static report => report.FirstReactionOn.HasValue)
             .Select(report => new MetricCandidate(
                 report,
-                WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays))
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays, forcedIncludeDates).TotalDays))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 

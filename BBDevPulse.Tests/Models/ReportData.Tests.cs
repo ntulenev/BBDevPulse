@@ -35,6 +35,21 @@ public sealed class ReportDataTests
         statistics.P75Days.Should().Be(0);
     }
 
+    [Fact(DisplayName = "TTFR statistics count a forced included Saturday")]
+    public void GetTtfrStatisticsCountsForcedIncludedSaturday()
+    {
+        var data = new ReportData(CreateReportParameters(
+            excludeWeekend: true,
+            forcedIncludeDates: [new DateOnly(2026, 11, 7)]));
+        var created = new DateTimeOffset(2026, 11, 7, 9, 0, 0, TimeSpan.Zero);
+        data.Reports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
+
+        var statistics = data.GetTtfrStatistics(new StatisticsCalculator());
+
+        statistics.Count.Should().Be(1);
+        statistics.MedianDays.Should().BeApproximately(15d / 24, 0.000001);
+    }
+
     [Fact(DisplayName = "Constructor throws when parameters are null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenParametersAreNullThrowsArgumentNullException()
@@ -319,7 +334,10 @@ public sealed class ReportDataTests
             firstReactionOn: firstReactionOn);
     }
 
-    private static ReportParameters CreateReportParameters(string? teamFilter = null)
+    private static ReportParameters CreateReportParameters(
+        string? teamFilter = null,
+        bool excludeWeekend = false,
+        IReadOnlyList<DateOnly>? forcedIncludeDates = null)
     {
         return new ReportParameters(
             filterDate: new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero),
@@ -329,6 +347,8 @@ public sealed class ReportDataTests
             repoSearchMode: RepoSearchMode.FilterFromTheList,
             prTimeFilterMode: PrTimeFilterMode.CreatedOnOnly,
             branchNameList: [],
-            teamFilter: teamFilter);
+            excludeWeekend: excludeWeekend,
+            teamFilter: teamFilter,
+            forcedIncludeDates: forcedIncludeDates);
     }
 }

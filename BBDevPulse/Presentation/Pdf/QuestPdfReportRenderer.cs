@@ -66,6 +66,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         var dateWindowLabel = reportData.Parameters.GetDateWindowLabel();
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
+        var forcedIncludeDates = reportData.Parameters.ForcedIncludeDates;
         var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var workspace = reportData.Parameters.Workspace.Value;
 
@@ -112,13 +113,14 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         workspace,
                         excludeWeekend,
                         excludedDays,
+                        forcedIncludeDates,
                         pullRequestSizeMode);
                     ComposeDurationSection(
                         column,
                         "Merge Time Stats",
                         metricReports
                             .Where(static report => report.MergedOn.HasValue)
-                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays)
+                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays, forcedIncludeDates).TotalDays)
                             .OrderBy(static days => days)
                             .ToList(),
                         "Best Merge Time",
@@ -169,6 +171,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         workspace,
                         excludeWeekend,
                         excludedDays,
+                        forcedIncludeDates,
                         pullRequestSizeMode);
                     ComposeDeveloperSection(column, reportData);
                     if (reportData.Parameters.ShowAllDetailsForDevelopers)
@@ -199,6 +202,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         string workspace,
         bool excludeWeekend,
         IReadOnlySet<DateOnly> excludedDays,
+        IReadOnlySet<DateOnly> forcedIncludeDates,
         PullRequestSizeMode pullRequestSizeMode)
     {
         _ = column.Item().Text("Pull Requests").Bold().FontSize(12);
@@ -254,15 +258,15 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 var repositoryUrl = BuildRepositoryUrl(workspace, report.RepositorySlug);
                 var pullRequestUrl = BuildPullRequestUrl(workspace, report.RepositorySlug, report.Id.Value);
                 var timeToMerge = report.MergedOn.HasValue
-                    ? FormatDuration(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays)
+                    ? FormatDuration(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays, forcedIncludeDates)
                     : "-";
                 var prAge = report.State == PullRequestState.Open
-                    ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend, excludedDays)
+                    ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend, excludedDays, forcedIncludeDates)
                         .TotalDays
                         .ToString("0.0", CultureInfo.InvariantCulture)
                     : "-";
                 var ttfr = report.FirstReactionOn.HasValue
-                    ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
+                    ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays, forcedIncludeDates)
                     : "-";
                 var size = FormatPullRequestSize(report, pullRequestSizeMode);
                 var created = report.CreatedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -524,6 +528,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         string workspace,
         bool excludeWeekend,
         IReadOnlySet<DateOnly> excludedDays,
+        IReadOnlySet<DateOnly> forcedIncludeDates,
         PullRequestSizeMode pullRequestSizeMode)
     {
         _ = column.Item().Text("Worst PRs by Metric").Bold().FontSize(12);
@@ -533,7 +538,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             return;
         }
 
-        var selections = BuildWorstMetricSelections(reports, excludeWeekend, excludedDays, pullRequestSizeMode);
+        var selections = BuildWorstMetricSelections(reports, excludeWeekend, excludedDays, pullRequestSizeMode, forcedIncludeDates);
         column.Item().Table(table =>
         {
             table.ColumnsDefinition(columns =>
@@ -698,13 +703,14 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         List<PullRequestReport> reports,
         bool excludeWeekend,
         IReadOnlySet<DateOnly> excludedDays,
-        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines)
+        PullRequestSizeMode pullRequestSizeMode = PullRequestSizeMode.Lines,
+        IReadOnlySet<DateOnly>? forcedIncludeDates = null)
     {
         var mergeCandidates = reports
             .Where(static report => report.MergedOn.HasValue)
             .Select(report => new MetricCandidate(
                 report,
-                WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays))
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays, forcedIncludeDates).TotalDays))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
@@ -712,7 +718,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .Where(static report => report.FirstReactionOn.HasValue)
             .Select(report => new MetricCandidate(
                 report,
-                WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays))
+                WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays, forcedIncludeDates).TotalDays))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
 
@@ -787,9 +793,10 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         DateTimeOffset start,
         DateTimeOffset end,
         bool excludeWeekend,
-        IReadOnlySet<DateOnly> excludedDays)
+        IReadOnlySet<DateOnly> excludedDays,
+        IReadOnlySet<DateOnly> forcedIncludeDates)
     {
-        var duration = WorkDurationCalculator.Calculate(start, end, excludeWeekend, excludedDays);
+        var duration = WorkDurationCalculator.Calculate(start, end, excludeWeekend, excludedDays, forcedIncludeDates);
         return _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.Add(duration));
     }
 

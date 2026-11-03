@@ -32,6 +32,7 @@ public sealed class BitbucketOptionsTests
             PullRequestSizeMode = PullRequestSizeMode.Files,
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026", "2026-02-04", " ", "", "03.02.2026"],
+            ForcedIncludeDates = ["07.11.2026", "2026-11-07", " "],
             ShowDeveloperUuidInStats = true,
             ShowAllDetailsForDevelopers = true,
             Pdf = new PdfOptions { Enabled = false, OutputPath = "report.pdf" }
@@ -56,6 +57,7 @@ public sealed class BitbucketOptionsTests
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 3));
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 4));
         parameters.ExcludedDays.Should().HaveCount(2);
+        parameters.ForcedIncludeDates.Should().ContainSingle().Which.Should().Be(new DateOnly(2026, 11, 7));
         parameters.TeamFilter.Should().Be("Core Team");
         parameters.ShowDeveloperUuidInStats.Should().BeTrue();
         parameters.ShowAllDetailsForDevelopers.Should().BeTrue();

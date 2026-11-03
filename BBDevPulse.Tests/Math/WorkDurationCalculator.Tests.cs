@@ -95,4 +95,19 @@ public sealed class WorkDurationCalculatorTests
         // Assert
         duration.Should().Be(TimeSpan.FromHours(24));
     }
+
+    [Fact(DisplayName = "Forced include date counts a Saturday despite both exclusion rules")]
+    [Trait("Category", "Unit")]
+    public void CalculateWhenSaturdayForcedIncludedCountsOnlyThatWeekendDay()
+    {
+        var start = new DateTimeOffset(2026, 11, 6, 0, 0, 0, TimeSpan.Zero); // Friday
+        var end = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero); // Monday
+        IReadOnlySet<DateOnly> excludedDays = new HashSet<DateOnly> { new(2026, 11, 7) };
+        IReadOnlySet<DateOnly> forcedIncludeDates = new HashSet<DateOnly> { new(2026, 11, 7) };
+
+        var duration = BBDevPulse.Math.WorkDurationCalculator.Calculate(
+            start, end, excludeWeekend: true, excludedDays, forcedIncludeDates);
+
+        duration.Should().Be(TimeSpan.FromDays(2));
+    }
 }

@@ -120,6 +120,11 @@ public sealed class BitbucketOptions
     public IReadOnlyList<string>? ExcludedDays { get; init; }
 
     /// <summary>
+    /// Optional dates that count as working days even when weekends or excluded days would remove them.
+    /// </summary>
+    public IReadOnlyList<string>? ForcedIncludeDates { get; init; }
+
+    /// <summary>
     /// Optional path to a CSV file with people metadata (Name;Grade;Department).
     /// </summary>
     public string? PeopleCsvPath { get; init; }
@@ -173,6 +178,12 @@ public sealed class BitbucketOptions
                 .Where(static day => !string.IsNullOrWhiteSpace(day))
                 .Select(static day => ParseExcludedDay(day.Trim()))
                 .Distinct()];
+        DateOnly[] forcedIncludeDates = ForcedIncludeDates is null
+            ? []
+            : [.. ForcedIncludeDates
+                .Where(static day => !string.IsNullOrWhiteSpace(day))
+                .Select(static day => ParseExcludedDay(day.Trim(), "forced include date"))
+                .Distinct()];
 
         return new Models.ReportParameters(
             filterDate,
@@ -188,7 +199,8 @@ public sealed class BitbucketOptions
             teamFilter,
             ShowDeveloperUuidInStats,
             ShowAllDetailsForDevelopers,
-            toDateExclusive);
+            toDateExclusive,
+            forcedIncludeDates: forcedIncludeDates);
     }
 
     private (DateTimeOffset FilterDate, DateTimeOffset? ToDateExclusive) ResolveDateRange()
@@ -220,7 +232,7 @@ public sealed class BitbucketOptions
         return (DateTimeOffset.UtcNow.AddDays(-Days.Value), null);
     }
 
-    private static DateOnly ParseExcludedDay(string value)
+    private static DateOnly ParseExcludedDay(string value, string label = "excluded day")
     {
         if (DateOnly.TryParseExact(value, "dd.MM.yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
         {
@@ -232,6 +244,6 @@ public sealed class BitbucketOptions
             return day;
         }
 
-        throw new FormatException($"Invalid excluded day '{value}'. Expected dd.MM.yyyy or yyyy-MM-dd.");
+        throw new FormatException($"Invalid {label} '{value}'. Expected dd.MM.yyyy or yyyy-MM-dd.");
     }
 }

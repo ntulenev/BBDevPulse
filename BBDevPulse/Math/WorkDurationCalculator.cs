@@ -12,12 +12,14 @@ internal static class WorkDurationCalculator
     /// <param name="end">End timestamp.</param>
     /// <param name="excludeWeekend">Whether to exclude Saturday and Sunday.</param>
     /// <param name="excludedDays">Optional days that should be excluded fully.</param>
+    /// <param name="forcedIncludeDates">Dates that count as working days even when otherwise excluded.</param>
     /// <returns>Calculated duration.</returns>
     public static TimeSpan Calculate(
         DateTimeOffset start,
         DateTimeOffset end,
         bool excludeWeekend,
-        IReadOnlySet<DateOnly>? excludedDays = null)
+        IReadOnlySet<DateOnly>? excludedDays = null,
+        IReadOnlySet<DateOnly>? forcedIncludeDates = null)
     {
         if (end <= start)
         {
@@ -38,9 +40,10 @@ internal static class WorkDurationCalculator
             var nextDay = new DateTimeOffset(cursor.Date.AddDays(1), cursor.Offset);
             var segmentEnd = end < nextDay ? end : nextDay;
 
+            var date = DateOnly.FromDateTime(cursor.Date);
             var isWeekend = cursor.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
-            var isExcluded = hasExcludedDays && excludedDays!.Contains(DateOnly.FromDateTime(cursor.Date));
-            if ((!excludeWeekend || !isWeekend) && !isExcluded)
+            var isExcluded = hasExcludedDays && excludedDays!.Contains(date);
+            if (forcedIncludeDates?.Contains(date) == true || ((!excludeWeekend || !isWeekend) && !isExcluded))
             {
                 total += segmentEnd - cursor;
             }
