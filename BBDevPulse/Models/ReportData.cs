@@ -17,12 +17,13 @@ public sealed class ReportData
     /// <summary>Records a Bitbucket identity before developer statistics can merge it with another identity.</summary>
     public void ObserveDeveloperIdentity(DeveloperIdentity identity)
     {
+        ArgumentNullException.ThrowIfNull(identity.DisplayName);
         if (identity.Uuid is null || string.IsNullOrWhiteSpace(identity.DisplayName.Value))
         {
             return;
         }
 
-        lock (this)
+        lock (_identityLock)
         {
             if (!_observedIdentities.TryGetValue(identity.DisplayName.Value, out var uuids))
             {
@@ -36,7 +37,7 @@ public sealed class ReportData
     /// <summary>Returns names observed with more than one distinct UUID.</summary>
     public IReadOnlyList<(string Name, IReadOnlyList<string> Uuids)> GetIdentityCollisions()
     {
-        lock (this)
+        lock (_identityLock)
         {
             return _observedIdentities.Where(static entry => entry.Value.Count > 1)
                 .OrderBy(static entry => entry.Key, StringComparer.OrdinalIgnoreCase)
@@ -75,24 +76,16 @@ public sealed class ReportData
     public TtfrStatistics GetTtfrStatistics(IStatisticsCalculator calculator)
     {
         ArgumentNullException.ThrowIfNull(calculator);
-        if (_ttfrStatistics is not null)
-        {
-            return _ttfrStatistics;
-        }
-
         var days = Reports
             .Where(static report => report.IncludeInMetrics && report.FirstReactionOn.HasValue)
             .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value,
                 Parameters.ExcludeWeekend, Parameters.ExcludedDays, Parameters.ForcedIncludeDates).TotalDays)
             .OrderBy(static value => value)
             .ToArray();
-        _ttfrStatistics = days.Length == 0
+        return days.Length == 0
             ? new TtfrStatistics(days, 0, 0)
             : new TtfrStatistics(days, calculator.Percentile(days, 50), calculator.Percentile(days, 75));
-        return _ttfrStatistics;
     }
-
-    private TtfrStatistics? _ttfrStatistics;
 
     /// <summary>
     /// Gets the developer statistics keyed by identity.
@@ -144,6 +137,7 @@ public sealed class ReportData
 
     public bool IsDeveloperIncluded(DeveloperIdentity identity)
     {
+        ArgumentNullException.ThrowIfNull(identity.DisplayName);
         if (!Parameters.HasTeamFilter)
         {
             return true;
@@ -161,6 +155,7 @@ public sealed class ReportData
 
     public DeveloperStats GetOrAddDeveloper(DeveloperIdentity identity)
     {
+        ArgumentNullException.ThrowIfNull(identity.DisplayName);
         ObserveDeveloperIdentity(identity);
         var key = DeveloperKey.FromIdentity(identity);
         if (DeveloperStats.TryGetValue(key, out var existing))
@@ -201,4 +196,5 @@ public sealed class ReportData
     }
 
     private readonly Dictionary<string, PersonCsvRow> _peopleByDisplayName;
+    private readonly object _identityLock = new();
 }
