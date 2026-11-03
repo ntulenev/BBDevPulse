@@ -27,7 +27,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Developer display name.
     /// </summary>
-    public DisplayName DisplayName { get; set; }
+    public DisplayName DisplayName { get; set => field = value ?? throw new ArgumentNullException(nameof(value)); }
 
     /// <summary>
     /// Developer grade from CSV enrichment.
@@ -47,32 +47,80 @@ public sealed class DeveloperStats
     /// <summary>
     /// Pull requests opened since the filter date.
     /// </summary>
-    public int PrsOpenedSince { get; set; }
+    public int PrsOpenedSince
+    {
+        get;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Pull requests merged after the filter date.
     /// </summary>
-    public int PrsMergedAfter { get; set; }
+    public int PrsMergedAfter
+    {
+        get;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Comments added after the filter date.
     /// </summary>
-    public int CommentsAfter { get; set; }
+    public int CommentsAfter
+    {
+        get;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Comments added after the filter date on pull requests authored by other developers.
     /// </summary>
-    public int PeerCommentsAfter { get; set; }
+    public int PeerCommentsAfter
+    {
+        get;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Approvals added after the filter date.
     /// </summary>
-    public int ApprovalsAfter { get; set; }
+    public int ApprovalsAfter
+    {
+        get;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Corrections count across pull requests opened by the developer.
     /// </summary>
-    public int Corrections { get; set; }
+    public int Corrections
+    {
+        get;
+        set
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(value);
+            field = value;
+        }
+    }
 
     /// <summary>
     /// Whether correction counts were available for every authored pull request.

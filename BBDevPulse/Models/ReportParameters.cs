@@ -53,6 +53,31 @@ public sealed class ReportParameters
             throw new ArgumentOutOfRangeException(nameof(toDateExclusive));
         }
 
+        if (!Enum.IsDefined(repoSearchMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(repoSearchMode));
+        }
+
+        if (!Enum.IsDefined(prTimeFilterMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(prTimeFilterMode));
+        }
+
+        if (!Enum.IsDefined(pullRequestSizeMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(pullRequestSizeMode));
+        }
+
+        if (repoNameList.Any(static name => name is null))
+        {
+            throw new ArgumentException("Repository filter contains a null name.", nameof(repoNameList));
+        }
+
+        if (branchNameList.Any(static name => name is null))
+        {
+            throw new ArgumentException("Branch filter contains a null name.", nameof(branchNameList));
+        }
+
         FilterDate = filterDate;
         Workspace = workspace;
         RepoNameFilter = repoNameFilter;
