@@ -38,20 +38,19 @@ public sealed class PeopleCsvProviderTests
         result.Should().BeEmpty();
     }
 
-    [Fact(DisplayName = "GetPeopleByDisplayName throws when configured CSV file does not exist")]
+    [Fact(DisplayName = "GetPeopleByDisplayName returns no people when configured CSV file does not exist")]
     [Trait("Category", "Unit")]
-    public async Task GetPeopleByDisplayNameAsyncWhenFileDoesNotExistThrowsFileNotFoundException()
+    public async Task GetPeopleByDisplayNameAsyncWhenFileDoesNotExistReturnsEmptyDictionary()
     {
         // Arrange
         var missingPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "people.csv");
         var sut = new PeopleCsvProvider(Options.Create(CreateOptions(peopleCsvPath: missingPath)));
 
         // Act
-        Func<Task> act = () => sut.GetPeopleByDisplayNameAsync();
+        var result = await sut.GetPeopleByDisplayNameAsync();
 
         // Assert
-        (await act.Should().ThrowAsync<FileNotFoundException>())
-            .WithMessage($"People CSV file '{missingPath}' was not found.");
+        result.Should().BeEmpty();
     }
 
     [Fact(DisplayName = "GetPeopleByDisplayName parses CSV rows and matches keys by display name value")]

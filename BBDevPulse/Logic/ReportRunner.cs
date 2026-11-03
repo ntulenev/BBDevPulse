@@ -48,15 +48,25 @@ internal sealed class ReportRunner : IReportRunner
         _pdfReportRenderer = pdfReportRenderer;
         _peopleCsvProvider = peopleCsvProvider;
         _telemetryService = telemetryService;
-        _parameters = options.Value.CreateReportParameters();
+        _options = options.Value;
     }
 
     /// <inheritdoc />
     public async Task RunAsync(CancellationToken cancellationToken)
     {
+        var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
+        var teams = peopleByName.Values
+            .Select(static person => person.Department.Trim())
+            .Where(static team => !string.IsNullOrWhiteSpace(team) &&
+                !string.Equals(team, DeveloperStats.NOT_AVAILABLE, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static team => team, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams);
+        var parameters = _options.CreateReportParameters(teamFilter);
         await BuildAuthAsync(cancellationToken).ConfigureAwait(false);
-        var filteredRepos = await BuildRepositoriesAsync(cancellationToken).ConfigureAwait(false);
-        await BuildReportsAsync(filteredRepos, cancellationToken).ConfigureAwait(false);
+        var filteredRepos = await BuildRepositoriesAsync(parameters, cancellationToken).ConfigureAwait(false);
+        await BuildReportsAsync(filteredRepos, parameters, peopleByName, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task BuildAuthAsync(CancellationToken cancellationToken)
@@ -66,25 +76,25 @@ internal sealed class ReportRunner : IReportRunner
               .ConfigureAwait(false);
     }
 
-    private async Task<List<Repository>> BuildRepositoriesAsync(CancellationToken cancellationToken)
+    private async Task<List<Repository>> BuildRepositoriesAsync(ReportParameters parameters, CancellationToken cancellationToken)
     {
         var repositories = await _presenter.FetchRepositoriesAsync(
-        (onPage, token) => _client.GetRepositoriesAsync(_parameters.Workspace, onPage, token),
+        (onPage, token) => _client.GetRepositoriesAsync(parameters.Workspace, onPage, token),
         cancellationToken)
         .ConfigureAwait(false);
         var filteredRepos = repositories
-            .Where(repo => repo.MatchesFilter(_parameters)).ToList();
+            .Where(repo => repo.MatchesFilter(parameters)).ToList();
         _presenter.RenderRepositoryTable(
            filteredRepos,
-           _parameters);
-        _presenter.RenderBranchFilterInfo(_parameters);
+           parameters);
+        _presenter.RenderBranchFilterInfo(parameters);
         return filteredRepos;
     }
 
-    private async Task BuildReportsAsync(List<Repository> filteredRepos, CancellationToken cancellationToken)
+    private async Task BuildReportsAsync(List<Repository> filteredRepos, ReportParameters parameters,
+        Dictionary<DisplayName, PersonCsvRow> peopleByName, CancellationToken cancellationToken)
     {
-        var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
-        var reportData = new ReportData(_parameters, peopleByName);
+        var reportData = new ReportData(parameters, peopleByName);
         await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
         {
             await _analyzer.AnalyzeAsync(
@@ -132,5 +142,5 @@ internal sealed class ReportRunner : IReportRunner
     private readonly IPdfReportRenderer _pdfReportRenderer;
     private readonly IPeopleCsvProvider _peopleCsvProvider;
     private readonly IBitbucketTelemetryService _telemetryService;
-    private readonly ReportParameters _parameters;
+    private readonly BitbucketOptions _options;
 }

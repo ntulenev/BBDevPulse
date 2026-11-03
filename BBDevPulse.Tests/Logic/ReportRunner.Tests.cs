@@ -522,6 +522,9 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
+                teams.Count == 1 && teams[0] == "Core Platform")))
+            .Returns((string?)null);
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
@@ -610,7 +613,7 @@ public sealed class ReportRunnerTests
     public async Task RunAsyncWhenTeamFilterConfiguredMakesPeopleAvailableDuringAnalysis()
     {
         // Arrange
-        var options = CreateOptions(repoNameList: ["RepoA"], peopleCsvPath: "people.csv", teamFilter: "Core");
+        var options = CreateOptions(repoNameList: ["RepoA"], peopleCsvPath: "people.csv");
         var repository = new Repository(new RepoName("RepoA"), new RepoSlug("repo-a"));
         var peopleLoadedBeforeAnalyze = false;
 
@@ -637,6 +640,9 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
+                teams.Count == 2 && teams[0] == "Core" && teams[1] == "Other")))
+            .Returns("Core");
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
@@ -689,7 +695,9 @@ public sealed class ReportRunnerTests
         peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>
             {
-                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core")
+                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core"),
+                [new DisplayName("Bob")] = new PersonCsvRow("Senior", "core"),
+                [new DisplayName("Carol")] = new PersonCsvRow("Senior", "Other")
             });
 
         var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict);
@@ -715,8 +723,7 @@ public sealed class ReportRunnerTests
 
     private static BitbucketOptions CreateOptions(
         IReadOnlyList<string>? repoNameList = null,
-        string? peopleCsvPath = null,
-        string? teamFilter = null)
+        string? peopleCsvPath = null)
     {
         return new BitbucketOptions
         {
@@ -731,7 +738,6 @@ public sealed class ReportRunnerTests
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly,
             PeopleCsvPath = peopleCsvPath,
-            TeamFilter = teamFilter,
             Html = new HtmlOptions(),
             Pdf = new PdfOptions()
         };

@@ -120,11 +120,6 @@ public sealed class BitbucketOptions
     public string? PeopleCsvPath { get; init; }
 
     /// <summary>
-    /// Optional team name filter resolved from the people CSV.
-    /// </summary>
-    public string? TeamFilter { get; init; }
-
-    /// <summary>
     /// Whether to show Bitbucket UUIDs in developer stats.
     /// </summary>
     public bool ShowDeveloperUuidInStats { get; init; }
@@ -152,7 +147,9 @@ public sealed class BitbucketOptions
     /// <summary>
     /// Builds report parameters from the current options.
     /// </summary>
-    public Models.ReportParameters CreateReportParameters()
+    /// <param name="teamFilter">Team selected from the people CSV.</param>
+    /// <returns>Parameters for the report.</returns>
+    public Models.ReportParameters CreateReportParameters(string? teamFilter = null)
     {
         var (filterDate, toDateExclusive) = ResolveDateRange();
         var workspace = new Models.Workspace(Workspace);
@@ -183,7 +180,7 @@ public sealed class BitbucketOptions
             ExcludeWeekend,
             excludedDays,
             PullRequestSizeMode,
-            TeamFilter,
+            teamFilter,
             ShowDeveloperUuidInStats,
             ShowAllDetailsForDevelopers,
             toDateExclusive);

@@ -38,13 +38,30 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
 
         if (!File.Exists(_peopleCsvPath))
         {
-            throw new FileNotFoundException($"People CSV file '{_peopleCsvPath}' was not found.", _peopleCsvPath);
+            return new(DisplayNameValueComparer.Instance);
         }
 
+        try
+        {
+            return await ReadPeopleAsync(_peopleCsvPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            return new(DisplayNameValueComparer.Instance);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new(DisplayNameValueComparer.Instance);
+        }
+    }
+
+    private static async Task<Dictionary<DisplayName, PersonCsvRow>> ReadPeopleAsync(
+        string path, CancellationToken cancellationToken)
+    {
         var peopleByName = new Dictionary<DisplayName, PersonCsvRow>(DisplayNameValueComparer.Instance);
         var lineNumber = 0;
         await using var stream = new FileStream(
-            _peopleCsvPath,
+            path,
             FileMode.Open,
             FileAccess.Read,
             FileShare.Read,
