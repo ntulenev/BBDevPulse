@@ -55,7 +55,9 @@ The startup warning highlights that `ShowAllDetailsForDevelopers = true` can sub
 
 - `SearchByFilter` selects repositories whose name or slug contains `RepoNameFilter`; `FilterFromTheList` matches names or slugs exactly against `RepoNameList`. Both comparisons ignore case. An empty filter or list includes all repositories.
 - `BranchNameList` limits PRs by destination branch, ignoring case. An empty list accepts every target branch.
-- `LastKnownUpdateAndCreated` includes older PRs that have recent updates; `CreatedOnOnly` stops at PRs created before the start date. These modes control how PR pages are read.
+- `LastKnownUpdateAndCreated` uses the PR's Bitbucket `updated_on` field as **LastKnownUpdate**. It selects PRs created or last updated on or after the start of the period. If neither date falls on or after the start, the PR is excluded. Bitbucket does not document exactly which actions update this field, so minor activity such as comments may not be reflected. With an end date, PRs created after it are excluded, but `updated_on` can be later. Repository and destination-branch filters also apply. See [Bitbucket's pull request properties](https://support.atlassian.com/bitbucket-cloud/docs/event-payloads/).
+- After this initial selection, a PR created before the period is included only if its activity contains an event with a recognized date inside the period. The event can be a comment, approval, PR update, or another activity whose date the application recognizes; it does not have to be a code change. Commits are loaded only after this check and do not independently qualify a PR. `CreatedOnOnly` instead limits the initial selection to PRs created on or after the start date.
+- Comment and approval statistics include only events within the report period on PRs that pass these selection rules and, when applicable, the team filter. Comments on other PRs are not counted, even if a team member wrote them during the period. The activity reader currently stops at the first event dated before the period; if Bitbucket returns later in-period events after it, those events can also be missed, and an older PR may be excluded altogether. Existing cached activity can preserve an incomplete result.
 - With a selected team, the PR table includes PRs authored by team members and external-author PRs on which team members were active. External-author rows are marked in orange in the console and PDF. Only team-authored PRs contribute to PR metrics; review activity on external PRs still contributes to the selected developers' statistics.
 
 The optional people CSV has this format:
@@ -86,7 +88,14 @@ PDF report:
 
 The console, HTML, and PDF show PR and developer tables, PR throughput, merge time, time to first reaction (TTFR), comments, peer comments, corrections, PR size, and worst PRs by metric. When enabled, developer detail sections include authored PRs, comments, approvals, and follow-up commits. HTML detailed tables support sorting and filtering; summary statistic tables are static.
 
-`Comments` on a PR is its total comment count. `Peer Comments` counts a developer's comments on other people's PRs; self-comments and comments on PRs with an unknown author do not count as peer comments. Duration metrics exclude weekends and explicit `ExcludedDays` only when configured. `ForcedIncludeDates` overrides both rules for working weekends or rescheduled holidays. PRs and activity on excluded dates remain eligible for the report.
+Historical reports are not snapshots of Bitbucket at the end of the selected period. Some fields use the data available when the report is generated and may differ from their historical values:
+
+- **PR state:** a PR that was open at the end of the period may now be shown as merged or declined. Rejection dates and counts also depend on the current state and available timestamps.
+- **PR size:** the diff and size tier use the available source and destination revisions, which may have changed after the period. Size statistics and biggest-PR rankings can therefore differ from their historical values.
+- **Corrections:** the count uses the currently available PR commit list, filtered by commit date. Rewritten history can change the result for a past period.
+- **Author, target branch and repository name:** these use the values available when generating the report and may have changed since the selected period. Current target-branch and team filters can consequently change which PRs are included.
+
+`Comments` on a PR counts its recognized comments within the report period, subject to the selection and activity-reading limits above. `Peer Comments` counts a developer's comments on other people's selected PRs; self-comments and comments on PRs with an unknown author do not count as peer comments. Duration metrics exclude weekends and explicit `ExcludedDays` only when configured. `ForcedIncludeDates` overrides both rules for working weekends or rescheduled holidays. PRs and activity on excluded dates remain eligible for the report.
 
 PR size comes from Bitbucket diffstat. `PullRequestSizeMode = Lines` uses added plus removed lines; `Files` uses the count of changed files. The selected measure drives the PR `Size` tier, size statistics, and the biggest-PR selection:
 
