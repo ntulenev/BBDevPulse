@@ -1,262 +1,112 @@
 # BBDevPulse
+
 <img src="BBDevPulse.png" alt="BBDevPulse logo" width="250">
 
-BBDevPulse is a console analytics utility for tracking Bitbucket pull request activity.
-It helps you see PR throughput, review load, merge speed, and per-developer contribution.
+BBDevPulse is a .NET 10 console application that analyzes Bitbucket Cloud pull requests, review activity, and developer contributions. It displays a console report and can save HTML and PDF reports. A built-in demo mode produces the same report from synthetic data without contacting Bitbucket.
 
-## How the service works
-1. Loads configuration from `appsettings.json` (`Bitbucket` section).
-2. Authenticates against Bitbucket Cloud API using basic auth (`Username` + `AppPassword`).
-3. Fetches repositories from the configured workspace with pagination (`PageLength`).
-4. Filters repositories using `RepoSearchMode`:
-   - `SearchByFilter` -> uses `RepoNameFilter` substring match (name or slug).
-   - `FilterFromTheList` -> uses exact matches from `RepoNameList` (name or slug).
-5. Fetches pull requests for each selected repo (open, merged, declined, superseded), sorted by latest updates.
-6. Applies PR time-stop mode (`PrTimeFilterMode`) to stop reading older PR pages earlier.
-7. For each matching pull request, first checks the local file cache for previously downloaded analysis data.
-8. On cache miss, fetches PR activity (comments/approvals/updates), correction commits, and PR diffstat size (added/removed lines), then saves the snapshot to the local cache.
-9. On cache hit, reuses the saved snapshot and skips repeated Bitbucket requests for already analyzed PRs.
-10. Applies the configured report window:
-   - `Days` for a rolling lookback from now, or
-   - `FromDate` + `ToDate` for an explicit inclusive date range.
-11. Renders output tables:
-   - Repositories included in analysis
-   - Pull request report (includes `Size` T-shirt metric)
-   - Merge-time statistics (best/median/75p/longest)
-   - PR size statistics (smallest/biggest/median/75p by selected size mode)
-   - Comments statistics (based on PR-level `Comments` totals)
-   - Peer comments statistics (based on per-developer comments in other people's PRs)
-   - Developer statistics (grade, department, PRs opened, merged, comments, peer comments, approvals, corrections)
-   - Optional developer detail sections when `ShowAllDetailsForDevelopers = true`:
-     - Authored PRs
-     - Comments
-     - Approvals
-     - Follow-up commits
-   - Worst PRs by metric (longest merge, longest TTFR, most corrections, biggest PR)
-   - Bitbucket telemetry summary:
-     - Real HTTP request count
-     - Analysis cache hits/misses/stores
-     - Estimated avoided requests
-     - Estimated cache efficiency
-     - Request breakdown by normalized Bitbucket API endpoint
-12. Optionally generates an HTML report (`Bitbucket:Html` settings) and a PDF report using QuestPDF (`Bitbucket:Pdf` settings).
-13. HTML report mirrors the PDF structure:
-   - Detailed tables support sorting and filtering (`Pull Requests`, `Worst PRs by Metric`, `Developer Stats`, developer detail tables).
-   - Summary stats tables (`Merge Time Stats`, `TTFR Stats`, `Corrections Stats`, `PR Size Stats`) are rendered as static read-only tables.
+## Quick start: synthetic demo
 
-When a team is selected from the `PeopleCsvPath` departments in the startup menu:
-- All matching repositories and pull requests are still analyzed for activity.
-- PR rows include pull requests whose author belongs to the selected team, plus PRs authored outside the team when the selected team had activity on them.
-- External-author PRs shown because of team activity are highlighted in orange in console/PDF output.
-- PR-based metrics still include only pull requests whose author belongs to the selected team.
-- Developer output includes only developers from the selected team.
-- Team members still get comment/approval activity counted even on PRs authored by people outside the team.
+The committed sample `BBDevPulse/appsettings.json` has `Bitbucket:DemoMode` set to `true`. With the .NET 10 SDK installed, run from the repository root:
 
-## Local cache and telemetry
-BBDevPulse stores pull request analysis snapshots on disk and reuses them on the next run if the PR fingerprint has not changed.
-This reduces repeated Bitbucket API calls for already analyzed pull requests.
-
-- Cache location: `AppContext.BaseDirectory/cache/pull-request-analysis`
-- Cache contents: PR activity, correction commits, PR size summary, and detailed follow-up commit activity
-- Cache cleanup: no automatic eviction is performed; remove old cache files manually when needed
-- Telemetry output: shown in console summary when `Bitbucket:Telemetry:Enabled = true`
-
-## Comments and Peer Comments
-BBDevPulse exposes two different comment-related metrics:
-
-- `Comments`: total PR comment count on a pull request row. This is a PR-level metric and reflects all comments counted for that PR.
-- `Peer Comments`: a developer-level metric that counts only comments made in pull requests authored by other developers.
-
-How `Peer Comments` is calculated:
-
-- The report iterates over comment activities that fall inside the selected date window.
-- A comment is added to the comment author's `Comments` counter.
-- The same comment is added to the author's `Peer Comments` counter only when the PR author is known and the comment author is not the same person as the PR author.
-- Self-comments on your own pull requests are excluded from `Peer Comments`.
-- If the PR author is unknown, the comment is not counted as a peer comment because the report cannot reliably decide whether the PR is foreign.
-
-How `Peer Comments Stats` is calculated:
-
-- Take `Peer Comments` totals for all developers included in the report, including zero values.
-- Sort them ascending.
-- `Min Peer Comments` = minimum developer value.
-- `Max Peer Comments` = maximum developer value.
-- `Median` = 50th percentile across developers.
-- `75P` = 75th percentile across developers.
-
-This makes `Peer Comments` a more honest signal of review participation than raw PR comment totals, because it excludes comments people leave on their own pull requests.
-
-## PR Size calculation
-PR size is based on Bitbucket `diffstat` between pull request source and destination commits.
-The metric used for T-shirt sizing is controlled by `PullRequestSizeMode`.
-
-For each PR:
-- Resolve `source` and `destination` commit hashes from PR details.
-- Request diffstat for commit range:
-  - `repositories/{workspace}/{repo}/diffstat/{workspace}/{repo}:{sourceHash}..{destinationHash}?topic=true`
-- Aggregate values:
-  - `linesAdded` = sum of `lines_added`
-  - `linesRemoved` = sum of `lines_removed`
-  - `lineChurn` = `linesAdded + linesRemoved`
-
-### `PullRequestSizeMode = Lines` (default)
-T-shirt size (`Size`) is derived from `lineChurn`:
-- `XS` -> `<= 100`
-- `S` -> `101..300`
-- `M` -> `301..700`
-- `L` -> `701..1200`
-- `XL` -> `> 1200`
-
-### `PullRequestSizeMode = Files`
-T-shirt size (`Size`) is derived from `filesChanged`:
-- `XS` -> `<= 2`
-- `S` -> `3..5`
-- `M` -> `6..10`
-- `L` -> `11..20`
-- `XL` -> `> 20`
-
-Where size is shown:
-- Pull Requests table: `Size` column in format `Tier (value)` where value is `lineChurn` (Lines mode) or `filesChanged` (Files mode).
-- PR Size Stats section:
-  - `Smallest PR` = minimum value for selected mode
-  - `Biggest PR` = maximum value for selected mode
-  - `Median` = 50th percentile value for selected mode
-  - `75P` = 75th percentile value for selected mode
-- Worst PRs by Metric: `Biggest PR` is the PR with highest value for selected mode (distinct selection from other worst metrics).
-
-If diffstat cannot be read for a PR (API error, missing commit hashes), size is treated as unavailable for that PR and excluded from PR-size aggregates.
-
-## appsettings.json parameters
-All settings are under the `Bitbucket` object.
-
-- `DemoMode` (`bool`): Uses a built-in synthetic report without Bitbucket API requests, credentials, or `PeopleCsvPath`. The committed sample configuration enables it by default.
-- `Days` (`int`): Optional rolling lookback window. Used only when `FromDate` and `ToDate` are not configured.
-- `FromDate` (`string`): Optional inclusive report start date. Supports `dd.MM.yyyy` and `yyyy-MM-dd`.
-- `ToDate` (`string`): Optional inclusive report end date. Supports `dd.MM.yyyy` and `yyyy-MM-dd`.
-- `Workspace` (`string`): Bitbucket workspace slug/name to scan repositories from.
-- `PageLength` (`int`): API page size for repository/PR/activity requests.
-- `PullRequestConcurrency` (`int`): Maximum number of pull requests analyzed in parallel per repository.
-- `RepositoryConcurrency` (`int`): Maximum number of repositories analyzed in parallel.
-- `MaxRetries` (`int`): Maximum number of retries for retryable Bitbucket API requests such as `429 Too Many Requests`.
-- `RetryDelayStepSeconds` (`int`): Base retry backoff step in seconds.
-- `MaxRetryDelaySeconds` (`int`): Maximum retry backoff delay in seconds.
-- `Username` (`string`): Bitbucket account username/email used for authentication.
-- `AppPassword` (`string`): Bitbucket app password used for authentication.
-- `RepoSearchMode` (`string` enum):
-  - `SearchByFilter`
-  - `FilterFromTheList`
-- `PrTimeFilterMode` (`string` enum):
-  - `LastKnownUpdateAndCreated` (default behavior): stop PR paging when both
-    `lastKnownUpdate` and `createdOn` are older than `filterDate`.
-  - `CreatedOnOnly`: stop PR paging when `createdOn` is older than `filterDate`.
-- `PullRequestSizeMode` (`string` enum):
-  - `Lines` (default): PR size metric is `lineChurn = linesAdded + linesRemoved`.
-  - `Files`: PR size metric is number of changed files.
-- `ExcludeWeekend` (`bool`): Excludes Saturdays and Sundays from time-based metrics (TTFR, time-to-merge, open PR age).
-- `ExcludedDays` (`string[]`): Optional explicit holidays/non-working days excluded from time-based metrics.
-  Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
-- `PeopleCsvPath` (`string`): Optional path to a CSV file with developer metadata in format `Name;Grade;Department`.
-  Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
-- Team selection: When `PeopleCsvPath` contains departments, the startup menu shows each team with its member count and an unfiltered option. Selecting a team displays its members and grades in pages of 12 before report collection begins.
-- `ShowDeveloperUuidInStats` (`bool`): Optional flag to include Bitbucket user UUIDs in developer stats output. Default is `false`.
-- `ShowAllDetailsForDevelopers` (`bool`): Optional flag to append detailed per-developer sections after the summary report. When enabled, the report includes authored PRs, comments, approvals, and follow-up commits for each developer. Default is `false`.
-- `Telemetry.Enabled` (`bool`): Enables/disables Bitbucket request telemetry in the console output. Default is `true`.
-- `RepoNameFilter` (`string`): Substring filter used when `RepoSearchMode = SearchByFilter`.
-- `RepoNameList` (`string[]`): Explicit repo names/slugs used when `RepoSearchMode = FilterFromTheList`.
-- `BranchNameList` (`string[]`): Target branch names to include in PR analysis (e.g., `develop`, `master`).
-- `Html.Enabled` (`bool`): Enables/disables HTML generation after console output is rendered.
-- `Html.OutputPath` (`string`): Output file path for the HTML report. A date suffix (`dd_MM_yyyy`) is appended automatically.
-- `Html.OpenInBrowser` (`bool`): Opens the generated HTML report in the default browser after it is saved.
-- `Pdf.Enabled` (`bool`): Enables/disables PDF generation after console output is rendered.
-- `Pdf.OutputPath` (`string`): Output file path for the PDF. A date suffix (`dd_MM_yyyy`) is appended automatically.
-
-## Demo mode
-
-Set `Bitbucket:DemoMode` to `true` and run the application. The demo uses built-in synthetic repositories, PRs, activity, and an embedded people CSV. The same team picker shows synthetic people and grades, and selecting a team filters the report. It does not read Bitbucket credentials or the configured `PeopleCsvPath`, and it does not call the Bitbucket API. The startup screen marks the run as synthetic and asks for confirmation before rendering.
-
-Demo mode creates `bbdevpulse-demo-report_<date>.html` and `bbdevpulse-demo-report_<date>.pdf` in the current directory. A selected team adds its normalized name as a prefix. It ignores the normal HTML/PDF output paths and browser-launch setting so real paths cannot appear in a demo. Both reports are marked as synthetic. Set `DemoMode` to `false` for a live Bitbucket run and supply your local credentials.
-
-## Example configuration
-```json
-{
-  "Bitbucket": {
-    "DemoMode": false,
-    "Days": 30,
-    "FromDate": "",
-    "ToDate": "",
-    "Workspace": "your-workspace",
-    "PageLength": 50,
-    "PullRequestConcurrency": 4,
-    "RepositoryConcurrency": 4,
-    "MaxRetries": 10,
-    "RetryDelayStepSeconds": 2,
-    "MaxRetryDelaySeconds": 30,
-    "Username": "your-email@company.com",
-    "AppPassword": "your-app-password",
-    "RepoSearchMode": "FilterFromTheList",
-    "PrTimeFilterMode": "LastKnownUpdateAndCreated",
-    "PullRequestSizeMode": "Lines",
-    "ExcludeWeekend": false,
-    "ExcludedDays": [
-      "01.01.2026",
-      "2026-01-02"
-    ],
-    "PeopleCsvPath": "people.csv",
-    "ShowDeveloperUuidInStats": false,
-    "ShowAllDetailsForDevelopers": false,
-    "Telemetry": {
-      "Enabled": true
-    },
-    "RepoNameFilter": "ABC.",
-    "RepoNameList": [
-      "Service.A",
-      "Service.B"
-    ],
-    "BranchNameList": [
-      "develop"
-    ],
-    "Html": {
-      "Enabled": true,
-      "OutputPath": "bbdevpulse-report.html",
-      "OpenInBrowser": false
-    },
-    "Pdf": {
-      "Enabled": true,
-      "OutputPath": "bbdevpulse-report.pdf"
-    }
-  }
-}
+```powershell
+dotnet run --project BBDevPulse/BBDevPulse.csproj
 ```
 
-For a fixed monthly report, prefer:
-```json
-{
-  "Bitbucket": {
-    "FromDate": "2026-02-01",
-    "ToDate": "2026-02-28"
-  }
-}
-```
+Choose **Do not apply team filter** or one of the synthetic teams. The menu shows a count for each team; selecting one previews its people and grades before the report settings and confirmation prompt. Confirm to render the report. Demo mode reads an [embedded synthetic people CSV](BBDevPulse/Demo/people.csv), uses synthetic repositories, PRs, and activity, and does not access Bitbucket or the configured `PeopleCsvPath`. Credentials and other live Bitbucket settings are not needed for this mode.
 
-Example `people.csv`:
+Demo mode always writes dated `bbdevpulse-demo-report_*.html` and `bbdevpulse-demo-report_*.pdf` files to the current working directory. Selecting a team adds its normalized name to the beginning of each filename. The configured HTML/PDF paths and `Html.OpenInBrowser` are ignored in demo mode.
+
+### Generated sample reports
+
+These files were generated by running the current demo mode with the unfiltered and **Platform** selections. The names, repositories, activity, and metrics are synthetic. Download the HTML files and open them locally to use their sorting and filtering controls.
+
+| Selection | HTML | PDF |
+| --- | --- | --- |
+| No team filter | [Interactive HTML](examples/demo-all.html) | [PDF](examples/demo-all.pdf) |
+| Platform team | [Interactive HTML](examples/demo-platform.html) | [PDF](examples/demo-platform.pdf) |
+
+## Live Bitbucket run
+
+Set `Bitbucket:DemoMode` to `false` in `BBDevPulse/appsettings.json`, then configure the workspace, `Username`, `AppPassword`, repository and branch selection, and a date window. Keep real credentials and local paths out of commits. Run the same `dotnet run` command shown above.
+
+Before any Bitbucket request, the application:
+
+1. Reads `PeopleCsvPath` if configured and accessible. When it finds departments, it offers a team picker. Choosing a team shows its people and grades in pages of 12.
+2. Shows the effective UTC date window, dates excluded from duration calculations, workspace and Bitbucket user, repository selection rules, merge target branches, PR time and size modes, developer output options, and planned output filenames.
+3. Waits for confirmation before authenticating and loading repositories.
+
+The startup warning highlights that `ShowAllDetailsForDevelopers = true` can substantially increase report generation time. If the people CSV is missing or inaccessible, the run continues without a team picker or team filter.
+
+### Scope and team filtering
+
+- `SearchByFilter` selects repositories whose name or slug contains `RepoNameFilter`; `FilterFromTheList` matches names or slugs exactly against `RepoNameList`. Both comparisons ignore case. An empty filter or list includes all repositories.
+- `BranchNameList` limits PRs by destination branch, ignoring case. An empty list accepts every target branch.
+- `LastKnownUpdateAndCreated` includes older PRs that have recent updates; `CreatedOnOnly` stops at PRs created before the start date. These modes control how PR pages are read.
+- With a selected team, the PR table includes PRs authored by team members and external-author PRs on which team members were active. External-author rows are marked in orange in the console and PDF. Only team-authored PRs contribute to PR metrics; review activity on external PRs still contributes to the selected developers' statistics.
+
+The optional people CSV has this format:
+
 ```text
 Name;Grade;Department
 Alice Doe;Senior;Core
 Bob Smith;Middle;Import
 ```
-## Output
 
->For demonstration purposes, the program output shown in the screenshots uses synthetic data to avoid exposing information from real repositories and users.
+Names must match Bitbucket display names exactly to enrich developer statistics. Departments form the team choices, with duplicate department names grouped without regard to case. A developer without a CSV match retains `N/A` metadata. Without departments, there is no team picker.
 
-### Console
-<img src="Page1.png" alt="BBDevPulse output part 1">
-<img src="Page2.png" alt="BBDevPulse output part 2">
+## Reports and metrics
 
-### PDF
-<img src="Page3.png" alt="BBDevPulse output part 3">
-<img src="Page4.png" alt="BBDevPulse output part 4">
+The console, HTML, and PDF show PR and developer tables, PR throughput, merge time, time to first reaction (TTFR), comments, peer comments, corrections, PR size, and worst PRs by metric. When enabled, developer detail sections include authored PRs, comments, approvals, and follow-up commits. HTML detailed tables support sorting and filtering; summary statistic tables are static.
 
-### HTML
-- Uses the same sections as the PDF report.
-- Detailed tables are interactive in the browser and support sorting/filtering.
-- Summary stats tables are intentionally static.
+`Comments` on a PR is its total comment count. `Peer Comments` counts a developer's comments on other people's PRs; self-comments and comments on PRs with an unknown author do not count as peer comments. Duration metrics exclude weekends and explicit `ExcludedDays` only when configured. PRs and activity on excluded dates remain eligible for the report.
+
+PR size comes from Bitbucket diffstat. `PullRequestSizeMode = Lines` uses added plus removed lines; `Files` uses the count of changed files. The selected measure drives the PR `Size` tier, size statistics, and the biggest-PR selection:
+
+| Tier | Lines changed | Files changed |
+| --- | ---: | ---: |
+| XS | 0–100 | 0–2 |
+| S | 101–300 | 3–5 |
+| M | 301–700 | 6–10 |
+| L | 701–1200 | 11–20 |
+| XL | Over 1200 | Over 20 |
+
+If diffstat is unavailable, that PR has no size value and is omitted from size aggregates. Reports distinguish unavailable correction data from a measured zero.
+
+## Configuration reference
+
+All settings are inside the `Bitbucket` object in `BBDevPulse/appsettings.json`. The committed file is a safe demo example; live settings are local to your installation.
+
+| Setting | Effect |
+| --- | --- |
+| `DemoMode` | `true` uses the built-in synthetic data and fixed demo outputs. |
+| `Days` | Positive rolling lookback from the current UTC time. Used when `FromDate` and `ToDate` are empty. |
+| `FromDate`, `ToDate` | Inclusive UTC calendar-day range; both must be set together. Accept `dd.MM.yyyy` or `yyyy-MM-dd`. |
+| `Workspace` | Bitbucket workspace to search in live mode. |
+| `Username`, `AppPassword` | Bitbucket Cloud Basic authentication credentials for live mode. |
+| `PageLength` | Page size for Bitbucket API requests. |
+| `RepositoryConcurrency`, `PullRequestConcurrency` | Maximum parallel repository and per-repository PR analysis. |
+| `MaxRetries`, `RetryDelayStepSeconds`, `MaxRetryDelaySeconds` | Retry limit and backoff for retryable API requests. |
+| `RepoSearchMode`, `RepoNameFilter`, `RepoNameList` | Repository selection as described above. Modes: `SearchByFilter`, `FilterFromTheList`. |
+| `BranchNameList` | Destination branches included in PR analysis. |
+| `PrTimeFilterMode` | `LastKnownUpdateAndCreated` or `CreatedOnOnly`; controls the PR paging cutoff. |
+| `PullRequestSizeMode` | `Lines` (default) or `Files`; controls size tiers and aggregates. |
+| `ExcludeWeekend`, `ExcludedDays` | Exclude Saturdays/Sundays and specified dates from duration calculations. Dates accept the same formats as `FromDate`. |
+| `PeopleCsvPath` | Optional `Name;Grade;Department` file for live developer metadata and team choices. |
+| `ShowDeveloperUuidInStats` | Show Bitbucket UUIDs beside developers in statistics; default `false`. |
+| `ShowAllDetailsForDevelopers` | Include per-developer PR, comment, approval, and commit details; default `false`. May substantially increase generation time. |
+| `Telemetry.Enabled` | Show live API request and cache telemetry in the console; default `true`. |
+| `Html.Enabled`, `Html.OutputPath`, `Html.OpenInBrowser` | Generate HTML at the specified path and optionally open it. |
+| `Pdf.Enabled`, `Pdf.OutputPath` | Generate PDF at the specified path. |
+
+Live output paths receive a local-date suffix (`dd_MM_yyyy`) before the extension. A selected team adds a normalized team-name prefix. Relative paths resolve from the process's working directory. Disabled formats show as disabled in the startup summary.
+
+### Analysis cache and telemetry
+
+In live mode, BBDevPulse caches PR activity, correction commits, and diffstat snapshots in `AppContext.BaseDirectory/cache/pull-request-analysis`. An unchanged PR can reuse its snapshot on a later run. The cache has no automatic eviction. When telemetry is enabled, the console shows actual HTTP requests, cache hits/misses/stores, estimated avoided requests, and a request breakdown by API endpoint.
+
+## Build and test
+
+```powershell
+dotnet build BBDevPulse.slnx
+dotnet test BBDevPulse.slnx
+```

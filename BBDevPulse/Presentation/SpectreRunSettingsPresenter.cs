@@ -26,7 +26,7 @@ internal static class SpectreRunSettingsPresenter
             ? "[bold deepskyblue1]BBDevPulse  /  Synthetic demo[/]"
             : "[bold deepskyblue1]BBDevPulse  /  Review run[/]").LeftJustified().RuleStyle("grey"));
         AnsiConsole.MarkupLine(demoMode
-            ? "[bold orange1]DEMO MODE[/] [grey]All report data is synthetic. No Bitbucket API or people CSV will be read.[/]"
+            ? "[bold orange1]DEMO MODE[/] [grey]All report data is synthetic. No Bitbucket API or configured people CSV will be read.[/]"
             : "[grey]Check the settings below before loading data from Bitbucket.[/]");
         AnsiConsole.WriteLine();
 
@@ -48,7 +48,7 @@ internal static class SpectreRunSettingsPresenter
             ("Merge targets", parameters.BranchNameList.Count == 0
                 ? "All target branches"
                 : string.Join(", ", parameters.BranchNameList.Select(static branch => branch.Value))),
-            ("Team", parameters.TeamFilter ?? "All teams")
+            ("Team", parameters.TeamFilter ?? "No team filter")
         ]);
         AnsiConsole.WriteLine();
 
