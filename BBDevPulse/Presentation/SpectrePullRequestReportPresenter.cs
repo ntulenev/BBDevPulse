@@ -55,7 +55,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
             .AddColumn("PR ID");
 
         var index = 1;
-        foreach (var report in reportData.Reports)
+        foreach (var report in reportData.Reports.OrderBy(static report => report.CreatedOn))
         {
             var timeToMerge = report.MergedOn.HasValue
                 ? FormatDuration(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays, forcedIncludeDates)
