@@ -80,7 +80,23 @@ using var host = Host.CreateDefaultBuilder(args)
     })
     .Build();
 
-await host.Services
-    .GetRequiredService<IReportRunner>()
-    .RunAsync(CancellationToken.None)
-    .ConfigureAwait(false);
+using var shutdown = new CancellationTokenSource();
+ConsoleCancelEventHandler cancel = (_, eventArgs) =>
+{
+    eventArgs.Cancel = true;
+    shutdown.Cancel();
+};
+Console.CancelKeyPress += cancel;
+try
+{
+    await host.Services.GetRequiredService<IReportRunner>()
+        .RunAsync(shutdown.Token).ConfigureAwait(false);
+}
+catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
+{
+    Environment.ExitCode = 130;
+}
+finally
+{
+    Console.CancelKeyPress -= cancel;
+}

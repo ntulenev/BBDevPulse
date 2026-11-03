@@ -10,6 +10,15 @@ namespace BBDevPulse.API;
 /// </summary>
 internal sealed class PaginatorHelper : IPaginatorHelper
 {
+    public PaginatorHelper(Uri? baseAddress = null)
+    {
+        _baseAddress = baseAddress ?? new Uri("https://api.bitbucket.org/2.0/");
+        if (!_baseAddress.IsAbsoluteUri)
+        {
+            throw new ArgumentException("Pagination base address must be absolute.", nameof(baseAddress));
+        }
+    }
+
     /// <inheritdoc />
     public async IAsyncEnumerable<T> ReadAllAsync<T>(
         Uri firstPage,
@@ -22,10 +31,26 @@ internal sealed class PaginatorHelper : IPaginatorHelper
 
         var next = firstPage;
         var pageIndex = 0;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
 
         while (next is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Uri resolved;
+            try
+            {
+                resolved = new Uri(_baseAddress, next);
+            }
+            catch (UriFormatException exception)
+            {
+                throw new InvalidOperationException("Invalid Bitbucket pagination URI.", exception);
+            }
+
+            if (!visited.Add(resolved.AbsoluteUri))
+            {
+                throw new InvalidOperationException("Bitbucket pagination contains a repeated page.");
+            }
+
             pageIndex++;
             onPage?.Invoke(pageIndex);
 
@@ -42,4 +67,6 @@ internal sealed class PaginatorHelper : IPaginatorHelper
             next = page.NextPage;
         }
     }
+
+    private readonly Uri _baseAddress;
 }

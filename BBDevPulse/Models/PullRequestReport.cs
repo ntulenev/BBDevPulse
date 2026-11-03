@@ -42,7 +42,9 @@ public sealed class PullRequestReport
         int filesChanged = 0,
         int linesAdded = 0,
         int linesRemoved = 0,
-        bool isActivityOnlyMatch = false)
+        bool isActivityOnlyMatch = false,
+        bool? hasSizeData = null,
+        bool hasCorrectionsData = true)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(repositorySlug);
@@ -66,6 +68,8 @@ public sealed class PullRequestReport
         LinesAdded = linesAdded;
         LinesRemoved = linesRemoved;
         IsActivityOnlyMatch = isActivityOnlyMatch;
+        HasSizeData = hasSizeData ?? (filesChanged > 0 || linesAdded > 0 || linesRemoved > 0);
+        HasCorrectionsData = hasCorrectionsData;
     }
 
     /// <summary>
@@ -166,7 +170,9 @@ public sealed class PullRequestReport
     /// <summary>
     /// Indicates whether size data is available for this pull request.
     /// </summary>
-    public bool HasSizeData => FilesChanged > 0 || LinesAdded > 0 || LinesRemoved > 0;
+    public bool HasSizeData { get; }
+
+    public bool HasCorrectionsData { get; }
 
     /// <summary>
     /// Pull request size tier based on churn.
@@ -183,7 +189,7 @@ public sealed class PullRequestReport
         return mode switch
         {
             PullRequestSizeMode.Lines => HasSizeData,
-            PullRequestSizeMode.Files => FilesChanged > 0,
+            PullRequestSizeMode.Files => HasSizeData,
             _ => HasSizeData
         };
     }

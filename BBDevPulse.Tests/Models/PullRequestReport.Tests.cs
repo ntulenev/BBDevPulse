@@ -6,6 +6,17 @@ namespace BBDevPulse.Tests.Models;
 
 public sealed class PullRequestReportTests
 {
+    [Fact]
+    public void SuccessfulZeroSizeIsAvailable()
+    {
+        var created = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var report = new PullRequestReport("Repo", "repo", "Alice", "main", created, created,
+            null, null, PullRequestState.Open, new PullRequestId(1), 0, hasSizeData: true);
+
+        report.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().BeTrue();
+        report.GetSizeMetricValue(PullRequestSizeMode.Lines).Should().Be(0);
+    }
+
     [Fact(DisplayName = "Constructor throws when repository is null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenRepositoryIsNullThrowsArgumentNullException()

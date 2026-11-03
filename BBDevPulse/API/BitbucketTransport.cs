@@ -36,17 +36,23 @@ internal sealed class BitbucketTransport : IBitbucketTransport
     /// <inheritdoc />
     public async Task<T> GetAsync<T>(Uri url, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(url);
+        var requestUri = ResolveRequestUri(url);
         return await _retryPolicyHelper.ExecuteAsync(
             async token =>
             {
-                _telemetryService.TrackRequest(url);
-                using var response = await _httpClient.GetAsync(url, token)
+                _telemetryService.TrackRequest(requestUri);
+                using var response = await _httpClient.GetAsync(requestUri, token)
                     .ConfigureAwait(false);
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                if (response.StatusCode is HttpStatusCode.TooManyRequests or
+                    HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
                 {
                     var body = await response.Content.ReadAsStringAsync(token)
                         .ConfigureAwait(false);
-                    throw new RetryableBitbucketException(response.StatusCode, body);
+                    var retryAfter = response.Headers.TryGetValues("Retry-After", out var values)
+                        ? values.FirstOrDefault()
+                        : null;
+                    throw new RetryableBitbucketException(response.StatusCode, body, retryAfter);
                 }
 
                 if (!response.IsSuccessStatusCode)
@@ -67,6 +73,40 @@ internal sealed class BitbucketTransport : IBitbucketTransport
             },
             static ex => ex is RetryableBitbucketException,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private Uri ResolveRequestUri(Uri url)
+    {
+        var baseAddress = _httpClient.BaseAddress;
+        if (baseAddress is null)
+        {
+            if (!url.IsAbsoluteUri)
+            {
+                throw new InvalidOperationException("Bitbucket API base address is missing.");
+            }
+
+            return url;
+        }
+
+        Uri resolved;
+        try
+        {
+            resolved = new Uri(baseAddress, url);
+        }
+        catch (UriFormatException exception)
+        {
+            throw new InvalidOperationException("Invalid Bitbucket pagination URI.", exception);
+        }
+
+        if (resolved.Scheme != baseAddress.Scheme ||
+            !string.Equals(resolved.Host, baseAddress.Host, StringComparison.OrdinalIgnoreCase) ||
+            resolved.Port != baseAddress.Port ||
+            !string.IsNullOrEmpty(resolved.UserInfo))
+        {
+            throw new InvalidOperationException("Bitbucket pagination URI has a different API origin.");
+        }
+
+        return resolved;
     }
 
     private static readonly JsonSerializerOptions _jsonOptions = new()

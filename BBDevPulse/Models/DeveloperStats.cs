@@ -75,6 +75,11 @@ public sealed class DeveloperStats
     public int Corrections { get; set; }
 
     /// <summary>
+    /// Whether correction counts were available for every authored pull request.
+    /// </summary>
+    public bool HasCompleteCorrectionsData { get; set; } = true;
+
+    /// <summary>
     /// Detailed list of pull requests authored by the developer.
     /// </summary>
     public List<PullRequestReport> AuthoredPullRequests { get; } = [];

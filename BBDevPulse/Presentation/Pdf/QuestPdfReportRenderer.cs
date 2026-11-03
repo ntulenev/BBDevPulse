@@ -120,17 +120,15 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     ComposeDurationSection(
                         column,
                         "TTFR Stats",
-                        metricReports
-                            .Where(static report => report.FirstReactionOn.HasValue)
-                            .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
-                            .OrderBy(static days => days)
-                            .ToList(),
+                        reportData.GetTtfrStatistics(_statisticsCalculator).OrderedDays,
                         "Best TTFR",
-                        "Longest TTFR");
+                        "Longest TTFR",
+                        reportData.GetTtfrStatistics(_statisticsCalculator));
                     ComposeCountSection(
                         column,
                         "Corrections Stats",
                         metricReports
+                            .Where(static report => report.HasCorrectionsData)
                             .Select(static report => (double)report.Corrections)
                             .OrderBy(static value => value)
                             .ToList(),
@@ -279,7 +277,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 AddBodyTextCell(table, prAge, report.IsActivityOnlyMatch);
                 AddBodyTextCell(table, timeToMerge, report.IsActivityOnlyMatch);
                 AddBodyTextCell(table, report.Comments.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
-                AddBodyTextCell(table, report.Corrections.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.IsActivityOnlyMatch);
                 AddBodyTextCell(table, size, report.IsActivityOnlyMatch);
                 AddHyperlinkCell(table, pullRequestUrl, report.Id.Value.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
                 index++;
@@ -303,9 +301,10 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private void ComposeDurationSection(
         ColumnDescriptor column,
         string title,
-        List<double> orderedDays,
+        IReadOnlyList<double> orderedDays,
         string bestLabel,
-        string longestLabel)
+        string longestLabel,
+        TtfrStatistics? statistics = null)
     {
         _ = column.Item().Text(title).Bold().FontSize(12);
         if (orderedDays.Count == 0)
@@ -316,8 +315,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
 
         var best = orderedDays[0];
         var longest = orderedDays[^1];
-        var median = _statisticsCalculator.Percentile(orderedDays, 50);
-        var p75 = _statisticsCalculator.Percentile(orderedDays, 75);
+        var median = statistics?.MedianDays ?? _statisticsCalculator.Percentile(orderedDays, 50);
+        var p75 = statistics?.P75Days ?? _statisticsCalculator.Percentile(orderedDays, 75);
 
         column.Item().Table(table =>
         {
@@ -477,7 +476,9 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
-                _ = table.Cell().Element(BodyCell).Text(stat.Corrections.ToString(CultureInfo.InvariantCulture));
+                var corrections = stat.Corrections.ToString(CultureInfo.InvariantCulture);
+                _ = table.Cell().Element(BodyCell).Text(stat.HasCompleteCorrectionsData
+                    ? corrections : $"{corrections} (partial)");
                 index++;
             }
         });
@@ -710,6 +711,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .ToList();
 
         var correctionCandidates = reports
+            .Where(static report => report.HasCorrectionsData)
             .Select(static report => new MetricCandidate(report, report.Corrections))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
@@ -761,7 +763,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     {
         if (!report.HasSizeDataForMode(sizeMode))
         {
-            return "-";
+            return "Unavailable";
         }
 
         var sizeValue = report.GetSizeMetricValue(sizeMode);
@@ -893,7 +895,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 AddBodyTextCell(table, report.State.ToString(), highlight: false);
                 AddBodyTextCell(table, report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", highlight: false);
                 AddBodyTextCell(table, report.Comments.ToString(CultureInfo.InvariantCulture), highlight: false);
-                AddBodyTextCell(table, report.Corrections.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", highlight: false);
                 AddBodyTextCell(table, FormatPullRequestSize(report, PullRequestSizeMode.Lines), highlight: false);
             }
         });
@@ -1034,7 +1036,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         PullRequestSizeMode pullRequestSizeMode) =>
         activity.HasSizeDataForMode(pullRequestSizeMode)
             ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
-            : "-";
+            : "Unavailable";
 
     private static string TrimCommitMessage(string message) =>
         message

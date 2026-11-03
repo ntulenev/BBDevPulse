@@ -196,7 +196,7 @@ internal sealed class FilePullRequestAnalysisCache : IPullRequestAnalysisCache
         }
     }
 
-    private const int CURRENT_VERSION = 1;
+    private const int CURRENT_VERSION = 2;
 
     private static readonly JsonSerializerOptions _serializerOptions = new()
     {

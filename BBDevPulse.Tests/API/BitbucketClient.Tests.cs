@@ -1311,7 +1311,7 @@ public sealed class BitbucketClientTests
         uriBuilder.VerifyAll();
     }
 
-    [Fact(DisplayName = "GetPullRequestSizeAsync returns empty size when diffstat request fails")]
+    [Fact(DisplayName = "GetPullRequestSizeAsync propagates diffstat request failures")]
     [Trait("Category", "Unit")]
     public async Task GetPullRequestSizeAsyncWhenDiffStatFailsReturnsEmpty()
     {
@@ -1340,14 +1340,14 @@ public sealed class BitbucketClientTests
         var client = CreateClient(transport.Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Act
-        var result = await client.GetPullRequestSizeAsync(
+        Func<Task> act = () => client.GetPullRequestSizeAsync(
             new Workspace("ws"),
             new RepoSlug("repo"),
             new PullRequestId(7),
             cancellationToken);
 
         // Assert
-        result.Should().Be(PullRequestSizeSummary.Empty);
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
     private static BitbucketClient CreateClient(

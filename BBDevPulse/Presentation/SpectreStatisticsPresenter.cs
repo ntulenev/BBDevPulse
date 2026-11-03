@@ -192,14 +192,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     public void RenderTtfrStats(ReportData reportData)
     {
         ArgumentNullException.ThrowIfNull(reportData);
-        var excludeWeekend = reportData.Parameters.ExcludeWeekend;
-        var excludedDays = reportData.Parameters.ExcludedDays;
-        var ttfrDays = reportData.Reports
-            .Where(static report => report.IncludeInMetrics)
-            .Where(r => r.FirstReactionOn.HasValue)
-            .Select(r => WorkDurationCalculator.Calculate(r.CreatedOn, r.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
-            .OrderBy(days => days)
-            .ToList();
+        var statistics = reportData.GetTtfrStatistics(_statisticsCalculator);
+        var ttfrDays = statistics.OrderedDays;
 
         if (ttfrDays.Count == 0)
         {
@@ -208,10 +202,10 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             return;
         }
 
-        var best = ttfrDays.First();
-        var longest = ttfrDays.Last();
-        var median = _statisticsCalculator.Percentile(ttfrDays, 50);
-        var p75 = _statisticsCalculator.Percentile(ttfrDays, 75);
+        var best = ttfrDays[0];
+        var longest = ttfrDays[^1];
+        var median = statistics.MedianDays;
+        var p75 = statistics.P75Days;
 
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -233,6 +227,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         ArgumentNullException.ThrowIfNull(reportData);
         var corrections = reportData.Reports
             .Where(static report => report.IncludeInMetrics)
+            .Where(static report => report.HasCorrectionsData)
             .Select(r => (double)r.Corrections)
             .OrderBy(value => value)
             .ToList();
@@ -337,6 +332,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .ToList();
 
         var correctionCandidates = metricReports
+            .Where(static report => report.HasCorrectionsData)
             .Select(static report => new MetricCandidate(report, report.Corrections))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
@@ -449,7 +445,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             row.Add(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
-            row.Add(stat.Corrections.ToString(CultureInfo.InvariantCulture));
+            var corrections = stat.Corrections.ToString(CultureInfo.InvariantCulture);
+            row.Add(stat.HasCompleteCorrectionsData ? corrections : $"{corrections} (partial)");
             _ = table.AddRow([.. row]);
             index++;
         }
@@ -630,7 +627,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
                 report.State.ToString(),
                 report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-",
                 report.Comments.ToString(CultureInfo.InvariantCulture),
-                report.Corrections.ToString(CultureInfo.InvariantCulture),
+                report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable",
                 report.HasSizeData
                     ? $"{report.GetSizeMetricValue(PullRequestSizeMode.Lines).ToString(CultureInfo.InvariantCulture)} ({report.GetSizeTier(PullRequestSizeMode.Lines)})"
                     : "-");
@@ -741,7 +738,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         PullRequestSizeMode pullRequestSizeMode) =>
         activity.HasSizeDataForMode(pullRequestSizeMode)
             ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
-            : "-";
+            : "Unavailable";
 
     private static string ShortCommitHash(string commitHash) =>
         commitHash.Length <= 12

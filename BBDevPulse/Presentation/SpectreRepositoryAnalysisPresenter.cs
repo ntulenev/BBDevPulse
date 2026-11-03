@@ -1,4 +1,5 @@
 using BBDevPulse.Abstractions;
+using System.Runtime.ExceptionServices;
 using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 
@@ -47,44 +48,74 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                 var inFlight = 0;
                 var uiLock = new object();
                 using var semaphore = new SemaphoreSlim(_maxConcurrentRepositories, _maxConcurrentRepositories);
+                using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 var repositoryTasks = new List<Task>(total);
-
-                foreach (var repository in repositories)
+                Exception? sourceError = null;
+                Exception? handlerError = null;
+                try
                 {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-                    var running = Interlocked.Increment(ref inFlight);
-
-                    lock (uiLock)
+                    foreach (var repository in repositories)
                     {
-                        task.Description =
-                            $"Analyzing {repository.DisplayName} ({Volatile.Read(ref completed)}/{total} complete, {running} active)";
-                    }
+                        await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
+                        var running = Interlocked.Increment(ref inFlight);
 
-                    repositoryTasks.Add(AnalyzeRepositoryAsync());
-
-                    async Task AnalyzeRepositoryAsync()
-                    {
-                        try
+                        lock (uiLock)
                         {
-                            await analyzeRepository(repository, cancellationToken).ConfigureAwait(false);
+                            task.Description =
+                                $"Analyzing {repository.DisplayName} ({Volatile.Read(ref completed)}/{total} complete, {running} active)";
                         }
-                        finally
+
+                        repositoryTasks.Add(AnalyzeRepositoryAsync());
+
+                        async Task AnalyzeRepositoryAsync()
                         {
-                            var finished = Interlocked.Increment(ref completed);
-                            var active = Interlocked.Decrement(ref inFlight);
-
-                            lock (uiLock)
+                            try
                             {
-                                task.Increment(1);
-                                task.Description = $"Analyzing repositories ({finished}/{total} complete, {active} active)";
+                                await analyzeRepository(repository, stop.Token).ConfigureAwait(false);
                             }
+                            catch (Exception exception) when (!stop.IsCancellationRequested)
+                            {
+                                Interlocked.CompareExchange(ref handlerError, exception, null);
+                                stop.Cancel();
+                                throw;
+                            }
+                            finally
+                            {
+                                var finished = Interlocked.Increment(ref completed);
+                                var active = Interlocked.Decrement(ref inFlight);
 
-                            _ = semaphore.Release();
+                                lock (uiLock)
+                                {
+                                    task.Increment(1);
+                                    task.Description = $"Analyzing repositories ({finished}/{total} complete, {active} active)";
+                                }
+
+                                _ = semaphore.Release();
+                            }
                         }
                     }
                 }
-
-                await Task.WhenAll(repositoryTasks).ConfigureAwait(false);
+                catch (Exception exception)
+                {
+                    sourceError = exception is OperationCanceledException &&
+                        !cancellationToken.IsCancellationRequested && handlerError is not null
+                        ? handlerError : exception;
+                    await stop.CancelAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    try
+                    {
+                        await Task.WhenAll(repositoryTasks).ConfigureAwait(false);
+                    }
+                    catch when (sourceError is not null)
+                    {
+                    }
+                }
+                if (sourceError is not null)
+                {
+                    ExceptionDispatchInfo.Capture(sourceError).Throw();
+                }
 
                 lock (uiLock)
                 {

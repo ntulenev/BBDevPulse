@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -56,35 +57,66 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var branchNameList = parameters.BranchNameList;
 
         using var semaphore = new SemaphoreSlim(_maxConcurrentPullRequests, _maxConcurrentPullRequests);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var analysisTasks = new List<Task>();
-
-        await foreach (var pr in _client.GetPullRequestsAsync(
-                           workspace,
-                           repo.Slug,
-                           pullRequest => pullRequest.ShouldStopByTimeFilter(filterDate, prTimeFilterMode),
-                           cancellationToken).ConfigureAwait(false))
+        Exception? sourceError = null;
+        Exception? handlerError = null;
+        try
         {
-            if (!pr.MatchesBranchFilter(branchNameList))
+            await foreach (var pr in _client.GetPullRequestsAsync(
+                workspace,
+                repo.Slug,
+                pullRequest => pullRequest.ShouldStopByTimeFilter(filterDate, prTimeFilterMode),
+                stop.Token).ConfigureAwait(false))
             {
-                continue;
-            }
+                if (!pr.MatchesBranchFilter(branchNameList))
+                {
+                    continue;
+                }
 
-            if (parameters.HasUpperBound &&
-                pr.CreatedOn >= parameters.ToDateExclusive!.Value)
+                if (parameters.HasUpperBound &&
+                    pr.CreatedOn >= parameters.ToDateExclusive!.Value)
+                {
+                    continue;
+                }
+
+                await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
+                analysisTasks.Add(AnalyzePullRequestWithSemaphoreAsync(
+                    repo,
+                    reportData,
+                    pr,
+                    semaphore,
+                    exception =>
+                    {
+                        Interlocked.CompareExchange(ref handlerError, exception, null);
+                        stop.Cancel();
+                    },
+                    stop.Token));
+            }
+        }
+        catch (Exception exception)
+        {
+            sourceError = exception is OperationCanceledException &&
+                !cancellationToken.IsCancellationRequested && handlerError is not null
+                ? handlerError : exception;
+            await stop.CancelAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            try
             {
-                continue;
+                await Task.WhenAll(analysisTasks).ConfigureAwait(false);
             }
-
-            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-            analysisTasks.Add(AnalyzePullRequestWithSemaphoreAsync(
-                repo,
-                reportData,
-                pr,
-                semaphore,
-                cancellationToken));
+            catch when (sourceError is not null)
+            {
+                // Keep the source failure after all active handlers have stopped.
+            }
+        }
+        if (sourceError is not null)
+        {
+            ExceptionDispatchInfo.Capture(sourceError).Throw();
         }
 
-        await Task.WhenAll(analysisTasks).ConfigureAwait(false);
     }
 
     private async Task AnalyzePullRequestWithSemaphoreAsync(
@@ -92,11 +124,17 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         ReportData reportData,
         PullRequest pr,
         SemaphoreSlim semaphore,
+        Action<Exception> onError,
         CancellationToken cancellationToken)
     {
         try
         {
             await AnalyzePullRequestAsync(repo, reportData, pr, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            onError(exception);
+            throw;
         }
         finally
         {
@@ -197,7 +235,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             return;
         }
 
-        if (!snapshot.HasEnrichment)
+        if (!snapshot.HasCommits || !snapshot.HasSize ||
+            (collectDeveloperDetails && snapshot.CommitActivities.Any(static activity => !activity.HasSizeData)))
         {
             snapshot = await EnrichAnalysisSnapshotAsync(
                 snapshot,
@@ -266,7 +305,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 sizeSummary.FilesChanged,
                 sizeSummary.LinesAdded,
                 sizeSummary.LinesRemoved,
-                isActivityOnlyMatch: !includeAuthoredPullRequest)
+                isActivityOnlyMatch: !includeAuthoredPullRequest,
+                hasSizeData: snapshot.HasSize,
+                hasCorrectionsData: snapshot.HasCommits)
             : null;
 
         lock (reportData)
@@ -284,7 +325,14 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                     authorStats.PrsMergedAfter++;
                 }
 
-                authorStats.Corrections += corrections;
+                if (snapshot.HasCommits)
+                {
+                    authorStats.Corrections += corrections;
+                }
+                else
+                {
+                    authorStats.HasCompleteCorrectionsData = false;
+                }
                 if (collectDeveloperDetails && reportEntry is not null)
                 {
                     authorStats.AuthoredPullRequests.Add(reportEntry);
@@ -354,7 +402,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
     }
 
-    private async Task<IReadOnlyList<PullRequestCommitInfo>> GetCorrectionCommitsAsync(
+    private async Task<IReadOnlyList<PullRequestCommitInfo>?> GetCorrectionCommitsAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
@@ -386,10 +434,10 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
             return correctionCommits;
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Correction commits are supplemental data and should not fail the whole report.
-            return [];
+            return null;
         }
     }
 
@@ -448,21 +496,17 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        var correctionCommits = await GetCorrectionCommitsAsync(
-            parameters.Workspace,
-            repo.Slug,
-            pr.Id,
-            pr.CreatedOn,
-            parameters,
-            cancellationToken).ConfigureAwait(false);
-        var sizeSummary = await GetPullRequestSizeSafeAsync(
-            parameters.Workspace,
-            repo.Slug,
-            pr.Id,
-            cancellationToken).ConfigureAwait(false);
+        var loadedCommits = snapshot.HasCommits ? snapshot.CorrectionCommits :
+            await GetCorrectionCommitsAsync(parameters.Workspace, repo.Slug, pr.Id,
+                pr.CreatedOn, parameters, cancellationToken).ConfigureAwait(false);
+        var correctionCommits = loadedCommits ?? snapshot.CorrectionCommits;
+        var loadedSize = snapshot.HasSize ? snapshot.SizeSummary :
+            await GetPullRequestSizeSafeAsync(parameters.Workspace, repo.Slug, pr.Id,
+                cancellationToken).ConfigureAwait(false);
+        var sizeSummary = loadedSize ?? snapshot.SizeSummary;
 
         IReadOnlyList<DeveloperCommitActivity> commitActivities = [];
-        if (collectDeveloperDetails && hasAuthorIdentity && correctionCommits.Count > 0)
+        if (collectDeveloperDetails && hasAuthorIdentity && loadedCommits is not null && correctionCommits.Count > 0)
         {
             commitActivities = await GetCommitActivitiesAsync(
                 repositoryName: repo.DisplayName,
@@ -470,6 +514,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 repo.Slug,
                 pr.Id,
                 correctionCommits,
+                snapshot.CommitActivities,
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -478,7 +523,10 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             correctionCommits,
             sizeSummary,
             commitActivities,
-            hasEnrichment: true);
+            hasEnrichment: loadedCommits is not null && loadedSize is not null &&
+                commitActivities.All(static activity => activity.HasSizeData),
+            hasCommits: loadedCommits is not null,
+            hasSize: loadedSize is not null);
     }
 
     private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(
@@ -487,14 +535,31 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
         IReadOnlyList<PullRequestCommitInfo> correctionCommits,
+        IReadOnlyList<DeveloperCommitActivity> cachedActivities,
         CancellationToken cancellationToken)
     {
         var activities = new List<DeveloperCommitActivity>(correctionCommits.Count);
+        var cachedSizes = new Dictionary<string, PullRequestSizeSummary>(StringComparer.Ordinal);
+        foreach (var activity in cachedActivities)
+        {
+            if (activity.HasSizeData)
+            {
+                cachedSizes.TryAdd(activity.CommitHash, activity.SizeSummary);
+            }
+        }
 
         foreach (var commit in correctionCommits)
         {
-            var sizeSummary = await GetCommitSizeSafeAsync(workspace, repoSlug, commit.Hash, cancellationToken)
-                .ConfigureAwait(false);
+            PullRequestSizeSummary? sizeSummary;
+            if (cachedSizes.TryGetValue(commit.Hash, out var cachedSize))
+            {
+                sizeSummary = cachedSize;
+            }
+            else
+            {
+                sizeSummary = await GetCommitSizeSafeAsync(workspace, repoSlug, commit.Hash, cancellationToken)
+                    .ConfigureAwait(false);
+            }
             activities.Add(new DeveloperCommitActivity(
                 repositoryName,
                 repoSlug.Value,
@@ -502,7 +567,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 commit.Hash,
                 commit.Message,
                 commit.Date,
-                sizeSummary));
+                sizeSummary ?? PullRequestSizeSummary.Empty,
+                sizeSummary is not null));
         }
 
         return activities;
@@ -523,7 +589,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         return activity.Approval is not null && reportData.IsDeveloperIncluded(activity.Approval.User);
     }
 
-    private async Task<PullRequestSizeSummary> GetPullRequestSizeSafeAsync(
+    private async Task<PullRequestSizeSummary?> GetPullRequestSizeSafeAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
@@ -537,13 +603,13 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 pullRequestId,
                 cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            return PullRequestSizeSummary.Empty;
+            return null;
         }
     }
 
-    private async Task<PullRequestSizeSummary> GetCommitSizeSafeAsync(
+    private async Task<PullRequestSizeSummary?> GetCommitSizeSafeAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         string commitHash,
@@ -557,9 +623,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 commitHash,
                 cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            return PullRequestSizeSummary.Empty;
+            return null;
         }
     }
 

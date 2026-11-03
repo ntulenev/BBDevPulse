@@ -65,17 +65,15 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         _ = content.Append(BuildDurationStatsTable(
             "ttfr-stats",
             "TTFR Stats",
-            metricReports
-                .Where(static report => report.FirstReactionOn.HasValue)
-                .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value, excludeWeekend, excludedDays).TotalDays)
-                .OrderBy(static days => days)
-                .ToList(),
+            reportData.GetTtfrStatistics(_statisticsCalculator).OrderedDays,
             "Best TTFR",
-            "Longest TTFR"));
+            "Longest TTFR",
+            reportData.GetTtfrStatistics(_statisticsCalculator)));
         _ = content.Append(BuildCountStatsTable(
             "correction-stats",
             "Corrections Stats",
             metricReports
+                .Where(static report => report.HasCorrectionsData)
                 .Select(static report => (double)report.Corrections)
                 .OrderBy(static value => value)
                 .ToList(),
@@ -194,7 +192,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(prAgeDuration is null ? "-" : FormatDuration(prAgeDuration.Value), prAgeDuration?.TotalMinutes, prAgeDuration is null ? "-" : FormatDuration(prAgeDuration.Value)),
                 BuildTextCell(timeToMergeDuration is null ? "-" : FormatDuration(timeToMergeDuration.Value), timeToMergeDuration?.TotalMinutes, timeToMergeDuration is null ? "-" : FormatDuration(timeToMergeDuration.Value)),
                 BuildTextCell(report.Comments.ToString(CultureInfo.InvariantCulture), report.Comments),
-                BuildTextCell(report.Corrections.ToString(CultureInfo.InvariantCulture), report.Corrections),
+                BuildTextCell(report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.HasCorrectionsData ? report.Corrections : null),
                 BuildTextCell(FormatPullRequestSize(report, pullRequestSizeMode), report.HasSizeDataForMode(pullRequestSizeMode) ? report.GetSizeMetricValue(pullRequestSizeMode) : null),
                 BuildLinkCell(report.Id.Value.ToString(CultureInfo.InvariantCulture), pullRequestUrl, report.Id.Value)
             ], report.IsActivityOnlyMatch ? "activity-only" : null));
@@ -225,9 +223,10 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
     private string BuildDurationStatsTable(
         string sectionId,
         string title,
-        List<double> orderedDays,
+        IReadOnlyList<double> orderedDays,
         string bestLabel,
-        string longestLabel)
+        string longestLabel,
+        TtfrStatistics? statistics = null)
     {
         if (orderedDays.Count == 0)
         {
@@ -241,8 +240,8 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 interactive: false);
         }
 
-        var median = _statisticsCalculator.Percentile(orderedDays, 50);
-        var p75 = _statisticsCalculator.Percentile(orderedDays, 75);
+        var median = statistics?.MedianDays ?? _statisticsCalculator.Percentile(orderedDays, 50);
+        var p75 = statistics?.P75Days ?? _statisticsCalculator.Percentile(orderedDays, 75);
         var rows = new List<TableRow>(4)
         {
             BuildMetricRow(bestLabel, FormatDuration(orderedDays[0]), orderedDays[0]),
@@ -540,7 +539,10 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture), stat.CommentsAfter),
                 BuildTextCell(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture), stat.PeerCommentsAfter),
                 BuildTextCell(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture), stat.ApprovalsAfter),
-                BuildTextCell(stat.Corrections.ToString(CultureInfo.InvariantCulture), stat.Corrections)
+                BuildTextCell(stat.HasCompleteCorrectionsData
+                    ? stat.Corrections.ToString(CultureInfo.InvariantCulture)
+                    : $"{stat.Corrections.ToString(CultureInfo.InvariantCulture)} (partial)",
+                    stat.HasCompleteCorrectionsData ? stat.Corrections : null)
             ]);
 
             rows.Add(new TableRow(cells));
@@ -625,7 +627,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(report.State.ToString()),
                 BuildTextCell(HtmlPresentationHelpers.FormatDateTime(report.MergedOn), report.MergedOn?.ToUnixTimeSeconds()),
                 BuildTextCell(report.Comments.ToString(CultureInfo.InvariantCulture), report.Comments),
-                BuildTextCell(report.Corrections.ToString(CultureInfo.InvariantCulture), report.Corrections),
+                BuildTextCell(report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.HasCorrectionsData ? report.Corrections : null),
                 BuildTextCell(FormatPullRequestSize(report, PullRequestSizeMode.Lines), report.HasSizeDataForMode(PullRequestSizeMode.Lines) ? report.GetSizeMetricValue(PullRequestSizeMode.Lines) : null)
             ]))
             .ToList();
@@ -957,7 +959,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
     {
         if (!report.HasSizeDataForMode(sizeMode))
         {
-            return "-";
+            return "Unavailable";
         }
 
         var sizeValue = report.GetSizeMetricValue(sizeMode);
@@ -976,7 +978,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         PullRequestSizeMode pullRequestSizeMode) =>
         activity.HasSizeDataForMode(pullRequestSizeMode)
             ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
-            : "-";
+            : "Unavailable";
 
     private static IReadOnlyList<TableColumn> MetricColumns { get; } = CreateMetricColumns("Value");
 

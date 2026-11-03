@@ -13,6 +13,46 @@ namespace BBDevPulse.Tests.API;
 
 public sealed class BitbucketTransportTests
 {
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task GetAsyncDoesNotRetryAuthenticationFailures(HttpStatusCode status)
+    {
+        var calls = 0;
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+        {
+            calls++;
+            return new HttpResponseMessage(status) { Content = new StringContent("auth failed") };
+        }));
+        var transport = new BitbucketTransport(client, CreatePassthroughRetryPolicyHelper(), CreateTelemetryService().Object);
+
+        Func<Task> act = () => transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        calls.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData("https://other.example/2.0/user")]
+    [InlineData("http://api.bitbucket.org/2.0/user")]
+    [InlineData("https://api.bitbucket.org:444/2.0/user")]
+    [InlineData("//other.example/2.0/user")]
+    public async Task GetAsyncRejectsForeignOriginBeforeTransport(string next)
+    {
+        var sent = false;
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+        {
+            sent = true;
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        })) { BaseAddress = new Uri("https://api.bitbucket.org/2.0/") };
+        var transport = new BitbucketTransport(client, CreatePassthroughRetryPolicyHelper(), CreateTelemetryService().Object);
+
+        Func<Task> act = () => transport.GetAsync<SampleDto>(new Uri(next, UriKind.RelativeOrAbsolute), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        sent.Should().BeFalse();
+    }
+
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
     [Fact(DisplayName = "Constructor throws when HTTP client is null")]
@@ -130,9 +170,11 @@ public sealed class BitbucketTransportTests
         exception.Which.Message.Should().Contain("empty");
     }
 
-    [Fact(DisplayName = "GetAsync retries when Bitbucket returns too many requests and eventually succeeds")]
+    [Theory(DisplayName = "GetAsync retries transient responses and eventually succeeds")]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
     [Trait("Category", "Unit")]
-    public async Task GetAsyncWhenTooManyRequestsReturnedRetriesAndSucceeds()
+    public async Task GetAsyncWhenTransientStatusReturnedRetriesAndSucceeds(HttpStatusCode status)
     {
         // Arrange
         var callCount = 0;
@@ -140,7 +182,7 @@ public sealed class BitbucketTransportTests
         {
             callCount++;
             return callCount == 1
-                ? new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+                ? new HttpResponseMessage(status)
                 {
                     Content = new StringContent(string.Empty, Encoding.UTF8, "text/plain")
                 }
