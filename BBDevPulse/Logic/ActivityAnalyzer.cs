@@ -18,10 +18,6 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
         if (parameters.IsInRange(activity.ActivityDate))
         {
             analysis.HasActivityInRange = true;
-        }
-
-        if (parameters.IsInRange(activity.ActivityDate))
-        {
             var lastActivity = analysis.LastActivity;
             _ = activity.TryUpdateLastActivity(ref lastActivity);
             analysis.LastActivity = lastActivity;

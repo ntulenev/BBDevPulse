@@ -1,10 +1,9 @@
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 using BBDevPulse.Transport;
-
-using System.Text.Json;
 
 using Microsoft.Extensions.Options;
 
@@ -18,9 +17,14 @@ internal sealed class BitbucketClient : IBitbucketClient
     /// <summary>
     /// Initializes a new instance of the <see cref="BitbucketClient"/> class.
     /// </summary>
-    /// <param name="httpClient">Configured HTTP client.</param>
     /// <param name="options">Bitbucket options.</param>
-    /// <param name="activityMapper">Activity mapper.</param>
+    /// <param name="transport">Configured Bitbucket transport.</param>
+    /// <param name="uriBuilder">General URI builder.</param>
+    /// <param name="repositoriesUriBuilder">Repository URI builder.</param>
+    /// <param name="pullRequestsUriBuilder">Pull request URI builder.</param>
+    /// <param name="pullRequestCommitRangeCache">Commit range cache.</param>
+    /// <param name="paginatorHelper">Pagination helper.</param>
+    /// <param name="mapper">Bitbucket response mapper.</param>
     public BitbucketClient(
         IOptions<BitbucketOptions> options,
         IBitbucketTransport transport,
@@ -96,9 +100,6 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(repoSlug);
         ArgumentNullException.ThrowIfNull(shouldStop);
         var firstPage = _pullRequestsUriBuilder.Build(workspace, repoSlug);
-#pragma warning disable CS0219 // Used in paginator
-        var stop = false;
-#pragma warning restore CS0219
 
         await foreach (var pr in _paginatorHelper.ReadAllAsync(
             firstPage,
@@ -118,7 +119,6 @@ internal sealed class BitbucketClient : IBitbucketClient
             var model = _mapper.Map(pr);
             if (shouldStop(model))
             {
-                stop = true;
                 break;
             }
 
@@ -143,9 +143,6 @@ internal sealed class BitbucketClient : IBitbucketClient
             $"repositories/{workspace.Value}/{repoSlug.Value}/pullrequests/{pullRequestId.Value}/activity" +
             $"?pagelen={_options.PageLength}&sort=-created_on",
             BitbucketFieldGroup.PullRequestActivity);
-#pragma warning disable CS0219 // Used in paginator
-        var stop = false;
-#pragma warning restore CS0219
 
         await foreach (var activity in _paginatorHelper.ReadAllAsync(
             firstPage,
@@ -164,7 +161,6 @@ internal sealed class BitbucketClient : IBitbucketClient
             var model = _mapper.Map(activity);
             if (shouldStop(model))
             {
-                stop = true;
                 break;
             }
 
