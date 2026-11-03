@@ -33,7 +33,8 @@ public sealed class SpectreReportPresenterTests
         });
 
         selected.Should().Be("Core");
-        output.Should().Contain("All teams (3 people)");
+        output.Should().Contain("Do not apply team filter");
+        output.Should().NotContain("3 people");
         output.Should().Contain("Core (2 people)");
         output.Should().Contain("Alice");
         output.Should().Contain("Senior");
@@ -41,7 +42,7 @@ public sealed class SpectreReportPresenterTests
         output.Should().Contain("Middle");
     }
 
-    [Fact(DisplayName = "All teams option does not show the member preview")]
+    [Fact(DisplayName = "No team filter option does not show the member preview")]
     public void SelectTeamFilterWhenAllChosenSkipsMembers()
     {
         var presenter = CreateSut();
@@ -57,7 +58,8 @@ public sealed class SpectreReportPresenterTests
         });
 
         selected.Should().BeNull();
-        output.Should().Contain("All teams (2 people)");
+        output.Should().Contain("Do not apply team filter");
+        output.Should().NotContain("2 people");
         output.Should().NotContain("Senior");
     }
 

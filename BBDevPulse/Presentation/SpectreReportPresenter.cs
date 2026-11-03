@@ -34,7 +34,7 @@ public sealed class SpectreReportPresenter : IReportPresenter
             return null;
         }
 
-        var choices = new List<TeamChoice> { new($"All teams ({CountLabel(totalPeople)})", null) };
+        var choices = new List<TeamChoice> { new("Do not apply team filter", null) };
         choices.AddRange(teams.Select(team => new TeamChoice(
             $"{team.Name} ({CountLabel(team.Members.Count)})", team)));
         var prompt = new SelectionPrompt<TeamChoice>()
