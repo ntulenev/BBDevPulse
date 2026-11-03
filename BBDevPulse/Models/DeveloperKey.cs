@@ -2,6 +2,7 @@ namespace BBDevPulse.Models;
 
 /// <summary>
 /// Represents the preferred identity key used to aggregate developer stats.
+/// The default value is empty, compares equal to other empty keys and hashes to zero.
 /// </summary>
 public readonly struct DeveloperKey : IEquatable<DeveloperKey>
 {

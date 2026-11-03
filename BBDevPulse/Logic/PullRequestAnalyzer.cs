@@ -326,7 +326,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 hasCorrectionsData: snapshot.HasCommits)
             : null;
 
-        lock (reportData)
+        reportData.ApplyAnalysis(() =>
         {
             if (authorIdentity.HasValue && includeAuthoredPullRequest)
             {
@@ -415,7 +415,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 reportData.Reports.Add(reportEntry!);
             }
-        }
+        });
     }
 
     private async Task<IReadOnlyList<PullRequestCommitInfo>?> GetCorrectionCommitsAsync(

@@ -8,6 +8,16 @@ namespace BBDevPulse.Tests.Models;
 public sealed class ReportDataTests
 {
     [Fact]
+    public void ParallelAnalysisUpdatesArePreservedOnPublication()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(null, new DisplayName("Alice"));
+        Parallel.For(0, 200, _ => data.ApplyAnalysis(() => data.GetOrAddDeveloper(identity).CommentsAfter++));
+        data.Freeze();
+        data.DeveloperStats.Values.Single().CommentsAfter.Should().Be(200);
+    }
+
+    [Fact]
     public void PublishedReportIsIndependentOfCollectionReferencesHeldByProducer()
     {
         var data = new ReportData(CreateReportParameters());

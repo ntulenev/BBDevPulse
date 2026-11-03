@@ -215,6 +215,16 @@ public sealed class ReportData
     }
 
     private readonly Dictionary<string, PersonCsvRow> _peopleByDisplayName;
+    internal void ApplyAnalysis(Action update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        lock (_identityLock)
+        {
+            EnsureMutable();
+            update();
+        }
+    }
+
     /// <summary>Ends accumulation after all analysis tasks finish. The report can then be read concurrently.</summary>
     internal void Freeze()
     {

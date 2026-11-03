@@ -48,10 +48,10 @@ public sealed class PullRequestReport
         bool? hasSizeData = null,
         bool hasCorrectionsData = true)
     {
-        ArgumentNullException.ThrowIfNull(repository);
-        ArgumentNullException.ThrowIfNull(repositorySlug);
-        ArgumentNullException.ThrowIfNull(author);
-        ArgumentNullException.ThrowIfNull(targetBranch);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repository);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositorySlug);
+        ArgumentException.ThrowIfNullOrWhiteSpace(author);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetBranch);
         ArgumentNullException.ThrowIfNull(id);
         ArgumentOutOfRangeException.ThrowIfNegative(comments);
         ArgumentOutOfRangeException.ThrowIfNegative(corrections);
