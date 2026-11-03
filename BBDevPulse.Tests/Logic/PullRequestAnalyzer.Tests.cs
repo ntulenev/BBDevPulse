@@ -18,6 +18,43 @@ namespace BBDevPulse.Tests.Logic;
 public sealed class PullRequestAnalyzerTests
 {
     [Fact]
+    public async Task AnalyzeAsyncDoesNotTreatPartialCommitPageAsComplete()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
+            closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
+            author: null, destination: null);
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable([pr]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+            .Returns(() => PartialCommits());
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(PullRequestSizeSummary.Empty);
+
+        static async IAsyncEnumerable<PullRequestCommitInfo> PartialCommits()
+        {
+            yield return new PullRequestCommitInfo("hash", new DateTimeOffset(2026, 2, 24, 9, 0, 0, TimeSpan.Zero), "fix");
+            await Task.Yield();
+            throw new InvalidOperationException("second page failed");
+        }
+
+        var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        await analyzer.AnalyzeAsync(repository, data, CancellationToken.None);
+
+        data.Reports.Single().HasCorrectionsData.Should().BeFalse();
+        data.Reports.Single().HasSizeData.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task AnalyzeAsyncRetriesMissingSizeThenUsesUpdatedDiskSnapshot()
     {
         var cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
