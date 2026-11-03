@@ -76,7 +76,12 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IPeopleCsvProvider, PeopleCsvProvider>();
         _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
         _ = services.AddSingleton<IPullRequestAnalyzer, PullRequestAnalyzer>();
-        _ = services.AddSingleton<IReportRunner, ReportRunner>();
+        _ = services.AddSingleton<ReportRunner>();
+        _ = services.AddSingleton<DemoReportRunner>();
+        _ = services.AddSingleton<IReportRunner>(sp =>
+            sp.GetRequiredService<IOptions<BitbucketOptions>>().Value.DemoMode
+                ? sp.GetRequiredService<DemoReportRunner>()
+                : sp.GetRequiredService<ReportRunner>());
     })
     .Build();
 

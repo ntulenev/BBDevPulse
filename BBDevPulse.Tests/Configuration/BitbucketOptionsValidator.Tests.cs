@@ -7,6 +7,26 @@ namespace BBDevPulse.Tests.Configuration;
 
 public sealed class BitbucketOptionsValidatorTests
 {
+    [Fact(DisplayName = "Demo mode does not require Bitbucket credentials or report settings")]
+    public void ValidateWhenDemoModeEnabledAcceptsEmptyBitbucketConfiguration()
+    {
+        var options = new BitbucketOptions
+        {
+            DemoMode = true,
+            Workspace = "",
+            PageLength = 0,
+            Username = "",
+            AppPassword = "",
+            RepoNameFilter = "",
+            RepoNameList = [],
+            BranchNameList = [],
+            RepoSearchMode = RepoSearchMode.SearchByFilter,
+            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly
+        };
+
+        new BitbucketOptionsValidator().Validate(null, options).Succeeded.Should().BeTrue();
+    }
+
     [Fact(DisplayName = "Validate throws when options are null")]
     [Trait("Category", "Unit")]
     public void ValidateWhenOptionsAreNullThrowsArgumentNullException()

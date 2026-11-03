@@ -16,6 +16,11 @@ internal sealed class BitbucketOptionsValidator : IValidateOptions<BitbucketOpti
     public ValidateOptionsResult Validate(string? name, BitbucketOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
+        if (options.DemoMode)
+        {
+            return ValidateOptionsResult.Success;
+        }
+
         var errors = new List<string>();
 
         if (string.IsNullOrWhiteSpace(options.FromDate) && string.IsNullOrWhiteSpace(options.ToDate))

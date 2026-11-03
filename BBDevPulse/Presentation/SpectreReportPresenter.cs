@@ -15,6 +15,13 @@ public sealed class SpectreReportPresenter : IReportPresenter
         SpectreRunSettingsPresenter.Render(parameters, username, htmlFileName, pdfFileName);
 
     /// <inheritdoc />
+    public void RenderDemoSettings(ReportParameters parameters, string htmlFileName, string pdfFileName) =>
+        SpectreRunSettingsPresenter.Render(parameters, "synthetic-user", htmlFileName, pdfFileName, demoMode: true);
+
+    /// <inheritdoc />
+    public bool ConfirmDemoStart() => AnsiConsole.Confirm("Render the synthetic demo report?", defaultValue: false);
+
+    /// <inheritdoc />
     public bool ConfirmStart() => AnsiConsole.Confirm("Start loading data from Bitbucket?", defaultValue: false);
 
     /// <inheritdoc />

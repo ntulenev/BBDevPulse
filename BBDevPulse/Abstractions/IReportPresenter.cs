@@ -17,6 +17,17 @@ public interface IReportPresenter
     void RenderRunSettings(ReportParameters parameters, string username, string? htmlFileName, string? pdfFileName);
 
     /// <summary>
+    /// Shows the settings for a synthetic demo report.
+    /// </summary>
+    void RenderDemoSettings(ReportParameters parameters, string htmlFileName, string pdfFileName);
+
+    /// <summary>
+    /// Waits for the user to confirm rendering the synthetic demo.
+    /// </summary>
+    /// <returns>True when the user confirms.</returns>
+    bool ConfirmDemoStart();
+
+    /// <summary>
     /// Waits for the user to approve starting Bitbucket data collection.
     /// </summary>
     /// <returns>True when the user confirms the run.</returns>

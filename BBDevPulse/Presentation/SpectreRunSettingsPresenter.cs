@@ -11,7 +11,8 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 internal static class SpectreRunSettingsPresenter
 {
-    public static void Render(ReportParameters parameters, string username, string? htmlFileName, string? pdfFileName)
+    public static void Render(ReportParameters parameters, string username, string? htmlFileName, string? pdfFileName,
+        bool demoMode = false)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentException.ThrowIfNullOrWhiteSpace(username);
@@ -21,8 +22,12 @@ internal static class SpectreRunSettingsPresenter
             ? $"{parameters.FilterDate:yyyy-MM-dd HH:mm} UTC  →  {end:yyyy-MM-dd HH:mm} UTC (end exclusive)"
             : $"{parameters.FilterDate:yyyy-MM-dd HH:mm} UTC  →  now";
 
-        AnsiConsole.Write(new Rule("[bold deepskyblue1]BBDevPulse  /  Review run[/]").LeftJustified().RuleStyle("grey"));
-        AnsiConsole.MarkupLine("[grey]Check the settings below before loading data from Bitbucket.[/]");
+        AnsiConsole.Write(new Rule(demoMode
+            ? "[bold deepskyblue1]BBDevPulse  /  Synthetic demo[/]"
+            : "[bold deepskyblue1]BBDevPulse  /  Review run[/]").LeftJustified().RuleStyle("grey"));
+        AnsiConsole.MarkupLine(demoMode
+            ? "[bold orange1]DEMO MODE[/] [grey]All report data is synthetic. No Bitbucket API or people CSV will be read.[/]"
+            : "[grey]Check the settings below before loading data from Bitbucket.[/]");
         AnsiConsole.WriteLine();
 
         WriteSection("01  Date range", [
@@ -38,7 +43,7 @@ internal static class SpectreRunSettingsPresenter
 
         WriteSection("02  Scope", [
             ("Workspace", parameters.Workspace.Value),
-            ("Bitbucket user", username),
+            (demoMode ? "Demo identity" : "Bitbucket user", username),
             ("Repositories", DescribeRepositorySearch(parameters)),
             ("Merge targets", parameters.BranchNameList.Count == 0
                 ? "All target branches"
