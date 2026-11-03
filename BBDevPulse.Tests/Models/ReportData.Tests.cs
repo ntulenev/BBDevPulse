@@ -7,6 +7,32 @@ namespace BBDevPulse.Tests.Models;
 
 public sealed class ReportDataTests
 {
+    [Theory]
+    [InlineData(-1, 0, 0)]
+    [InlineData(0, -1, 0)]
+    [InlineData(0, 0, -1)]
+    [InlineData(1, int.MaxValue, 1)]
+    public void DiffstatRejectsUnrepresentableSizes(int files, int additions, int removals)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new PullRequestSizeSummary(files, additions, removals));
+    }
+
+    [Fact]
+    public void RemovingAReportAndChangingCalculatorAffectTtfr()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var created = DateTimeOffset.UnixEpoch;
+        data.Reports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
+        data.Reports.Add(CreatePullRequestReport(2, created, created.AddDays(3)));
+        data.GetTtfrStatistics(new StatisticsCalculator()).Count.Should().Be(2);
+        data.Reports.RemoveAt(1);
+        var calculator = new Moq.Mock<BBDevPulse.Abstractions.IStatisticsCalculator>();
+        calculator.Setup(x => x.Percentile(Moq.It.IsAny<IReadOnlyList<double>>(), 50)).Returns(0.5);
+        var result = data.GetTtfrStatistics(calculator.Object);
+        result.Count.Should().Be(1);
+        result.MedianDays.Should().Be(0.5);
+    }
+
     [Fact]
     public void ParallelAnalysisUpdatesArePreservedOnPublication()
     {

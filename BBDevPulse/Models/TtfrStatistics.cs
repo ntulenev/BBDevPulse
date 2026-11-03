@@ -6,6 +6,22 @@ public sealed record TtfrStatistics(IReadOnlyList<double> OrderedDays, double Me
     /// <summary>Gets the ordered, nonnegative durations copied from the supplied observations.</summary>
     public IReadOnlyList<double> OrderedDays { get; } = CopyObservations(OrderedDays);
 
+    /// <summary>Median duration in days, or zero for an empty sample.</summary>
+    public double MedianDays { get; } = ValidateDuration(MedianDays, nameof(MedianDays));
+
+    /// <summary>75th percentile duration in days, or zero for an empty sample.</summary>
+    public double P75Days { get; } = ValidateDuration(P75Days, nameof(P75Days));
+
+    private static double ValidateDuration(double value, string parameter)
+    {
+        if (!double.IsFinite(value) || value < 0)
+        {
+            throw new ArgumentOutOfRangeException(parameter);
+        }
+
+        return value;
+    }
+
     private static System.Collections.ObjectModel.ReadOnlyCollection<double> CopyObservations(IReadOnlyList<double> observations)
     {
         ArgumentNullException.ThrowIfNull(observations);

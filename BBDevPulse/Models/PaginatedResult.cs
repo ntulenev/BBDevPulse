@@ -8,9 +8,9 @@ public sealed record PaginatedResult<T>(
     IReadOnlyList<T> Items,
     Uri? NextPage)
 {
-    /// <summary>Snapshot of items in response order.</summary>
+    /// <summary>Snapshot of items in response order. A missing values array represents an empty page.</summary>
     public IReadOnlyList<T> Items { get; } = Array.AsReadOnly(
-        (Items ?? throw new ArgumentNullException(nameof(Items))).ToArray());
+        (Items ?? []).ToArray());
 
     /// <inheritdoc />
     public bool Equals(PaginatedResult<T>? other) =>
