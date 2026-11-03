@@ -27,22 +27,22 @@ public sealed class DeveloperStats
     /// <summary>
     /// Developer display name.
     /// </summary>
-    public DisplayName DisplayName { get; set => field = value ?? throw new ArgumentNullException(nameof(value)); }
+    public DisplayName DisplayName { get; set { EnsureMutable(); field = value ?? throw new ArgumentNullException(nameof(value)); } }
 
     /// <summary>
     /// Developer grade from CSV enrichment.
     /// </summary>
-    public string Grade { get; set; } = NOT_AVAILABLE;
+    public string Grade { get; set { EnsureMutable(); field = value; } } = NOT_AVAILABLE;
 
     /// <summary>
     /// Developer Bitbucket UUID.
     /// </summary>
-    public UserUuid? BitbucketUuid { get; set; }
+    public UserUuid? BitbucketUuid { get; set { EnsureMutable(); field = value; } }
 
     /// <summary>
     /// Developer department from CSV enrichment.
     /// </summary>
-    public string Department { get; set; } = NOT_AVAILABLE;
+    public string Department { get; set { EnsureMutable(); field = value; } } = NOT_AVAILABLE;
 
     /// <summary>
     /// Pull requests opened since the filter date.
@@ -52,6 +52,7 @@ public sealed class DeveloperStats
         get;
         set
         {
+            EnsureMutable();
             ArgumentOutOfRangeException.ThrowIfNegative(value);
             field = value;
         }
@@ -65,6 +66,7 @@ public sealed class DeveloperStats
         get;
         set
         {
+            EnsureMutable();
             ArgumentOutOfRangeException.ThrowIfNegative(value);
             field = value;
         }
@@ -78,6 +80,7 @@ public sealed class DeveloperStats
         get;
         set
         {
+            EnsureMutable();
             ArgumentOutOfRangeException.ThrowIfNegative(value);
             field = value;
         }
@@ -91,6 +94,7 @@ public sealed class DeveloperStats
         get;
         set
         {
+            EnsureMutable();
             ArgumentOutOfRangeException.ThrowIfNegative(value);
             field = value;
         }
@@ -104,6 +108,7 @@ public sealed class DeveloperStats
         get;
         set
         {
+            EnsureMutable();
             ArgumentOutOfRangeException.ThrowIfNegative(value);
             field = value;
         }
@@ -117,6 +122,7 @@ public sealed class DeveloperStats
         get;
         set
         {
+            EnsureMutable();
             ArgumentOutOfRangeException.ThrowIfNegative(value);
             field = value;
         }
@@ -125,25 +131,44 @@ public sealed class DeveloperStats
     /// <summary>
     /// Whether correction counts were available for every authored pull request.
     /// </summary>
-    public bool HasCompleteCorrectionsData { get; set; } = true;
+    public bool HasCompleteCorrectionsData { get; set { EnsureMutable(); field = value; } } = true;
 
     /// <summary>
     /// Detailed list of pull requests authored by the developer.
     /// </summary>
-    public List<PullRequestReport> AuthoredPullRequests { get; } = [];
+    public IList<PullRequestReport> AuthoredPullRequests { get; private set; } = new List<PullRequestReport>();
 
     /// <summary>
     /// Detailed list of comments authored by the developer.
     /// </summary>
-    public List<DeveloperCommentActivity> CommentActivities { get; } = [];
+    public IList<DeveloperCommentActivity> CommentActivities { get; private set; } = new List<DeveloperCommentActivity>();
 
     /// <summary>
     /// Detailed list of approvals authored by the developer.
     /// </summary>
-    public List<DeveloperApprovalActivity> ApprovalActivities { get; } = [];
+    public IList<DeveloperApprovalActivity> ApprovalActivities { get; private set; } = new List<DeveloperApprovalActivity>();
 
     /// <summary>
     /// Detailed list of follow-up commits made on the developer's pull requests after creation.
     /// </summary>
-    public List<DeveloperCommitActivity> CommitActivities { get; } = [];
+    public IList<DeveloperCommitActivity> CommitActivities { get; private set; } = new List<DeveloperCommitActivity>();
+
+    internal void Freeze()
+    {
+        AuthoredPullRequests = Array.AsReadOnly(AuthoredPullRequests.ToArray());
+        CommentActivities = Array.AsReadOnly(CommentActivities.ToArray());
+        ApprovalActivities = Array.AsReadOnly(ApprovalActivities.ToArray());
+        CommitActivities = Array.AsReadOnly(CommitActivities.ToArray());
+        _frozen = true;
+    }
+
+    private void EnsureMutable()
+    {
+        if (_frozen)
+        {
+            throw new InvalidOperationException("Published statistics cannot be modified.");
+        }
+    }
+
+    private bool _frozen;
 }

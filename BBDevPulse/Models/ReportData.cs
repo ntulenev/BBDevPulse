@@ -18,6 +18,7 @@ public sealed class ReportData
     public void ObserveDeveloperIdentity(DeveloperIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName);
+        EnsureMutable();
         if (identity.Uuid is null || string.IsNullOrWhiteSpace(identity.DisplayName.Value))
         {
             return;
@@ -72,7 +73,7 @@ public sealed class ReportData
     /// <summary>
     /// Gets the pull request reports.
     /// </summary>
-    public List<PullRequestReport> Reports { get; } = [];
+    public IList<PullRequestReport> Reports { get; private set; } = new List<PullRequestReport>();
 
     /// <summary>Calculates time-to-first-review statistics from the current reports.</summary>
     /// <param name="calculator">Calculator used for the median and 75th percentile.</param>
@@ -94,7 +95,7 @@ public sealed class ReportData
     /// <summary>
     /// Gets the developer statistics keyed by identity.
     /// </summary>
-    public Dictionary<DeveloperKey, DeveloperStats> DeveloperStats { get; } = [];
+    public IDictionary<DeveloperKey, DeveloperStats> DeveloperStats { get; private set; } = new Dictionary<DeveloperKey, DeveloperStats>();
 
     /// <summary>
     /// Gets the number of pull requests created inside the selected range.
@@ -137,7 +138,11 @@ public sealed class ReportData
     /// <summary>
     /// Sorts reports by creation time, ascending.
     /// </summary>
-    public void SortReportsByCreatedOn() => Reports.Sort((left, right) => left.CreatedOn.CompareTo(right.CreatedOn));
+    public void SortReportsByCreatedOn()
+    {
+        EnsureMutable();
+        Reports = Reports.OrderBy(static report => report.CreatedOn).ToList();
+    }
 
     /// <summary>Checks whether a developer belongs to the selected team.</summary>
     /// <param name="identity">Developer identity with a display name.</param>
@@ -210,5 +215,33 @@ public sealed class ReportData
     }
 
     private readonly Dictionary<string, PersonCsvRow> _peopleByDisplayName;
+    /// <summary>Ends accumulation after all analysis tasks finish. The report can then be read concurrently.</summary>
+    internal void Freeze()
+    {
+        if (_frozen)
+        {
+            return;
+        }
+
+        foreach (var stats in DeveloperStats.Values)
+        {
+            stats.Freeze();
+        }
+
+        Reports = Array.AsReadOnly(Reports.ToArray());
+        DeveloperStats = new System.Collections.ObjectModel.ReadOnlyDictionary<DeveloperKey, DeveloperStats>(
+            new Dictionary<DeveloperKey, DeveloperStats>(DeveloperStats));
+        _frozen = true;
+    }
+
+    private void EnsureMutable()
+    {
+        if (_frozen)
+        {
+            throw new InvalidOperationException("Published reports cannot be modified.");
+        }
+    }
+
+    private bool _frozen;
     private readonly object _identityLock = new();
 }

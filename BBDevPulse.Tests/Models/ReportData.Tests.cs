@@ -8,6 +8,26 @@ namespace BBDevPulse.Tests.Models;
 public sealed class ReportDataTests
 {
     [Fact]
+    public void PublishedReportIsIndependentOfCollectionReferencesHeldByProducer()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var list = data.Reports;
+        var stats = data.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var details = stats.AuthoredPullRequests;
+        var report = CreatePullRequestReport(1, DateTimeOffset.UnixEpoch);
+        list.Add(report);
+        details.Add(report);
+        data.Freeze();
+
+        list.Clear();
+        details.Clear();
+        data.Reports.Should().ContainSingle();
+        stats.AuthoredPullRequests.Should().ContainSingle();
+        Assert.Throws<NotSupportedException>(() => data.Reports.Clear());
+        Assert.Throws<InvalidOperationException>(() => stats.CommentsAfter++);
+    }
+
+    [Fact]
     public void CollisionsUseObservedIdentitiesEvenAfterStatisticsAreMerged()
     {
         var data = new ReportData(CreateReportParameters());

@@ -111,6 +111,7 @@ internal sealed class ReportRunner : IReportRunner
         {
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
         }
+        reportData.Freeze();
         _presenter.RenderReport(reportData);
         _presenter.RenderTelemetrySummary(_telemetryService.GetSnapshot());
         await _htmlReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);

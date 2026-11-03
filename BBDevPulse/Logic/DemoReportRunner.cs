@@ -37,6 +37,7 @@ internal sealed class DemoReportRunner : IReportRunner
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        reportData.Freeze();
         _presenter.RenderReport(reportData);
         await _htmlReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
         await _pdfReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
