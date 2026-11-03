@@ -73,6 +73,9 @@ public sealed class ReportData
     /// </summary>
     public List<PullRequestReport> Reports { get; } = [];
 
+    /// <summary>Calculates time-to-first-review statistics from the current reports.</summary>
+    /// <param name="calculator">Calculator used for the median and 75th percentile.</param>
+    /// <returns>Ordered observations and percentile values in days.</returns>
     public TtfrStatistics GetTtfrStatistics(IStatisticsCalculator calculator)
     {
         ArgumentNullException.ThrowIfNull(calculator);
@@ -135,6 +138,9 @@ public sealed class ReportData
     /// </summary>
     public void SortReportsByCreatedOn() => Reports.Sort((left, right) => left.CreatedOn.CompareTo(right.CreatedOn));
 
+    /// <summary>Checks whether a developer belongs to the selected team.</summary>
+    /// <param name="identity">Developer identity with a display name.</param>
+    /// <returns>True when no team filter is active or the developer is in the selected team.</returns>
     public bool IsDeveloperIncluded(DeveloperIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName);
@@ -147,12 +153,19 @@ public sealed class ReportData
             person.IsInTeam(Parameters.TeamFilter!);
     }
 
+    /// <summary>Looks up CSV enrichment by display name.</summary>
+    /// <param name="displayName">Display name to look up.</param>
+    /// <param name="person">Matched person when found.</param>
+    /// <returns>True when the name is present.</returns>
     public bool TryGetPerson(DisplayName displayName, out PersonCsvRow person)
     {
         ArgumentNullException.ThrowIfNull(displayName);
         return _peopleByDisplayName.TryGetValue(displayName.Value, out person);
     }
 
+    /// <summary>Gets or creates the mutable statistics entry for a developer.</summary>
+    /// <param name="identity">Developer identity with a display name.</param>
+    /// <returns>The current statistics entry.</returns>
     public DeveloperStats GetOrAddDeveloper(DeveloperIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName);

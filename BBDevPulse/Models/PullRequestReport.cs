@@ -180,6 +180,7 @@ public sealed class PullRequestReport
     /// </summary>
     public bool HasSizeData { get; }
 
+    /// <summary>Indicates whether correction data was available for this pull request.</summary>
     public bool HasCorrectionsData { get; }
 
     /// <summary>
