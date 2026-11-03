@@ -22,7 +22,7 @@ Team selection, with the **Platform** option highlighted:
 
 ![Demo terminal team-filter selection](screenshots/demo-team-filter.png)
 
-Settings shown after selecting Platform, before confirming the run:
+Startup logo, tool description, and settings shown after selecting Platform, before confirming the run:
 
 ![Demo terminal startup settings and confirmation prompt](screenshots/demo-start-settings.png)
 
