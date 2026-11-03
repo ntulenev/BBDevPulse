@@ -156,6 +156,10 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var pullRequestFingerprint = BuildPullRequestFingerprint(pr);
 
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
+        if (authorIdentity.HasValue)
+        {
+            reportData.ObserveDeveloperIdentity(authorIdentity.Value);
+        }
         var includeAuthoredPullRequest = !parameters.HasTeamFilter ||
             (authorIdentity.HasValue && reportData.IsDeveloperIncluded(authorIdentity.Value));
         var cacheHit = TryReadAnalysisSnapshot(
@@ -188,6 +192,18 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
         foreach (var activity in snapshot.Activities)
         {
+            if (activity.Actor.HasValue)
+            {
+                reportData.ObserveDeveloperIdentity(activity.Actor.Value);
+            }
+            if (activity.Comment is not null)
+            {
+                reportData.ObserveDeveloperIdentity(activity.Comment.User);
+            }
+            if (activity.Approval is not null)
+            {
+                reportData.ObserveDeveloperIdentity(activity.Approval.User);
+            }
             if (parameters.HasTeamFilter &&
                 parameters.IsInRange(activity.ActivityDate) &&
                 HasIncludedTeamActivity(activity, reportData))

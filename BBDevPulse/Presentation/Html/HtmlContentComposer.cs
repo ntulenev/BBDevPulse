@@ -51,6 +51,19 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         var workspace = reportData.Parameters.Workspace.Value;
 
         var content = new StringBuilder(32 * 1024);
+        var warning = new StringBuilder();
+        var collisions = reportData.GetIdentityCollisions();
+        if (collisions.Count > 0)
+        {
+            _ = warning.Append("<div role=\"alert\" style=\"padding:12px 16px;border:2px solid #b91c1c;background:#fef2f2;color:#991b1b;margin-bottom:16px\"><strong>");
+            _ = warning.Append(HtmlPresentationHelpers.Encode(ReportData.IdentityCollisionWarning));
+            _ = warning.Append("</strong><ul>");
+            foreach (var collision in collisions)
+            {
+                _ = warning.Append("<li>").Append(HtmlPresentationHelpers.Encode(collision.Name + ": " + string.Join(", ", collision.Uuids))).Append("</li>");
+            }
+            _ = warning.AppendLine("</ul></div>");
+        }
         if (reportData.Parameters.IsDemo)
         {
             _ = content.AppendLine("<p role=\"note\" style=\"padding:10px 14px;border:1px solid #d97706;color:#92400e;font-weight:700\">DEMO MODE · Synthetic sample data</p>");
@@ -133,6 +146,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 ["__DEVELOPER_COUNT__"] = reportData.DeveloperStats.Count.ToString(CultureInfo.InvariantCulture),
                 ["__SIZE_MODE__"] = HtmlPresentationHelpers.Encode(GetPullRequestSizeMetricLabel(pullRequestSizeMode)),
                 ["__TEAM_FILTER__"] = HtmlPresentationHelpers.Encode(reportData.Parameters.TeamFilter ?? "(all developers)"),
+                ["__IDENTITY_WARNING__"] = warning.ToString(),
                 ["__CONTENT__"] = content.ToString()
             });
     }

@@ -18,6 +18,25 @@ namespace BBDevPulse.Tests.Logic;
 public sealed class PullRequestAnalyzerTests
 {
     [Fact]
+    public async Task AnalyzeAsyncObservesAuthorAndActivityIdentitiesBeforeTheyAreMerged()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+        var reviewer = new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Alice"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, author, null);
+        var activity = new PullRequestActivity(date.AddHours(1), null, reviewer, new ActivityComment(reviewer, date.AddHours(1)), null);
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable([pr]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable([activity]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
+        await CreateAnalyzer(client.Object, new ActivityAnalyzer()).AnalyzeAsync(repository, data, CancellationToken.None);
+        data.GetIdentityCollisions().Should().ContainSingle().Which.Uuids.Should().Equal("{a}", "{b}");
+        data.DeveloperStats.Should().HaveCount(1);
+    }
+    [Fact]
     public async Task AnalyzeAsyncStopsSchedulingAfterHandlerFailure()
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);

@@ -9,6 +9,41 @@ namespace BBDevPulse.Models;
 /// </summary>
 public sealed class ReportData
 {
+    /// <summary>Warning displayed when distinct Bitbucket users share a display name.</summary>
+    public const string IdentityCollisionWarning = "Different Bitbucket users share the same display name. This report may not be fully accurate; please verify it manually.";
+
+    private readonly Dictionary<string, HashSet<string>> _observedIdentities = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Records a Bitbucket identity before developer statistics can merge it with another identity.</summary>
+    public void ObserveDeveloperIdentity(DeveloperIdentity identity)
+    {
+        if (identity.Uuid is null || string.IsNullOrWhiteSpace(identity.DisplayName.Value))
+        {
+            return;
+        }
+
+        lock (this)
+        {
+            if (!_observedIdentities.TryGetValue(identity.DisplayName.Value, out var uuids))
+            {
+                uuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                _observedIdentities.Add(identity.DisplayName.Value, uuids);
+            }
+            uuids.Add(identity.Uuid.Value);
+        }
+    }
+
+    /// <summary>Returns names observed with more than one distinct UUID.</summary>
+    public IReadOnlyList<(string Name, IReadOnlyList<string> Uuids)> GetIdentityCollisions()
+    {
+        lock (this)
+        {
+            return _observedIdentities.Where(static entry => entry.Value.Count > 1)
+                .OrderBy(static entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(static entry => (entry.Key, (IReadOnlyList<string>)entry.Value.OrderBy(static uuid => uuid, StringComparer.OrdinalIgnoreCase).ToArray()))
+                .ToArray();
+        }
+    }
     /// <summary>
     /// Initializes a new instance of the <see cref="ReportData"/> class.
     /// </summary>
@@ -127,6 +162,7 @@ public sealed class ReportData
 
     public DeveloperStats GetOrAddDeveloper(DeveloperIdentity identity)
     {
+        ObserveDeveloperIdentity(identity);
         var key = DeveloperKey.FromIdentity(identity);
         if (DeveloperStats.TryGetValue(key, out var existing))
         {

@@ -126,6 +126,16 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
         reportData.SortReportsByCreatedOn();
 
+        var collisions = reportData.GetIdentityCollisions();
+        if (collisions.Count > 0)
+        {
+            AnsiConsole.MarkupLine("[bold red]" + Markup.Escape(ReportData.IdentityCollisionWarning) + "[/]");
+            foreach (var collision in collisions)
+            {
+                AnsiConsole.MarkupLine("[red]" + Markup.Escape(collision.Name + ": " + string.Join(", ", collision.Uuids)) + "[/]");
+            }
+        }
+
         _pullRequestReportPresenter.RenderPullRequestTable(reportData, reportData.Parameters.FilterDate);
         _statisticsPresenter.RenderMergeTimeStats(reportData);
         _statisticsPresenter.RenderTtfrStats(reportData);
