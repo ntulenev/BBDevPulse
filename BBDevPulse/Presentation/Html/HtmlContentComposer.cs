@@ -975,7 +975,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         PullRequestSizeMode pullRequestSizeMode) =>
         activity.HasSizeDataForMode(pullRequestSizeMode)
             ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
-            : "-";
+            : "Unavailable";
 
     private static IReadOnlyList<TableColumn> MetricColumns { get; } = CreateMetricColumns("Value");
 

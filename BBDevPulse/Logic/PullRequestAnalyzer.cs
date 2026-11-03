@@ -63,29 +63,29 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         try
         {
             await foreach (var pr in _client.GetPullRequestsAsync(
-                           workspace,
-                           repo.Slug,
-                           pullRequest => pullRequest.ShouldStopByTimeFilter(filterDate, prTimeFilterMode),
-                           cancellationToken).ConfigureAwait(false))
+                workspace,
+                repo.Slug,
+                pullRequest => pullRequest.ShouldStopByTimeFilter(filterDate, prTimeFilterMode),
+                cancellationToken).ConfigureAwait(false))
             {
-            if (!pr.MatchesBranchFilter(branchNameList))
-            {
-                continue;
-            }
+                if (!pr.MatchesBranchFilter(branchNameList))
+                {
+                    continue;
+                }
 
-            if (parameters.HasUpperBound &&
-                pr.CreatedOn >= parameters.ToDateExclusive!.Value)
-            {
-                continue;
-            }
+                if (parameters.HasUpperBound &&
+                    pr.CreatedOn >= parameters.ToDateExclusive!.Value)
+                {
+                    continue;
+                }
 
-            await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
-            analysisTasks.Add(AnalyzePullRequestWithSemaphoreAsync(
-                repo,
-                reportData,
-                pr,
-                semaphore,
-                stop.Token));
+                await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
+                analysisTasks.Add(AnalyzePullRequestWithSemaphoreAsync(
+                    repo,
+                    reportData,
+                    pr,
+                    semaphore,
+                    stop.Token));
             }
         }
         catch (Exception exception)
@@ -108,6 +108,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         {
             ExceptionDispatchInfo.Capture(sourceError).Throw();
         }
+
     }
 
     private async Task AnalyzePullRequestWithSemaphoreAsync(
@@ -415,7 +416,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
             return correctionCommits;
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             // Correction commits are supplemental data and should not fail the whole report.
             return null;
@@ -566,7 +567,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 pullRequestId,
                 cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             return null;
         }
@@ -586,7 +587,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 commitHash,
                 cancellationToken).ConfigureAwait(false);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             return null;
         }

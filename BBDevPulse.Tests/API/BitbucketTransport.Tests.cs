@@ -14,6 +14,25 @@ namespace BBDevPulse.Tests.API;
 public sealed class BitbucketTransportTests
 {
     [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.Forbidden)]
+    public async Task GetAsyncDoesNotRetryAuthenticationFailures(HttpStatusCode status)
+    {
+        var calls = 0;
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+        {
+            calls++;
+            return new HttpResponseMessage(status) { Content = new StringContent("auth failed") };
+        }));
+        var transport = new BitbucketTransport(client, CreatePassthroughRetryPolicyHelper(), CreateTelemetryService().Object);
+
+        Func<Task> act = () => transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+        calls.Should().Be(1);
+    }
+
+    [Theory]
     [InlineData("https://other.example/2.0/user")]
     [InlineData("http://api.bitbucket.org/2.0/user")]
     [InlineData("https://api.bitbucket.org:444/2.0/user")]

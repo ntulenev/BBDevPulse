@@ -10,6 +10,28 @@ namespace BBDevPulse.Tests.API;
 
 public sealed class RetryPolicyHelperTests
 {
+    [Fact]
+    public async Task ExecuteAsyncPreservesStatusWhenRetryBudgetIsExhausted()
+    {
+        var options = Options.Create(new BitbucketOptions
+        {
+            Days = 7, Workspace = "workspace", PageLength = 25,
+            MaxRetries = 0, Username = "user", AppPassword = "pass",
+            RepoNameFilter = string.Empty, RepoNameList = [], BranchNameList = [],
+            RepoSearchMode = RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly
+        });
+        var helper = new RetryPolicyHelper(options);
+        var failure = new RetryableBitbucketException(System.Net.HttpStatusCode.ServiceUnavailable, "busy");
+
+        Func<Task> act = () => helper.ExecuteAsync<int>(_ => Task.FromException<int>(failure),
+            ex => ex is RetryableBitbucketException, CancellationToken.None);
+
+        var thrown = await act.Should().ThrowAsync<RetryableBitbucketException>();
+        thrown.Which.Should().BeSameAs(failure);
+        thrown.Which.StatusCode.Should().Be(System.Net.HttpStatusCode.ServiceUnavailable);
+    }
+
     [Theory]
     [InlineData("120")]
     [InlineData("Wed, 21 Oct 2099 07:28:00 GMT")]

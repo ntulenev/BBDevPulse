@@ -1,6 +1,8 @@
 using FluentAssertions;
 
 using BBDevPulse.Abstractions;
+using BBDevPulse.Caching;
+using BBDevPulse.Caching.Mappers;
 using BBDevPulse.Configuration;
 using BBDevPulse.Logic;
 using BBDevPulse.Models;
@@ -15,6 +17,121 @@ namespace BBDevPulse.Tests.Logic;
 
 public sealed class PullRequestAnalyzerTests
 {
+    [Fact]
+    public async Task AnalyzeAsyncRetriesMissingSizeThenUsesUpdatedDiskSnapshot()
+    {
+        var cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+            var parameters = CreateParameters(date.AddDays(-1));
+            var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+            var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
+                closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
+                author: null, destination: null);
+            var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+            client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable([pr]));
+            client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+            client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+            client.SetupSequence(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("diffstat unavailable"))
+                .ReturnsAsync(new PullRequestSizeSummary(2, 4, 1));
+            var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(),
+                new Mock<IBitbucketTelemetryService>().Object, cacheDirectory);
+            var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
+                analysisCache: cache);
+
+            var first = new ReportData(parameters);
+            await analyzer.AnalyzeAsync(repository, first, CancellationToken.None);
+            first.Reports.Single().HasSizeData.Should().BeFalse();
+            first.Reports.Single().HasCorrectionsData.Should().BeTrue();
+
+            var second = new ReportData(parameters);
+            await analyzer.AnalyzeAsync(repository, second, CancellationToken.None);
+            second.Reports.Single().FilesChanged.Should().Be(2);
+            second.Reports.Single().HasSizeData.Should().BeTrue();
+
+            var third = new ReportData(parameters);
+            await analyzer.AnalyzeAsync(repository, third, CancellationToken.None);
+            third.Reports.Single().FilesChanged.Should().Be(2);
+            client.Verify(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        }
+        finally
+        {
+            var resolved = Path.GetFullPath(cacheDirectory);
+            var parent = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests"));
+            if (resolved.StartsWith(parent + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
+                Directory.Exists(resolved))
+            {
+                Directory.Delete(resolved, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task AnalyzeAsyncWaitsForActiveHandlerAndPreservesPageFailure()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var pullRequest = new PullRequest(new PullRequestId(1), PullRequestState.Open,
+            closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
+            author: null, destination: null);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sourceFailure = new InvalidOperationException("second page failed");
+        var active = 0;
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns((Workspace _, RepoSlug _, Func<PullRequest, bool> _, CancellationToken token) => ReadPullRequests(token));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns((Workspace _, RepoSlug _, PullRequestId _, Func<PullRequestActivity, bool> _, CancellationToken token) => ReadActivities(token));
+
+        async IAsyncEnumerable<PullRequest> ReadPullRequests([EnumeratorCancellation] CancellationToken token)
+        {
+            yield return pullRequest;
+            await started.Task;
+            token.ThrowIfCancellationRequested();
+            throw sourceFailure;
+        }
+
+        async IAsyncEnumerable<PullRequestActivity> ReadActivities([EnumeratorCancellation] CancellationToken token)
+        {
+            Interlocked.Increment(ref active);
+            started.SetResult();
+            try
+            {
+                await finish.Task;
+                token.ThrowIfCancellationRequested();
+            }
+            finally
+            {
+                Interlocked.Decrement(ref active);
+            }
+
+            yield break;
+        }
+
+        var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        var run = analyzer.AnalyzeAsync(repository, data, CancellationToken.None);
+        await started.Task;
+        run.IsCompleted.Should().BeFalse();
+        finish.SetResult();
+        var thrown = await FluentActions.Invoking(async () => await run).Should().ThrowAsync<InvalidOperationException>();
+        thrown.Which.Should().BeSameAs(sourceFailure);
+        active.Should().Be(0);
+    }
+
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
     [Fact(DisplayName = "Constructor throws when client is null")]

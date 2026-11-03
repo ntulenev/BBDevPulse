@@ -278,7 +278,7 @@ internal sealed class BitbucketClient : IBitbucketClient
             if (string.IsNullOrWhiteSpace(sourceCommitHash) ||
                 string.IsNullOrWhiteSpace(destinationCommitHash))
             {
-                return PullRequestSizeSummary.Empty;
+                throw new InvalidOperationException("Bitbucket pull request diffstat references are unavailable.");
             }
 
             var diffStatUri = _uriBuilder.BuildRelativeUri(

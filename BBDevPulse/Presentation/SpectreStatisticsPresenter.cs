@@ -332,6 +332,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .ToList();
 
         var correctionCandidates = metricReports
+            .Where(static report => report.HasCorrectionsData)
             .Select(static report => new MetricCandidate(report, report.Corrections))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
@@ -625,7 +626,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
                 report.State.ToString(),
                 report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-",
                 report.Comments.ToString(CultureInfo.InvariantCulture),
-                report.Corrections.ToString(CultureInfo.InvariantCulture),
+                report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable",
                 report.HasSizeData
                     ? $"{report.GetSizeMetricValue(PullRequestSizeMode.Lines).ToString(CultureInfo.InvariantCulture)} ({report.GetSizeTier(PullRequestSizeMode.Lines)})"
                     : "-");
@@ -736,7 +737,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         PullRequestSizeMode pullRequestSizeMode) =>
         activity.HasSizeDataForMode(pullRequestSizeMode)
             ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
-            : "-";
+            : "Unavailable";
 
     private static string ShortCommitHash(string commitHash) =>
         commitHash.Length <= 12

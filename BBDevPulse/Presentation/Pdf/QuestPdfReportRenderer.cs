@@ -709,6 +709,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
             .ToList();
 
         var correctionCandidates = reports
+            .Where(static report => report.HasCorrectionsData)
             .Select(static report => new MetricCandidate(report, report.Corrections))
             .OrderByDescending(static candidate => candidate.Value)
             .ToList();
@@ -1033,7 +1034,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         PullRequestSizeMode pullRequestSizeMode) =>
         activity.HasSizeDataForMode(pullRequestSizeMode)
             ? activity.GetSizeMetricValue(pullRequestSizeMode).ToString(CultureInfo.InvariantCulture)
-            : "-";
+            : "Unavailable";
 
     private static string TrimCommitMessage(string message) =>
         message

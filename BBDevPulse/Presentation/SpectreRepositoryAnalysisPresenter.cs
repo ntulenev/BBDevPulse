@@ -55,37 +55,37 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                 {
                     foreach (var repository in repositories)
                     {
-                    await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
-                    var running = Interlocked.Increment(ref inFlight);
+                        await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
+                        var running = Interlocked.Increment(ref inFlight);
 
-                    lock (uiLock)
-                    {
-                        task.Description =
-                            $"Analyzing {repository.DisplayName} ({Volatile.Read(ref completed)}/{total} complete, {running} active)";
-                    }
-
-                    repositoryTasks.Add(AnalyzeRepositoryAsync());
-
-                    async Task AnalyzeRepositoryAsync()
-                    {
-                        try
+                        lock (uiLock)
                         {
-                            await analyzeRepository(repository, stop.Token).ConfigureAwait(false);
+                            task.Description =
+                                $"Analyzing {repository.DisplayName} ({Volatile.Read(ref completed)}/{total} complete, {running} active)";
                         }
-                        finally
-                        {
-                            var finished = Interlocked.Increment(ref completed);
-                            var active = Interlocked.Decrement(ref inFlight);
 
-                            lock (uiLock)
+                        repositoryTasks.Add(AnalyzeRepositoryAsync());
+
+                        async Task AnalyzeRepositoryAsync()
+                        {
+                            try
                             {
-                                task.Increment(1);
-                                task.Description = $"Analyzing repositories ({finished}/{total} complete, {active} active)";
+                                await analyzeRepository(repository, stop.Token).ConfigureAwait(false);
                             }
+                            finally
+                            {
+                                var finished = Interlocked.Increment(ref completed);
+                                var active = Interlocked.Decrement(ref inFlight);
 
-                            _ = semaphore.Release();
+                                lock (uiLock)
+                                {
+                                    task.Increment(1);
+                                    task.Description = $"Analyzing repositories ({finished}/{total} complete, {active} active)";
+                                }
+
+                                _ = semaphore.Release();
+                            }
                         }
-                    }
                     }
                 }
                 catch (Exception exception)

@@ -11,6 +11,28 @@ namespace BBDevPulse.Tests.Caching;
 
 public sealed class FilePullRequestAnalysisCacheTests : IDisposable
 {
+    [Fact]
+    public void CachePreservesMissingSizeAndRejectsOldVersion()
+    {
+        var telemetry = CreateTelemetryService();
+        var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(), telemetry.Object, _cacheDirectory);
+        var workspace = new Workspace("ws");
+        var repo = new RepoSlug("repo");
+        var id = new PullRequestId(42);
+        var snapshot = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            hasEnrichment: false, hasCommits: true, hasSize: false);
+
+        cache.Store(workspace, repo, id, "pr", "parameters", snapshot);
+        cache.TryGet(workspace, repo, id, "pr", "parameters", out var loaded).Should().BeTrue();
+        loaded.HasCommits.Should().BeTrue();
+        loaded.HasSize.Should().BeFalse();
+
+        var path = Directory.EnumerateFiles(_cacheDirectory, "*.json", SearchOption.AllDirectories).Single();
+        var json = File.ReadAllText(path);
+        File.WriteAllText(path, json.Replace("\"Version\":2", "\"Version\":1", StringComparison.Ordinal));
+        cache.TryGet(workspace, repo, id, "pr", "parameters", out _).Should().BeFalse();
+    }
+
     private readonly string _cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
 
     [Fact(DisplayName = "Constructor throws when mapper is null")]
