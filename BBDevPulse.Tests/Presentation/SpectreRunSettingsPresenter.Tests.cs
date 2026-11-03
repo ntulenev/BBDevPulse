@@ -36,9 +36,12 @@ public sealed class SpectreRunSettingsPresenterTests
 
         var output = TestConsoleRunner.Run(_ => SpectreRunSettingsPresenter.Render(parameters));
 
-        output.Should().Contain("Report settings");
-        output.Should().Contain("ShowAllDetailsForDevelopers");
-        output.Should().Contain("WARNING");
+        output.Should().Contain("BBDevPulse  /  Review run");
+        output.Should().Contain("01  Date range");
+        output.Should().Contain("02  Scope");
+        output.Should().Contain("03  Report behavior");
+        output.Should().Contain("Developer details");
+        output.Should().Contain("TIME WARNING");
     }
 
     private static ReportParameters CreateParameters(

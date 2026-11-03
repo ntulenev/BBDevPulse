@@ -15,60 +15,55 @@ internal static class SpectreRunSettingsPresenter
     {
         ArgumentNullException.ThrowIfNull(parameters);
 
-        var table = new Table().Border(TableBorder.Rounded).Expand();
-        _ = table.AddColumn("Setting");
-        _ = table.AddColumn("Effective value and impact");
-
-        var end = parameters.ToDateExclusive;
-        var window = end.HasValue
-            ? $"{parameters.FilterDate:yyyy-MM-dd HH:mm} UTC to {end.Value:yyyy-MM-dd HH:mm} UTC (end exclusive)"
-            : $"from {parameters.FilterDate:yyyy-MM-dd HH:mm} UTC to now";
-        Add(table, "Date window", window);
-
         var excludedDates = GetExcludedDatesInWindow(parameters, DateTimeOffset.UtcNow);
-        Add(table, "ExcludeWeekend", parameters.ExcludeWeekend ? "true: Saturdays and Sundays" : "false");
-        Add(table, "ExcludedDays", parameters.ExcludedDays.Count == 0
-            ? "none"
-            : string.Join(", ", parameters.ExcludedDays.Order().Select(FormatDate)));
-        Add(table, "Excluded in window", excludedDates.Count == 0
-            ? "none"
-            : string.Join(", ", excludedDates.Select(FormatDate)));
-        Add(table, "Date exclusions", "These dates are removed from duration calculations only; PRs and activity on them remain eligible.");
+        var window = parameters.ToDateExclusive is { } end
+            ? $"{parameters.FilterDate:yyyy-MM-dd HH:mm} UTC  →  {end:yyyy-MM-dd HH:mm} UTC (end exclusive)"
+            : $"{parameters.FilterDate:yyyy-MM-dd HH:mm} UTC  →  now";
 
-        Add(table, "RepoSearchMode", DescribeRepositorySearch(parameters));
-        Add(table, "Merge target branches", parameters.BranchNameList.Count == 0
-            ? "all target branches"
-            : string.Join(", ", parameters.BranchNameList.Select(static branch => branch.Value)));
-        Add(table, "PrTimeFilterMode", parameters.PrTimeFilterMode switch
-        {
-            PrTimeFilterMode.LastKnownUpdateAndCreated =>
-                "LastKnownUpdateAndCreated: include PRs created or last updated since the start; older PRs with recent activity can enter the report.",
-            PrTimeFilterMode.CreatedOnOnly =>
-                "CreatedOnOnly: fetch PRs created since the start; older PRs with recent activity are not fetched.",
-            _ => parameters.PrTimeFilterMode.ToString()
-        });
-        Add(table, "PullRequestSizeMode", parameters.PullRequestSizeMode switch
-        {
-            PullRequestSizeMode.Files => "Files: size statistics and tiers use the count of changed files.",
-            PullRequestSizeMode.Lines => "Lines: size statistics and tiers use added plus removed lines.",
-            _ => parameters.PullRequestSizeMode.ToString()
-        });
-        Add(table, "ShowDeveloperUuidInStats", parameters.ShowDeveloperUuidInStats
-            ? "true: show Bitbucket UUIDs beside developers in statistics."
-            : "false: hide Bitbucket UUIDs in developer statistics.");
-        Add(table, "ShowAllDetailsForDevelopers", parameters.ShowAllDetailsForDevelopers
-            ? "true: include per-developer PR, commit, comment and approval details."
-            : "false: show summary statistics without per-developer detail sections.");
-        Add(table, "Team filter", parameters.TeamFilter ?? "all teams");
+        AnsiConsole.Write(new Rule("[bold deepskyblue1]BBDevPulse  /  Review run[/]").LeftJustified().RuleStyle("grey"));
+        AnsiConsole.MarkupLine("[grey]Check the settings below before loading data from Bitbucket.[/]");
+        AnsiConsole.WriteLine();
 
-        AnsiConsole.Write(new Rule("Report settings").LeftJustified());
-        AnsiConsole.Write(table);
+        WriteSection("01  Date range", [
+            ("Window", window),
+            ("Weekends", parameters.ExcludeWeekend ? "Excluded from duration calculations" : "Included in duration calculations"),
+            ("Extra excluded days", parameters.ExcludedDays.Count == 0 ? "None configured" : $"{parameters.ExcludedDays.Count} configured"),
+            ("Dates in this window", excludedDates.Count == 0
+                ? "None excluded"
+                : string.Join(", ", excludedDates.Select(FormatDate)))
+        ]);
+        AnsiConsole.MarkupLine("[grey]Date exclusions change duration metrics only. PRs and activity on those dates remain eligible.[/]");
+        AnsiConsole.WriteLine();
+
+        WriteSection("02  Scope", [
+            ("Repositories", DescribeRepositorySearch(parameters)),
+            ("Merge targets", parameters.BranchNameList.Count == 0
+                ? "All target branches"
+                : string.Join(", ", parameters.BranchNameList.Select(static branch => branch.Value))),
+            ("Team", parameters.TeamFilter ?? "All teams")
+        ]);
+        AnsiConsole.WriteLine();
+
+        WriteSection("03  Report behavior", [
+            ("PR time mode", DescribePrTimeMode(parameters.PrTimeFilterMode)),
+            ("PR size", DescribeSizeMode(parameters.PullRequestSizeMode)),
+            ("Developer UUIDs", parameters.ShowDeveloperUuidInStats
+                ? "Shown beside developers in statistics"
+                : "Hidden in developer statistics"),
+            ("Developer details", parameters.ShowAllDetailsForDevelopers
+                ? "On — include per-developer PR, commit, comment and approval details"
+                : "Off — summary statistics only")
+        ]);
+
         if (parameters.ShowAllDetailsForDevelopers)
         {
+            AnsiConsole.WriteLine();
             AnsiConsole.Write(new Panel(
-                "[bold red]WARNING: Detailed developer output may substantially increase report generation time.[/]"
-            ).BorderColor(Color.Red));
+                "[bold orange1]Detailed developer output may substantially increase report generation time.[/]"
+            ).Header("[bold orange1]TIME WARNING[/]").BorderColor(Color.Orange1));
         }
+
+        AnsiConsole.WriteLine();
     }
 
     internal static IReadOnlyList<DateOnly> GetExcludedDatesInWindow(
@@ -91,23 +86,50 @@ internal static class SpectreRunSettingsPresenter
         return excluded;
     }
 
+    private static void WriteSection(string title, IEnumerable<(string Label, string Value)> rows)
+    {
+        AnsiConsole.Write(new Rule($"[bold deepskyblue1]{title}[/]").LeftJustified().RuleStyle("grey"));
+        var table = new Table().NoBorder().HideHeaders().Expand();
+        _ = table.AddColumn(new TableColumn("Setting").Width(22));
+        _ = table.AddColumn("Value");
+        foreach (var (label, value) in rows)
+        {
+            _ = table.AddRow($"[grey]{Markup.Escape(label)}[/]", Markup.Escape(value));
+        }
+
+        AnsiConsole.Write(table);
+    }
+
     private static string DescribeRepositorySearch(ReportParameters parameters) =>
         parameters.RepoSearchMode switch
         {
             RepoSearchMode.SearchByFilter when string.IsNullOrWhiteSpace(parameters.RepoNameFilter.Value) =>
-                "SearchByFilter: no name or slug substring configured; all repositories are eligible.",
+                "SearchByFilter · all repositories (no name or slug filter)",
             RepoSearchMode.SearchByFilter =>
-                $"SearchByFilter: name or slug contains '{parameters.RepoNameFilter.Value}' (case-insensitive).",
+                $"SearchByFilter · name or slug contains '{parameters.RepoNameFilter.Value}' (case-insensitive)",
             RepoSearchMode.FilterFromTheList when parameters.RepoNameList.Count == 0 =>
-                "FilterFromTheList: list is empty; all repositories are eligible.",
+                "FilterFromTheList · all repositories (list is empty)",
             RepoSearchMode.FilterFromTheList =>
-                $"FilterFromTheList: name or slug exactly matches one of {string.Join(", ", parameters.RepoNameList.Select(static name => name.Value))} (case-insensitive).",
+                $"FilterFromTheList · exact name or slug: {string.Join(", ", parameters.RepoNameList.Select(static name => name.Value))} (case-insensitive)",
             _ => parameters.RepoSearchMode.ToString()
         };
 
+    private static string DescribePrTimeMode(PrTimeFilterMode mode) => mode switch
+    {
+        PrTimeFilterMode.LastKnownUpdateAndCreated =>
+            "LastKnownUpdateAndCreated · created or updated since the start; older PRs with recent activity may appear",
+        PrTimeFilterMode.CreatedOnOnly =>
+            "CreatedOnOnly · only PRs created since the start; older PRs with recent activity are skipped",
+        _ => mode.ToString()
+    };
+
+    private static string DescribeSizeMode(PullRequestSizeMode mode) => mode switch
+    {
+        PullRequestSizeMode.Files => "Files · size statistics and tiers count changed files",
+        PullRequestSizeMode.Lines => "Lines · size statistics and tiers count added plus removed lines",
+        _ => mode.ToString()
+    };
+
     private static string FormatDate(DateOnly date) =>
         date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-
-    private static void Add(Table table, string setting, string value) =>
-        _ = table.AddRow(Markup.Escape(setting), Markup.Escape(value));
 }
