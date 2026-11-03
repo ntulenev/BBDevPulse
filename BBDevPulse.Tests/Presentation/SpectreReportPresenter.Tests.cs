@@ -14,6 +14,19 @@ public sealed class SpectreReportPresenterTests
 {
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
+    [Fact]
+    public void RenderReportShowsCollisionBeforeStatistics()
+    {
+        var data = new ReportData(CreateReportParameters());
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice [team]")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Alice [team]")));
+        var presenter = CreateSut(pullRequestReportPresenter: new Mock<IPullRequestReportPresenter>().Object,
+            statisticsPresenter: new Mock<IStatisticsPresenter>().Object);
+        var output = TestConsoleRunner.Run(_ => presenter.RenderReport(data));
+        output.Should().Contain("Different Bitbucket users share the same display name.");
+        output.Should().Contain("Alice [team]: {a}, {b}");
+    }
+
     [Fact(DisplayName = "Team menu shows counts and selected team members with grades")]
     public void SelectTeamFilterWhenTeamChosenShowsMembers()
     {

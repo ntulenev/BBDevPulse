@@ -8,6 +8,29 @@ namespace BBDevPulse.Tests.Models;
 public sealed class ReportDataTests
 {
     [Fact]
+    public void CollisionsUseObservedIdentitiesEvenAfterStatisticsAreMerged()
+    {
+        var data = new ReportData(CreateReportParameters());
+        data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{B}"), new DisplayName("Alice")));
+        data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("ALICE")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{A}"), new DisplayName("alice")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Alice")));
+        data.DeveloperStats.Should().HaveCount(1);
+        var collision = data.GetIdentityCollisions().Should().ContainSingle().Subject;
+        collision.Name.Should().Be("Alice");
+        collision.Uuids.Should().Equal("{a}", "{B}");
+    }
+
+    [Fact]
+    public void SameUuidAndMissingUuidDoNotCreateCollision()
+    {
+        var data = new ReportData(CreateReportParameters());
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{A}"), new DisplayName("alice")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Alice")));
+        data.GetIdentityCollisions().Should().BeEmpty();
+    }
+    [Fact]
     public void GetTtfrStatisticsSharesThreeObservationSummary()
     {
         var data = new ReportData(CreateReportParameters());

@@ -68,6 +68,20 @@ Bob Smith;Middle;Import
 
 Names must match Bitbucket display names exactly to enrich developer statistics. Departments form the team choices, with duplicate department names grouped without regard to case. A developer without a CSV match retains `N/A` metadata. Without departments, there is no team picker.
 
+### Duplicate display names
+
+If the Bitbucket data read during a run contains the same display name for different UUIDs, a red warning at the beginning of the console, HTML, and PDF reports lists the name and UUIDs. Check the report manually: developer statistics may be combined and cannot be considered fully accurate. Names and UUIDs are compared without regard to case; users without a UUID cannot establish a collision. Detection covers identities observed in the PRs and activities fetched for the run, not every user in the workspace.
+
+This is expected to be unlikely in small organizations. The warning does not resolve collisions; a fix for separating identities will be prepared if an actual collision is encountered. The screenshots below use synthetic identities added specifically for this example.
+
+HTML report:
+
+![Synthetic duplicate-name warning in HTML](screenshots/identity-collision-html.png)
+
+PDF report:
+
+![Synthetic duplicate-name warning in PDF](screenshots/identity-collision-pdf.png)
+
 ## Reports and metrics
 
 The console, HTML, and PDF show PR and developer tables, PR throughput, merge time, time to first reaction (TTFR), comments, peer comments, corrections, PR size, and worst PRs by metric. When enabled, developer detail sections include authored PRs, comments, approvals, and follow-up commits. HTML detailed tables support sorting and filtering; summary statistic tables are static.
