@@ -20,6 +20,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 Console.OutputEncoding = Encoding.UTF8;
+SpectreStartupPresenter.Render();
 
 using var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration(static (__, config) =>
