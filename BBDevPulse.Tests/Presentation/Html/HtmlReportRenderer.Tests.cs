@@ -13,6 +13,29 @@ namespace BBDevPulse.Tests.Presentation.Html;
 
 public sealed class HtmlReportRendererTests
 {
+    [Fact(DisplayName = "RenderReport propagates save failure and does not open browser")]
+    [Trait("Category", "Unit")]
+    public async Task RenderReportAsyncWhenSaveFailsDoesNotLaunch()
+    {
+        var fileStore = new Mock<IHtmlReportFileStore>(MockBehavior.Strict);
+        using var cancellation = new CancellationTokenSource();
+        var failure = new IOException("Cannot save report");
+        fileStore.Setup(x => x.SaveAsync(It.IsAny<string>(), "<html>report</html>", cancellation.Token))
+            .ThrowsAsync(failure);
+        var composer = new Mock<IHtmlContentComposer>(MockBehavior.Strict);
+        composer.Setup(x => x.Compose(It.IsAny<ReportData>())).Returns("<html>report</html>");
+        var launcher = new Mock<IHtmlReportLauncher>(MockBehavior.Strict);
+        var renderer = new HtmlReportRenderer(
+            Options.Create(CreateOptions(new HtmlOptions { Enabled = true, OpenInBrowser = true })),
+            fileStore.Object, composer.Object, launcher.Object);
+
+        Func<Task> act = () => renderer.RenderReportAsync(new ReportData(CreateParameters()), cancellation.Token);
+
+        (await act.Should().ThrowAsync<IOException>()).Which.Should().BeSameAs(failure);
+        fileStore.VerifyAll();
+        launcher.Verify(x => x.Open(It.IsAny<string>()), Times.Never);
+    }
+
     [Fact(DisplayName = "RenderReport returns without saving when HTML generation is disabled")]
     [Trait("Category", "Unit")]
     public async Task RenderReportAsyncWhenHtmlIsDisabledDoesNotPersistDocument()
