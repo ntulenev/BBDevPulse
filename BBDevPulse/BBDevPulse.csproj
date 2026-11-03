@@ -29,6 +29,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Presentation\Html\Templates\*.html"
       LogicalName="BBDevPulse.HtmlTemplates.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Demo\people.csv" LogicalName="BBDevPulse.Demo.people.csv" />
   </ItemGroup>
 
   <ProjectExtensions><VisualStudio><UserProperties appsettings_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>

@@ -17,6 +17,10 @@ public sealed class DemoReportRunnerTests
     {
         var presented = false;
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.SelectTeamFilter(
+                It.Is<IReadOnlyList<TeamFilterOption>>(teams => teams.Count == 3 &&
+                    teams.Any(team => team.Name == "Platform" && team.Members.Count == 2)), 4))
+            .Returns((string?)null);
         presenter.Setup(x => x.RenderDemoSettings(
                 It.Is<ReportParameters>(parameters => parameters.IsDemo),
                 It.Is<string>(name => name.StartsWith("bbdevpulse-demo-report_", StringComparison.Ordinal) &&
@@ -50,6 +54,7 @@ public sealed class DemoReportRunnerTests
         var runner = new DemoReportRunner(presenter.Object, html.Object, pdf.Object);
         await runner.RunAsync(CancellationToken.None);
 
+        presenter.Verify(x => x.SelectTeamFilter(It.IsAny<IReadOnlyList<TeamFilterOption>>(), 4), Times.Once);
         presenter.Verify(x => x.ConfirmDemoStart(), Times.Once);
         if (confirmed)
         {
@@ -61,5 +66,33 @@ public sealed class DemoReportRunnerTests
             html.VerifyNoOtherCalls();
             pdf.VerifyNoOtherCalls();
         }
+    }
+
+    [Fact(DisplayName = "Demo runner passes selected synthetic team to report and settings")]
+    public async Task RunAsyncAppliesSelectedTeam()
+    {
+        var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.SelectTeamFilter(It.IsAny<IReadOnlyList<TeamFilterOption>>(), 4))
+            .Returns("Platform");
+        presenter.Setup(x => x.RenderDemoSettings(
+            It.Is<ReportParameters>(parameters => parameters.TeamFilter == "Platform"),
+            It.Is<string>(name => name.StartsWith("platform-bbdevpulse-demo-report_", StringComparison.Ordinal)),
+            It.Is<string>(name => name.StartsWith("platform-bbdevpulse-demo-report_", StringComparison.Ordinal))));
+        presenter.Setup(x => x.ConfirmDemoStart()).Returns(true);
+        presenter.Setup(x => x.RenderReport(It.Is<ReportData>(report =>
+            report.Parameters.TeamFilter == "Platform" && report.DeveloperStats.Count == 2)));
+
+        var html = new Mock<IHtmlReportRenderer>(MockBehavior.Strict);
+        html.Setup(x => x.RenderReportAsync(It.Is<ReportData>(report => report.Parameters.TeamFilter == "Platform"),
+            It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        var pdf = new Mock<IPdfReportRenderer>(MockBehavior.Strict);
+        pdf.Setup(x => x.RenderReportAsync(It.Is<ReportData>(report => report.Parameters.TeamFilter == "Platform"),
+            It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        await new DemoReportRunner(presenter.Object, html.Object, pdf.Object).RunAsync(CancellationToken.None);
+
+        presenter.VerifyAll();
+        html.VerifyAll();
+        pdf.VerifyAll();
     }
 }

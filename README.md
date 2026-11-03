@@ -172,9 +172,9 @@ All settings are under the `Bitbucket` object.
 
 ## Demo mode
 
-Set `Bitbucket:DemoMode` to `true` and run the application. The demo uses a built-in set of synthetic repositories, PRs, developers, and activity. It does not read Bitbucket credentials or `PeopleCsvPath`, and it does not call the Bitbucket API. The startup screen marks the run as synthetic and asks for confirmation before rendering.
+Set `Bitbucket:DemoMode` to `true` and run the application. The demo uses built-in synthetic repositories, PRs, activity, and an embedded people CSV. The same team picker shows synthetic people and grades, and selecting a team filters the report. It does not read Bitbucket credentials or the configured `PeopleCsvPath`, and it does not call the Bitbucket API. The startup screen marks the run as synthetic and asks for confirmation before rendering.
 
-Demo mode always creates `bbdevpulse-demo-report_<date>.html` and `bbdevpulse-demo-report_<date>.pdf` in the current directory. It ignores the normal HTML/PDF output paths and browser-launch setting so real paths cannot appear in a demo. Both reports are marked as synthetic. Set `DemoMode` to `false` for a live Bitbucket run and supply your local credentials.
+Demo mode creates `bbdevpulse-demo-report_<date>.html` and `bbdevpulse-demo-report_<date>.pdf` in the current directory. A selected team adds its normalized name as a prefix. It ignores the normal HTML/PDF output paths and browser-launch setting so real paths cannot appear in a demo. Both reports are marked as synthetic. Set `DemoMode` to `false` for a live Bitbucket run and supply your local credentials.
 
 ## Example configuration
 ```json

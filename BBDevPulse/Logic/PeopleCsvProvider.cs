@@ -58,8 +58,6 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
     private static async Task<Dictionary<DisplayName, PersonCsvRow>> ReadPeopleAsync(
         string path, CancellationToken cancellationToken)
     {
-        var peopleByName = new Dictionary<DisplayName, PersonCsvRow>(DisplayNameValueComparer.Instance);
-        var lineNumber = 0;
         await using var stream = new FileStream(
             path,
             FileMode.Open,
@@ -67,7 +65,15 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
             FileShare.Read,
             bufferSize: 4096,
             options: FileOptions.Asynchronous);
-        using var reader = new StreamReader(stream);
+        return await ReadPeopleAsync(stream, cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async Task<Dictionary<DisplayName, PersonCsvRow>> ReadPeopleAsync(
+        Stream stream, CancellationToken cancellationToken)
+    {
+        var peopleByName = new Dictionary<DisplayName, PersonCsvRow>(DisplayNameValueComparer.Instance);
+        var lineNumber = 0;
+        using var reader = new StreamReader(stream, leaveOpen: true);
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
