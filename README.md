@@ -97,6 +97,8 @@ Historical reports are not snapshots of Bitbucket at the end of the selected per
 
 `Comments` on a PR counts its recognized comments within the report period, subject to the selection and activity-reading limits above. `Peer Comments` counts a developer's comments on other people's selected PRs; self-comments and comments on PRs with an unknown author do not count as peer comments. Duration metrics exclude weekends and explicit `ExcludedDays` only when configured. `ForcedIncludeDates` overrides both rules for working weekends or rescheduled holidays. PRs and activity on excluded dates remain eligible for the report.
 
+`PRs per Developer` includes zero opened PRs for developers present in the report's developer statistics, including reviewers who opened no PRs during the period. People who do not appear in the analyzed activity are not automatically included from the people CSV, so this distribution is not necessarily for the whole team.
+
 PR size comes from Bitbucket diffstat. `PullRequestSizeMode = Lines` uses added plus removed lines; `Files` uses the count of changed files. The selected measure drives the PR `Size` tier, size statistics, and the biggest-PR selection:
 
 | Tier | Lines changed | Files changed |

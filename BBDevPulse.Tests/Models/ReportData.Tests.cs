@@ -300,9 +300,9 @@ public sealed class ReportDataTests
         rejected.Should().Be(2);
     }
 
-    [Fact(DisplayName = "GetOpenedPullRequestCountsPerDeveloper returns ordered authored counts and skips zeros")]
+    [Fact(DisplayName = "GetOpenedPullRequestCountsPerDeveloper includes developers with zero opened PRs")]
     [Trait("Category", "Unit")]
-    public void GetOpenedPullRequestCountsPerDeveloperWhenDeveloperStatsExistReturnsOrderedNonZeroCounts()
+    public void GetOpenedPullRequestCountsPerDeveloperWhenDeveloperStatsExistIncludesZeroCounts()
     {
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
@@ -317,7 +317,32 @@ public sealed class ReportDataTests
         var counts = reportData.GetOpenedPullRequestCountsPerDeveloper();
 
         // Assert
-        counts.Should().Equal(1d, 3d);
+        counts.Should().Equal(0d, 1d, 3d);
+    }
+
+    [Fact]
+    public void OpenedPullRequestDistributionCalculatesMedianAcrossAllObservedDevelopers()
+    {
+        var data = new ReportData(CreateReportParameters());
+        foreach (var (name, count) in new[] { ("Alice", 3), ("Bob", 0), ("Carol", 0) })
+        {
+            data.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName(name))).PrsOpenedSince = count;
+        }
+
+        var counts = data.GetOpenedPullRequestCountsPerDeveloper();
+        counts.Should().Equal(0d, 0d, 3d);
+        new StatisticsCalculator().Percentile(counts, 50).Should().Be(0);
+    }
+
+    [Fact]
+    public void OpenedPullRequestDistributionIncludesReviewersWhenNoPrsWereOpened()
+    {
+        var data = new ReportData(CreateReportParameters());
+        data.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Reviewer"))).CommentsAfter = 1;
+
+        var counts = data.GetOpenedPullRequestCountsPerDeveloper();
+        counts.Should().Equal(0d);
+        new StatisticsCalculator().Percentile(counts, 50).Should().Be(0);
     }
 
     [Fact(DisplayName = "GetPeerCommentCountsPerDeveloper returns ordered counts including zeros")]

@@ -123,7 +123,6 @@ public sealed class ReportData
     /// <returns>Ordered authored pull request counts per developer.</returns>
     public List<double> GetOpenedPullRequestCountsPerDeveloper() =>
         DeveloperStats.Values
-            .Where(static stats => stats.PrsOpenedSince > 0)
             .Select(static stats => (double)stats.PrsOpenedSince)
             .OrderBy(static count => count)
             .ToList();
