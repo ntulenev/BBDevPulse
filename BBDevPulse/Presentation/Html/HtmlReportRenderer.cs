@@ -29,7 +29,7 @@ public sealed class HtmlReportRenderer : IHtmlReportRenderer
         ArgumentNullException.ThrowIfNull(htmlContentComposer);
         ArgumentNullException.ThrowIfNull(htmlReportLauncher);
 
-        _htmlOptions = options.Value.Html ?? new HtmlOptions();
+        _htmlOptions = options.Value.DemoMode ? DemoReportOptions.Html : options.Value.Html ?? new HtmlOptions();
         _htmlReportFileStore = htmlReportFileStore;
         _htmlContentComposer = htmlContentComposer;
         _htmlReportLauncher = htmlReportLauncher;

@@ -42,7 +42,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         _dateDiffFormatter = dateDiffFormatter;
         _statisticsCalculator = statisticsCalculator;
         _pdfReportFileStore = pdfReportFileStore;
-        _pdfOptions = options.Value.Pdf ?? new PdfOptions();
+        _pdfOptions = options.Value.DemoMode ? DemoReportOptions.Pdf : options.Value.Pdf ?? new PdfOptions();
     }
 
     /// <inheritdoc />
@@ -83,6 +83,12 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 {
                     column.Spacing(2);
                     _ = column.Item().Text("BBDevPulse").Bold().FontSize(16);
+                    if (reportData.Parameters.IsDemo)
+                    {
+                        _ = column.Item().Text("DEMO MODE · Synthetic sample data")
+                            .Bold().FontColor(Colors.Orange.Medium);
+                    }
+
                     _ = column.Item().Text(
                         string.Format(
                             CultureInfo.InvariantCulture,

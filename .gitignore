@@ -3,6 +3,10 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Generated synthetic reports
+bbdevpulse-demo-report_*.html
+bbdevpulse-demo-report_*.pdf
+
 # User-specific files
 *.rsuser
 *.suo

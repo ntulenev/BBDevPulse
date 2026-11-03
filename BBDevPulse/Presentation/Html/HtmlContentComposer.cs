@@ -50,6 +50,11 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         var workspace = reportData.Parameters.Workspace.Value;
 
         var content = new StringBuilder(32 * 1024);
+        if (reportData.Parameters.IsDemo)
+        {
+            _ = content.AppendLine("<p role=\"note\" style=\"padding:10px 14px;border:1px solid #d97706;color:#92400e;font-weight:700\">DEMO MODE · Synthetic sample data</p>");
+        }
+
         _ = content.Append(BuildPullRequestTable(reportData, orderedReports));
         _ = content.AppendLine("<div class=\"stat-grid\">");
         _ = content.Append(BuildDurationStatsTable(

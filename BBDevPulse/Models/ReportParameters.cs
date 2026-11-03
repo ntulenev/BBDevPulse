@@ -38,7 +38,8 @@ public sealed class ReportParameters
         string? teamFilter = null,
         bool showDeveloperUuidInStats = false,
         bool showAllDetailsForDevelopers = false,
-        DateTimeOffset? toDateExclusive = null)
+        DateTimeOffset? toDateExclusive = null,
+        bool isDemo = false)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -60,6 +61,7 @@ public sealed class ReportParameters
         ShowDeveloperUuidInStats = showDeveloperUuidInStats;
         ShowAllDetailsForDevelopers = showAllDetailsForDevelopers;
         ToDateExclusive = toDateExclusive;
+        IsDemo = isDemo;
         ExcludedDays = excludedDays is null
             ? new HashSet<DateOnly>().ToFrozenSet()
             : new HashSet<DateOnly>(excludedDays).ToFrozenSet();
@@ -134,6 +136,11 @@ public sealed class ReportParameters
     /// Gets optional exclusive upper bound for the report range.
     /// </summary>
     public DateTimeOffset? ToDateExclusive { get; }
+
+    /// <summary>
+    /// Indicates that this report contains only built-in synthetic data.
+    /// </summary>
+    public bool IsDemo { get; }
 
     /// <summary>
     /// Gets a value indicating whether the report uses a bounded date range.

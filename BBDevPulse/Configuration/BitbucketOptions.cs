@@ -8,6 +8,11 @@ namespace BBDevPulse.Configuration;
 public sealed class BitbucketOptions
 {
     /// <summary>
+    /// Uses the built-in synthetic report instead of Bitbucket and people CSV data.
+    /// </summary>
+    public bool DemoMode { get; init; }
+
+    /// <summary>
     /// Configuration section name.
     /// </summary>
 #pragma warning disable CA1707 // Identifiers should not contain underscores
