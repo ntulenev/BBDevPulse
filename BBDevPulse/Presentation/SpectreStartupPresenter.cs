@@ -7,15 +7,31 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 internal static class SpectreStartupPresenter
 {
+    private const int WideLayoutWidth = 80;
+
     public static void Render()
     {
-        // A small chart and heartbeat echo the repository logo without relying on image support.
-        AnsiConsole.MarkupLine("[green]   ▂  ▄  ▆  █          ╱╲[/]");
-        AnsiConsole.MarkupLine("[green]   █  █  █  █  ───────╯  ╲  ╱╲[/]");
-        AnsiConsole.MarkupLine("[green]   █  █  █  █              ╲╱  ╲────[/]");
-        AnsiConsole.MarkupLine("[bold green]   BBDevPulse[/]");
-        AnsiConsole.MarkupLine("[grey]   Bitbucket pull requests, reviews, and developer activity.[/]");
-        AnsiConsole.MarkupLine("[grey]   Explore metrics in the console or export HTML and PDF reports.[/]");
+        var width = AnsiConsole.Profile.Width;
+
+        if (width >= WideLayoutWidth)
+        {
+            // Bars and a heartbeat are the two distinctive shapes in the repository logo.
+            AnsiConsole.MarkupLine("[green]    ▂   ▄   ▆   █             ╱╲[/]");
+            AnsiConsole.MarkupLine("[green]    █   █   █   █   ─────────╯  ╲  ╱╲[/]");
+            AnsiConsole.MarkupLine("[green]    █   █   █   █                 ╲╱  ╲────[/]");
+            AnsiConsole.MarkupLine("[green]    ────────────────────────────────────────[/]");
+            AnsiConsole.Write(new FigletText("BBDevPulse").Color(Color.Green));
+            AnsiConsole.MarkupLine("[grey]    Bitbucket pull requests, reviews, and developer activity.[/]");
+            AnsiConsole.MarkupLine("[grey]    Console metrics and HTML/PDF reports.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[green]  ▂ ▄ ▆ █    ───╱╲╱╲───[/]");
+            AnsiConsole.MarkupLine("[bold green]  BBDevPulse[/]");
+            AnsiConsole.MarkupLine("[grey]  Bitbucket PR and review analytics.[/]");
+            AnsiConsole.MarkupLine("[grey]  Console, HTML and PDF reports.[/]");
+        }
+
         AnsiConsole.WriteLine();
     }
 }
