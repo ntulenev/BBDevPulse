@@ -12,6 +12,7 @@ internal sealed class RetryableBitbucketException : InvalidOperationException
     /// </summary>
     /// <param name="statusCode">HTTP status code.</param>
     /// <param name="body">Response body.</param>
+    /// <param name="retryAfter">Optional Retry-After response header.</param>
     public RetryableBitbucketException(HttpStatusCode statusCode, string body, string? retryAfter = null)
         : base($"Bitbucket API request failed ({statusCode}): {body}")
     {

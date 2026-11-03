@@ -49,6 +49,7 @@ public sealed class ReportData
     /// Initializes a new instance of the <see cref="ReportData"/> class.
     /// </summary>
     /// <param name="parameters">Report parameters.</param>
+    /// <param name="peopleByDisplayName">Optional CSV enrichment indexed by display name.</param>
     public ReportData(
         ReportParameters parameters,
         IReadOnlyDictionary<DisplayName, PersonCsvRow>? peopleByDisplayName = null)

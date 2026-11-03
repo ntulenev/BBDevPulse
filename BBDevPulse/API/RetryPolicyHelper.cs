@@ -18,6 +18,7 @@ internal sealed class RetryPolicyHelper : IRetryPolicyHelper
     /// Initializes a new instance of the <see cref="RetryPolicyHelper"/> class.
     /// </summary>
     /// <param name="options">Bitbucket options.</param>
+    /// <param name="timeProvider">Optional clock for scheduling retries.</param>
     public RetryPolicyHelper(IOptions<BitbucketOptions> options, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(options);
