@@ -22,10 +22,27 @@ internal sealed class PaginatorHelper : IPaginatorHelper
 
         var next = firstPage;
         var pageIndex = 0;
+        var baseUri = firstPage.IsAbsoluteUri ? firstPage : new Uri("https://api.bitbucket.org/2.0/");
+        var visited = new HashSet<string>(StringComparer.Ordinal);
 
         while (next is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            Uri resolved;
+            try
+            {
+                resolved = new Uri(baseUri, next);
+            }
+            catch (UriFormatException exception)
+            {
+                throw new InvalidOperationException("Invalid Bitbucket pagination URI.", exception);
+            }
+
+            if (!visited.Add(resolved.AbsoluteUri))
+            {
+                throw new InvalidOperationException("Bitbucket pagination contains a repeated page.");
+            }
+
             pageIndex++;
             onPage?.Invoke(pageIndex);
 

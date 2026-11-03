@@ -7,6 +7,29 @@ namespace BBDevPulse.Tests.API;
 
 public sealed class PaginatorHelperTests
 {
+    [Fact]
+    public async Task ReadAllAsyncRejectsRepeatedPageBeforeThirdFetch()
+    {
+        var first = new Uri("https://example.test/page/a?cursor=1");
+        var second = new Uri("https://example.test/page/b?cursor=2");
+        var fetches = 0;
+        var helper = new PaginatorHelper();
+
+        async Task ReadAsync()
+        {
+            await foreach (var _ in helper.ReadAllAsync(first, (uri, _) =>
+            {
+                fetches++;
+                return Task.FromResult(new PaginatedResult<int>([fetches], uri == first ? second : first));
+            }, null, CancellationToken.None))
+            {
+            }
+        }
+
+        await FluentActions.Invoking(ReadAsync).Should().ThrowAsync<InvalidOperationException>();
+        fetches.Should().Be(2);
+    }
+
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
     [Fact(DisplayName = "ReadAllAsync throws when first page is null")]
