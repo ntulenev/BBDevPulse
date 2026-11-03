@@ -44,7 +44,7 @@ It helps you see PR throughput, review load, merge speed, and per-developer cont
    - Detailed tables support sorting and filtering (`Pull Requests`, `Worst PRs by Metric`, `Developer Stats`, developer detail tables).
    - Summary stats tables (`Merge Time Stats`, `TTFR Stats`, `Corrections Stats`, `PR Size Stats`) are rendered as static read-only tables.
 
-When `TeamFilter` is configured:
+When a team is selected from the `PeopleCsvPath` departments in the startup menu:
 - All matching repositories and pull requests are still analyzed for activity.
 - PR rows include pull requests whose author belongs to the selected team, plus PRs authored outside the team when the selected team had activity on them.
 - External-author PRs shown because of team activity are highlighted in orange in console/PDF output.
@@ -129,6 +129,7 @@ If diffstat cannot be read for a PR (API error, missing commit hashes), size is 
 ## appsettings.json parameters
 All settings are under the `Bitbucket` object.
 
+- `DemoMode` (`bool`): Uses a built-in synthetic report without Bitbucket API requests, credentials, or `PeopleCsvPath`. The committed sample configuration enables it by default.
 - `Days` (`int`): Optional rolling lookback window. Used only when `FromDate` and `ToDate` are not configured.
 - `FromDate` (`string`): Optional inclusive report start date. Supports `dd.MM.yyyy` and `yyyy-MM-dd`.
 - `ToDate` (`string`): Optional inclusive report end date. Supports `dd.MM.yyyy` and `yyyy-MM-dd`.
@@ -156,7 +157,7 @@ All settings are under the `Bitbucket` object.
   Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
 - `PeopleCsvPath` (`string`): Optional path to a CSV file with developer metadata in format `Name;Grade;Department`.
   Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
-- `TeamFilter` (`string`): Optional team name resolved from the `Department` column in `PeopleCsvPath`. When set, PR rows, PR metrics, and developer output are limited to that team, while team member review activity on other authors' PRs is still counted.
+- Team selection: When `PeopleCsvPath` contains departments, the startup menu offers those teams and an unfiltered option.
 - `ShowDeveloperUuidInStats` (`bool`): Optional flag to include Bitbucket user UUIDs in developer stats output. Default is `false`.
 - `ShowAllDetailsForDevelopers` (`bool`): Optional flag to append detailed per-developer sections after the summary report. When enabled, the report includes authored PRs, comments, approvals, and follow-up commits for each developer. Default is `false`.
 - `Telemetry.Enabled` (`bool`): Enables/disables Bitbucket request telemetry in the console output. Default is `true`.
@@ -169,10 +170,17 @@ All settings are under the `Bitbucket` object.
 - `Pdf.Enabled` (`bool`): Enables/disables PDF generation after console output is rendered.
 - `Pdf.OutputPath` (`string`): Output file path for the PDF. A date suffix (`dd_MM_yyyy`) is appended automatically.
 
+## Demo mode
+
+Set `Bitbucket:DemoMode` to `true` and run the application. The demo uses a built-in set of synthetic repositories, PRs, developers, and activity. It does not read Bitbucket credentials or `PeopleCsvPath`, and it does not call the Bitbucket API. The startup screen marks the run as synthetic and asks for confirmation before rendering.
+
+Demo mode always creates `bbdevpulse-demo-report_<date>.html` and `bbdevpulse-demo-report_<date>.pdf` in the current directory. It ignores the normal HTML/PDF output paths and browser-launch setting so real paths cannot appear in a demo. Both reports are marked as synthetic. Set `DemoMode` to `false` for a live Bitbucket run and supply your local credentials.
+
 ## Example configuration
 ```json
 {
   "Bitbucket": {
+    "DemoMode": false,
     "Days": 30,
     "FromDate": "",
     "ToDate": "",
@@ -194,7 +202,6 @@ All settings are under the `Bitbucket` object.
       "2026-01-02"
     ],
     "PeopleCsvPath": "people.csv",
-    "TeamFilter": "",
     "ShowDeveloperUuidInStats": false,
     "ShowAllDetailsForDevelopers": false,
     "Telemetry": {
