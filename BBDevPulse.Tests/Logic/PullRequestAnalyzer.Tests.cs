@@ -70,6 +70,7 @@ public sealed class PullRequestAnalyzerTests
         static async IAsyncEnumerable<PullRequestCommitInfo> PartialCommits()
         {
             yield return new PullRequestCommitInfo("hash", new DateTimeOffset(2026, 2, 24, 9, 0, 0, TimeSpan.Zero), "fix");
+            yield return new PullRequestCommitInfo("initial", new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero), "initial change");
             await Task.Yield();
             throw new InvalidOperationException("second page failed");
         }
@@ -80,6 +81,41 @@ public sealed class PullRequestAnalyzerTests
         data.Reports.Single().HasCorrectionsData.Should().BeFalse();
         data.Reports.Single().HasSizeData.Should().BeTrue();
         data.DeveloperStats.Values.Single().HasCompleteCorrectionsData.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AnalyzeAsyncPropagatesCancellationWhenSupplementalRequestFails()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
+            closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
+            author: null, destination: null);
+        using var cancellation = new CancellationTokenSource();
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable([pr]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                cancellation.Cancel();
+                return Task.FromException<PullRequestSizeSummary>(new InvalidOperationException("request failed during cancellation"));
+            });
+
+        var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        var report = new ReportData(CreateParameters(date.AddDays(-1)));
+
+        await FluentActions.Invoking(() => analyzer.AnalyzeAsync(repository, report, cancellation.Token))
+            .Should().ThrowAsync<OperationCanceledException>();
+        report.Reports.Should().BeEmpty();
     }
 
     [Fact]

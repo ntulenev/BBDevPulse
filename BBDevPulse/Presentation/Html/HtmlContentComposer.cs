@@ -594,7 +594,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             var developerId = "developer-" + index.ToString(CultureInfo.InvariantCulture);
             _ = html.AppendLine(string.Concat("  <section class=\"developer-card\" id=\"", developerId, "\">"));
             _ = html.AppendLine(string.Concat("    <h3>", HtmlPresentationHelpers.Encode(stat.DisplayName.Value), "</h3>"));
-            _ = html.Append(BuildAuthoredPullRequestsTable(stat, workspace, developerId));
+            _ = html.Append(BuildAuthoredPullRequestsTable(stat, workspace, developerId, pullRequestSizeMode));
             _ = html.Append(BuildCommentDetailsTable(stat, workspace, developerId));
             _ = html.Append(BuildApprovalDetailsTable(stat, workspace, developerId));
             _ = html.Append(BuildCommitDetailsTable(stat, workspace, developerId, pullRequestSizeMode));
@@ -608,7 +608,8 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
     private static string BuildAuthoredPullRequestsTable(
         DeveloperStats stat,
         string workspace,
-        string developerId)
+        string developerId,
+        PullRequestSizeMode pullRequestSizeMode)
     {
         var columns = new[]
         {
@@ -620,7 +621,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             new TableColumn("Merged", "number", "Merged"),
             new TableColumn("Comments", "number", "Comments"),
             new TableColumn("Fixes", "number", "Fixes"),
-            new TableColumn("Size", "number", "Size")
+            new TableColumn(GetPullRequestSizeMetricLabel(pullRequestSizeMode), "number", GetPullRequestSizeMetricLabel(pullRequestSizeMode))
         };
         var rows = stat.AuthoredPullRequests
             .OrderByDescending(static report => report.CreatedOn)
@@ -637,7 +638,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(HtmlPresentationHelpers.FormatDateTime(report.MergedOn), report.MergedOn?.ToUnixTimeSeconds()),
                 BuildTextCell(report.Comments.ToString(CultureInfo.InvariantCulture), report.Comments),
                 BuildTextCell(report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.HasCorrectionsData ? report.Corrections : null),
-                BuildTextCell(FormatPullRequestSize(report, PullRequestSizeMode.Lines), report.HasSizeDataForMode(PullRequestSizeMode.Lines) ? report.GetSizeMetricValue(PullRequestSizeMode.Lines) : null)
+                BuildTextCell(FormatPullRequestSize(report, pullRequestSizeMode), report.HasSizeDataForMode(pullRequestSizeMode) ? report.GetSizeMetricValue(pullRequestSizeMode) : null)
             ]))
             .ToList();
 

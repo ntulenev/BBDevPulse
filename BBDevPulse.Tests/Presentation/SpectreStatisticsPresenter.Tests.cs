@@ -1090,6 +1090,34 @@ public sealed class SpectreStatisticsPresenterTests
         output.Should().Contain("abcdef123456");
     }
 
+    [Fact]
+    public void RenderDeveloperDetailsUsesSelectedSizeModeAndMarksUnavailableSize()
+    {
+        var presenter = CreatePresenter();
+        var reportData = CreateReportData(
+            pullRequestSizeMode: PullRequestSizeMode.Files,
+            showAllDetailsForDevelopers: true);
+        var developer = new DeveloperStats(new DisplayName("Alice"));
+        developer.AuthoredPullRequests.Add(CreateReport(
+            id: 7, mergedOn: null, firstReactionOn: null,
+            filesChanged: 4, linesAdded: 60, linesRemoved: 20));
+        developer.AuthoredPullRequests.Add(CreateReport(
+            id: 8, mergedOn: null, firstReactionOn: null,
+            hasSizeData: false));
+        reportData.DeveloperStats[DeveloperKey.FromIdentity(
+            new DeveloperIdentity(null, new DisplayName("Alice")))] = developer;
+
+        var output = TestConsoleRunner.Run(console =>
+        {
+            console.Profile.Width = 160;
+            presenter.RenderDeveloperDetails(reportData);
+        });
+
+        output.Should().Contain("4 (S)");
+        output.Should().Contain("Unavailable");
+        output.Should().NotContain("80 (XS)");
+    }
+
     [Fact(DisplayName = "RenderBitbucketTelemetry throws when snapshot is null")]
     [Trait("Category", "Unit")]
     public void RenderBitbucketTelemetryWhenSnapshotIsNullThrowsArgumentNullException()
@@ -1196,7 +1224,8 @@ public sealed class SpectreStatisticsPresenterTests
         DateTimeOffset? rejectedOn = null,
         int filesChanged = 0,
         int linesAdded = 0,
-        int linesRemoved = 0)
+        int linesRemoved = 0,
+        bool? hasSizeData = null)
     {
         return new PullRequestReport(
             repository: repository,
@@ -1214,7 +1243,8 @@ public sealed class SpectreStatisticsPresenterTests
             firstReactionOn: firstReactionOn,
             filesChanged: filesChanged,
             linesAdded: linesAdded,
-            linesRemoved: linesRemoved);
+            linesRemoved: linesRemoved,
+            hasSizeData: hasSizeData);
     }
 
     private static bool IsOrderedNonEmpty(IReadOnlyList<double> values) =>

@@ -515,7 +515,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         foreach (var stat in orderedDeveloperStats)
         {
             _ = column.Item().PaddingTop(4).Text(stat.DisplayName.Value).Bold().FontSize(11);
-            ComposeAuthoredPullRequestDetails(column, stat, workspace);
+            ComposeAuthoredPullRequestDetails(column, stat, workspace, pullRequestSizeMode);
             ComposeCommentDetails(column, stat, workspace);
             ComposeApprovalDetails(column, stat, workspace);
             ComposeCommitDetails(column, stat, workspace, pullRequestSizeMode);
@@ -861,7 +861,8 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     private static void ComposeAuthoredPullRequestDetails(
         ColumnDescriptor column,
         DeveloperStats stat,
-        string workspace)
+        string workspace,
+        PullRequestSizeMode pullRequestSizeMode)
     {
         _ = column.Item().Text("Authored PRs").Bold();
         if (stat.AuthoredPullRequests.Count == 0)
@@ -895,7 +896,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = header.Cell().Element(HeaderCell).Text("Merged");
                 _ = header.Cell().Element(HeaderCell).Text("Comments");
                 _ = header.Cell().Element(HeaderCell).Text("Fixes");
-                _ = header.Cell().Element(HeaderCell).Text("Size");
+                _ = header.Cell().Element(HeaderCell).Text(GetPullRequestSizeMetricLabel(pullRequestSizeMode));
             });
 
             foreach (var report in stat.AuthoredPullRequests
@@ -909,7 +910,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 AddBodyTextCell(table, report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", highlight: false);
                 AddBodyTextCell(table, report.Comments.ToString(CultureInfo.InvariantCulture), highlight: false);
                 AddBodyTextCell(table, report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", highlight: false);
-                AddBodyTextCell(table, FormatPullRequestSize(report, PullRequestSizeMode.Lines), highlight: false);
+                AddBodyTextCell(table, FormatPullRequestSize(report, pullRequestSizeMode), highlight: false);
             }
         });
     }
