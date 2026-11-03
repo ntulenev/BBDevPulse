@@ -77,6 +77,7 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IPeopleCsvProvider, PeopleCsvProvider>();
         _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
         _ = services.AddSingleton<IPullRequestAnalyzer, PullRequestAnalyzer>();
+        _ = services.AddSingleton<ReportFilePublisher>();
         _ = services.AddSingleton<ReportRunner>();
         _ = services.AddSingleton<DemoReportRunner>();
         _ = services.AddSingleton<IReportRunner>(sp =>

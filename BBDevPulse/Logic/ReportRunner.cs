@@ -17,8 +17,7 @@ internal sealed class ReportRunner : IReportRunner
     /// <param name="client">Bitbucket API client.</param>
     /// <param name="analyzer">Pull request analyzer.</param>
     /// <param name="presenter">Report presenter.</param>
-    /// <param name="htmlReportRenderer">HTML report renderer.</param>
-    /// <param name="pdfReportRenderer">PDF report renderer.</param>
+    /// <param name="publisher">Publishes enabled report files.</param>
     /// <param name="peopleCsvProvider">People CSV provider.</param>
     /// <param name="telemetryService">Telemetry service.</param>
     /// <param name="options">Bitbucket options.</param>
@@ -26,8 +25,7 @@ internal sealed class ReportRunner : IReportRunner
         IBitbucketClient client,
         IPullRequestAnalyzer analyzer,
         IReportPresenter presenter,
-        IHtmlReportRenderer htmlReportRenderer,
-        IPdfReportRenderer pdfReportRenderer,
+        ReportFilePublisher publisher,
         IPeopleCsvProvider peopleCsvProvider,
         IBitbucketTelemetryService telemetryService,
         IOptions<BitbucketOptions> options)
@@ -35,8 +33,7 @@ internal sealed class ReportRunner : IReportRunner
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(analyzer);
         ArgumentNullException.ThrowIfNull(presenter);
-        ArgumentNullException.ThrowIfNull(htmlReportRenderer);
-        ArgumentNullException.ThrowIfNull(pdfReportRenderer);
+        ArgumentNullException.ThrowIfNull(publisher);
         ArgumentNullException.ThrowIfNull(peopleCsvProvider);
         ArgumentNullException.ThrowIfNull(telemetryService);
         ArgumentNullException.ThrowIfNull(options);
@@ -44,8 +41,7 @@ internal sealed class ReportRunner : IReportRunner
         _client = client;
         _analyzer = analyzer;
         _presenter = presenter;
-        _htmlReportRenderer = htmlReportRenderer;
-        _pdfReportRenderer = pdfReportRenderer;
+        _publisher = publisher;
         _peopleCsvProvider = peopleCsvProvider;
         _telemetryService = telemetryService;
         _options = options.Value;
@@ -114,8 +110,7 @@ internal sealed class ReportRunner : IReportRunner
         reportData.Freeze();
         _presenter.RenderReport(reportData);
         _presenter.RenderTelemetrySummary(_telemetryService.GetSnapshot());
-        await _htmlReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
-        await _pdfReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
+        await _publisher.PublishAsync(reportData, cancellationToken).ConfigureAwait(false);
     }
 
     private static void EnrichDeveloperStatsFromPeopleCsv(
@@ -143,8 +138,7 @@ internal sealed class ReportRunner : IReportRunner
     private readonly IBitbucketClient _client;
     private readonly IPullRequestAnalyzer _analyzer;
     private readonly IReportPresenter _presenter;
-    private readonly IHtmlReportRenderer _htmlReportRenderer;
-    private readonly IPdfReportRenderer _pdfReportRenderer;
+    private readonly ReportFilePublisher _publisher;
     private readonly IPeopleCsvProvider _peopleCsvProvider;
     private readonly IBitbucketTelemetryService _telemetryService;
     private readonly BitbucketOptions _options;

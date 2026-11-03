@@ -39,8 +39,7 @@ public sealed class ReportRunnerTests
             client.Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             presenter.Object,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             peopleCsvProvider.Object,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -63,8 +62,7 @@ public sealed class ReportRunnerTests
             client,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -85,8 +83,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             analyzer,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -107,8 +104,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             presenter,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -129,8 +125,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
-            htmlReportRenderer,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(htmlReportRenderer, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -151,8 +146,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            pdfReportRenderer,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, pdfReportRenderer),
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -173,8 +167,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             peopleCsvProvider,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             Options.Create(CreateOptions()));
@@ -195,8 +188,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             telemetryService,
             Options.Create(CreateOptions()));
@@ -217,8 +209,7 @@ public sealed class ReportRunnerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IReportPresenter>(MockBehavior.Strict).Object,
-            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
-            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            new ReportFilePublisher(new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object, new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object),
             new Mock<IPeopleCsvProvider>(MockBehavior.Strict).Object,
             new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
             options);
@@ -378,8 +369,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
-            htmlRenderer.Object,
-            pdfRenderer.Object,
+            new ReportFilePublisher(htmlRenderer.Object, pdfRenderer.Object),
             peopleCsvProvider.Object,
             telemetryService.Object,
             Options.Create(options));
@@ -507,8 +497,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
-            htmlRenderer.Object,
-            pdfRenderer.Object,
+            new ReportFilePublisher(htmlRenderer.Object, pdfRenderer.Object),
             peopleCsvProvider.Object,
             telemetryService.Object,
             Options.Create(options));
@@ -634,8 +623,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
-            htmlRenderer.Object,
-            pdfRenderer.Object,
+            new ReportFilePublisher(htmlRenderer.Object, pdfRenderer.Object),
             peopleCsvProvider.Object,
             telemetryService.Object,
             Options.Create(options));
@@ -764,8 +752,7 @@ public sealed class ReportRunnerTests
             client.Object,
             analyzer.Object,
             presenter.Object,
-            htmlRenderer.Object,
-            pdfRenderer.Object,
+            new ReportFilePublisher(htmlRenderer.Object, pdfRenderer.Object),
             peopleCsvProvider.Object,
             telemetryService.Object,
             Options.Create(options));
