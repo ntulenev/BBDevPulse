@@ -6,4 +6,26 @@ namespace BBDevPulse.Models;
 /// <typeparam name="T">Item type.</typeparam>
 public sealed record PaginatedResult<T>(
     IReadOnlyList<T> Items,
-    Uri? NextPage);
+    Uri? NextPage)
+{
+    /// <summary>Snapshot of items in response order.</summary>
+    public IReadOnlyList<T> Items { get; } = Array.AsReadOnly(
+        (Items ?? throw new ArgumentNullException(nameof(Items))).ToArray());
+
+    /// <inheritdoc />
+    public bool Equals(PaginatedResult<T>? other) =>
+        other is not null && NextPage == other.NextPage && Items.SequenceEqual(other.Items);
+
+    /// <inheritdoc />
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(NextPage);
+        foreach (var item in Items)
+        {
+            hash.Add(item);
+        }
+
+        return hash.ToHashCode();
+    }
+}

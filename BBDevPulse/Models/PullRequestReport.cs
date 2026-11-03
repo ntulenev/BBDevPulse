@@ -55,9 +55,7 @@ public sealed class PullRequestReport
         ArgumentNullException.ThrowIfNull(id);
         ArgumentOutOfRangeException.ThrowIfNegative(comments);
         ArgumentOutOfRangeException.ThrowIfNegative(corrections);
-        ArgumentOutOfRangeException.ThrowIfNegative(filesChanged);
-        ArgumentOutOfRangeException.ThrowIfNegative(linesAdded);
-        ArgumentOutOfRangeException.ThrowIfNegative(linesRemoved);
+        var size = new PullRequestSizeSummary(filesChanged, linesAdded, linesRemoved);
 
         Repository = repository;
         RepositorySlug = repositorySlug;
@@ -67,14 +65,19 @@ public sealed class PullRequestReport
         LastActivity = lastActivity;
         MergedOn = mergedOn;
         RejectedOn = rejectedOn;
+        if (!Enum.IsDefined(state))
+        {
+            throw new ArgumentOutOfRangeException(nameof(state));
+        }
+
         State = state;
         Id = id;
         Comments = comments;
         Corrections = corrections;
         FirstReactionOn = firstReactionOn;
-        FilesChanged = filesChanged;
-        LinesAdded = linesAdded;
-        LinesRemoved = linesRemoved;
+        FilesChanged = size.FilesChanged;
+        LinesAdded = size.LinesAdded;
+        LinesRemoved = size.LinesRemoved;
         IsActivityOnlyMatch = isActivityOnlyMatch;
         HasSizeData = hasSizeData ?? (filesChanged > 0 || linesAdded > 0 || linesRemoved > 0);
         HasCorrectionsData = hasCorrectionsData;

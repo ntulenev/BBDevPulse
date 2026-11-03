@@ -28,6 +28,11 @@ public sealed class PullRequest
     {
         ArgumentNullException.ThrowIfNull(id);
         Id = id;
+        if (!Enum.IsDefined(state))
+        {
+            throw new ArgumentOutOfRangeException(nameof(state));
+        }
+
         State = state;
         ClosedOn = closedOn;
         CreatedOn = createdOn;
