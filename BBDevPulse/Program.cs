@@ -55,6 +55,7 @@ using var host = Host.CreateDefaultBuilder(args)
                 new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         });
+        _ = services.AddTransient<BitbucketResponseReader>();
         _ = services.AddTransient<IBitbucketClient, BitbucketClient>();
 
         _ = services.AddSingleton<IReportPresenter, SpectreReportPresenter>();
