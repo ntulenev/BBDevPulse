@@ -8,6 +8,12 @@ namespace BBDevPulse.Abstractions;
 public interface IReportPresenter
 {
     /// <summary>
+    /// Shows the effective report settings before data collection starts.
+    /// </summary>
+    /// <param name="parameters">Resolved report parameters.</param>
+    void RenderRunSettings(ReportParameters parameters);
+
+    /// <summary>
     /// Lets the user choose one of the teams found in the people CSV, or all teams.
     /// </summary>
     /// <param name="teams">Distinct team names.</param>

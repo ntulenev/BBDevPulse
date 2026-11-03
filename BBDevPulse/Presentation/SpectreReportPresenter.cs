@@ -11,6 +11,10 @@ namespace BBDevPulse.Presentation;
 public sealed class SpectreReportPresenter : IReportPresenter
 {
     /// <inheritdoc />
+    public void RenderRunSettings(ReportParameters parameters) =>
+        SpectreRunSettingsPresenter.Render(parameters);
+
+    /// <inheritdoc />
     public string? SelectTeamFilter(IReadOnlyList<string> teams)
     {
         ArgumentNullException.ThrowIfNull(teams);

@@ -64,6 +64,7 @@ internal sealed class ReportRunner : IReportRunner
             .ToList();
         var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams);
         var parameters = _options.CreateReportParameters(teamFilter);
+        _presenter.RenderRunSettings(parameters);
         await BuildAuthAsync(cancellationToken).ConfigureAwait(false);
         var filteredRepos = await BuildRepositoriesAsync(parameters, cancellationToken).ConfigureAwait(false);
         await BuildReportsAsync(filteredRepos, parameters, peopleByName, cancellationToken).ConfigureAwait(false);

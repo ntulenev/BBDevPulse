@@ -255,6 +255,8 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()))
+            .Callback(() => authRequests.Should().Be(0));
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
@@ -406,6 +408,7 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()));
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
@@ -522,6 +525,7 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()));
         presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
                 teams.Count == 1 && teams[0] == "Core Platform")))
             .Returns((string?)null);
@@ -640,6 +644,7 @@ public sealed class ReportRunnerTests
             .Returns(Task.CompletedTask);
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()));
         presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
                 teams.Count == 2 && teams[0] == "Core" && teams[1] == "Other")))
             .Returns("Core");
