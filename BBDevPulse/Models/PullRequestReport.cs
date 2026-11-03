@@ -25,6 +25,8 @@ public sealed class PullRequestReport
     /// <param name="linesAdded">Total added lines in pull request diffstat.</param>
     /// <param name="linesRemoved">Total removed lines in pull request diffstat.</param>
     /// <param name="isActivityOnlyMatch">Whether this pull request is shown because the selected team was active on it.</param>
+    /// <param name="hasSizeData">Whether diffstat size data is available.</param>
+    /// <param name="hasCorrectionsData">Whether correction data is available.</param>
     public PullRequestReport(
         string repository,
         string repositorySlug,
@@ -50,6 +52,12 @@ public sealed class PullRequestReport
         ArgumentNullException.ThrowIfNull(repositorySlug);
         ArgumentNullException.ThrowIfNull(author);
         ArgumentNullException.ThrowIfNull(targetBranch);
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentOutOfRangeException.ThrowIfNegative(comments);
+        ArgumentOutOfRangeException.ThrowIfNegative(corrections);
+        ArgumentOutOfRangeException.ThrowIfNegative(filesChanged);
+        ArgumentOutOfRangeException.ThrowIfNegative(linesAdded);
+        ArgumentOutOfRangeException.ThrowIfNegative(linesRemoved);
 
         Repository = repository;
         RepositorySlug = repositorySlug;

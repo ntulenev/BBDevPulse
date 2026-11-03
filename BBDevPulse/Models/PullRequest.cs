@@ -26,6 +26,7 @@ public sealed class PullRequest
         User? author,
         PullRequestDestination? destination)
     {
+        ArgumentNullException.ThrowIfNull(id);
         Id = id;
         State = state;
         ClosedOn = closedOn;

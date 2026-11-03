@@ -25,6 +25,7 @@ public sealed class ReportParameters
     /// <param name="showAllDetailsForDevelopers">Whether to append detailed per-developer activity sections after summary reports.</param>
     /// <param name="toDateExclusive">Optional exclusive upper bound for the report range.</param>
     /// <param name="forcedIncludeDates">Dates counted as working days regardless of weekend or exclusion rules.</param>
+    /// <param name="isDemo">Whether the report uses built-in synthetic data.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -47,14 +48,18 @@ public sealed class ReportParameters
         ArgumentNullException.ThrowIfNull(repoNameFilter);
         ArgumentNullException.ThrowIfNull(repoNameList);
         ArgumentNullException.ThrowIfNull(branchNameList);
+        if (toDateExclusive.HasValue && toDateExclusive.Value <= filterDate)
+        {
+            throw new ArgumentOutOfRangeException(nameof(toDateExclusive));
+        }
 
         FilterDate = filterDate;
         Workspace = workspace;
         RepoNameFilter = repoNameFilter;
-        RepoNameList = repoNameList;
+        RepoNameList = Array.AsReadOnly(repoNameList.ToArray());
         RepoSearchMode = repoSearchMode;
         PrTimeFilterMode = prTimeFilterMode;
-        BranchNameList = branchNameList;
+        BranchNameList = Array.AsReadOnly(branchNameList.ToArray());
         ExcludeWeekend = excludeWeekend;
         PullRequestSizeMode = pullRequestSizeMode;
         TeamFilter = string.IsNullOrWhiteSpace(teamFilter)

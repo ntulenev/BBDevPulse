@@ -122,10 +122,10 @@ public sealed class ReportParametersTests
         parameters.FilterDate.Should().Be(filterDate);
         parameters.Workspace.Should().Be(workspace);
         parameters.RepoNameFilter.Should().Be(repoNameFilter);
-        parameters.RepoNameList.Should().BeSameAs(repoNameList);
+        parameters.RepoNameList.Should().Equal(repoNameList);
         parameters.RepoSearchMode.Should().Be(RepoSearchMode.FilterFromTheList);
         parameters.PrTimeFilterMode.Should().Be(PrTimeFilterMode.LastKnownUpdateAndCreated);
-        parameters.BranchNameList.Should().BeSameAs(branchNameList);
+        parameters.BranchNameList.Should().Equal(branchNameList);
         parameters.ExcludeWeekend.Should().BeTrue();
         parameters.ExcludedDays.Should().Contain(new DateOnly(2026, 2, 22));
         parameters.PullRequestSizeMode.Should().Be(PullRequestSizeMode.Files);
