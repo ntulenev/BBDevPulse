@@ -18,4 +18,6 @@ internal sealed class CachedDeveloperCommitActivity
     public DateTimeOffset Date { get; init; }
 
     public CachedPullRequestSizeSummary SizeSummary { get; init; } = null!;
+
+    public bool HasSizeData { get; init; } = true;
 }

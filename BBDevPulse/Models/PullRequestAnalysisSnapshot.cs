@@ -18,7 +18,9 @@ public sealed class PullRequestAnalysisSnapshot
         IReadOnlyList<PullRequestCommitInfo> correctionCommits,
         PullRequestSizeSummary sizeSummary,
         IReadOnlyList<DeveloperCommitActivity> commitActivities,
-        bool hasEnrichment = false)
+        bool hasEnrichment = false,
+        bool? hasCommits = null,
+        bool? hasSize = null)
     {
         ArgumentNullException.ThrowIfNull(activities);
         ArgumentNullException.ThrowIfNull(correctionCommits);
@@ -29,6 +31,8 @@ public sealed class PullRequestAnalysisSnapshot
         SizeSummary = sizeSummary;
         CommitActivities = commitActivities;
         HasEnrichment = hasEnrichment;
+        HasCommits = hasCommits ?? hasEnrichment;
+        HasSize = hasSize ?? hasEnrichment;
     }
 
     /// <summary>
@@ -55,4 +59,8 @@ public sealed class PullRequestAnalysisSnapshot
     /// Whether correction commits and size data were loaded for this snapshot.
     /// </summary>
     public bool HasEnrichment { get; }
+
+    public bool HasCommits { get; }
+
+    public bool HasSize { get; }
 }

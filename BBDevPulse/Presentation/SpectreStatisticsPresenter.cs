@@ -233,6 +233,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         ArgumentNullException.ThrowIfNull(reportData);
         var corrections = reportData.Reports
             .Where(static report => report.IncludeInMetrics)
+            .Where(static report => report.HasCorrectionsData)
             .Select(r => (double)r.Corrections)
             .OrderBy(value => value)
             .ToList();

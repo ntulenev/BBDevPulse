@@ -14,4 +14,8 @@ internal sealed class CachedPullRequestAnalysisSnapshot
     public IReadOnlyList<CachedDeveloperCommitActivity>? CommitActivities { get; init; }
 
     public bool HasEnrichment { get; init; }
+
+    public bool HasCommits { get; init; }
+
+    public bool HasSize { get; init; }
 }

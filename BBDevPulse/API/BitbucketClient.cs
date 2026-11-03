@@ -223,7 +223,6 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(repoSlug);
         ArgumentException.ThrowIfNullOrWhiteSpace(commitHash);
 
-        try
         {
             var diffStatUri = _uriBuilder.BuildRelativeUri(
                 $"repositories/{workspace.Value}/{repoSlug.Value}/diffstat/{commitHash}" +
@@ -231,10 +230,6 @@ internal sealed class BitbucketClient : IBitbucketClient
                 BitbucketFieldGroup.PullRequestDiffStat);
 
             return await ReadPullRequestDiffStatAsync(diffStatUri, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return PullRequestSizeSummary.Empty;
         }
     }
 
@@ -249,7 +244,6 @@ internal sealed class BitbucketClient : IBitbucketClient
         ArgumentNullException.ThrowIfNull(repoSlug);
         ArgumentNullException.ThrowIfNull(pullRequestId);
 
-        try
         {
             var sourceCommitHash = default(string);
             var destinationCommitHash = default(string);
@@ -294,10 +288,6 @@ internal sealed class BitbucketClient : IBitbucketClient
                 BitbucketFieldGroup.PullRequestDiffStat);
 
             return await ReadPullRequestDiffStatAsync(diffStatUri, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception exception) when (exception is not OperationCanceledException)
-        {
-            return PullRequestSizeSummary.Empty;
         }
     }
 

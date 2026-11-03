@@ -131,6 +131,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         column,
                         "Corrections Stats",
                         metricReports
+                            .Where(static report => report.HasCorrectionsData)
                             .Select(static report => (double)report.Corrections)
                             .OrderBy(static value => value)
                             .ToList(),
@@ -279,7 +280,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 AddBodyTextCell(table, prAge, report.IsActivityOnlyMatch);
                 AddBodyTextCell(table, timeToMerge, report.IsActivityOnlyMatch);
                 AddBodyTextCell(table, report.Comments.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
-                AddBodyTextCell(table, report.Corrections.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
+                AddBodyTextCell(table, report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.IsActivityOnlyMatch);
                 AddBodyTextCell(table, size, report.IsActivityOnlyMatch);
                 AddHyperlinkCell(table, pullRequestUrl, report.Id.Value.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch);
                 index++;
@@ -761,7 +762,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
     {
         if (!report.HasSizeDataForMode(sizeMode))
         {
-            return "-";
+            return "Unavailable";
         }
 
         var sizeValue = report.GetSizeMetricValue(sizeMode);
@@ -893,7 +894,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 AddBodyTextCell(table, report.State.ToString(), highlight: false);
                 AddBodyTextCell(table, report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-", highlight: false);
                 AddBodyTextCell(table, report.Comments.ToString(CultureInfo.InvariantCulture), highlight: false);
-                AddBodyTextCell(table, report.Corrections.ToString(CultureInfo.InvariantCulture), highlight: false);
+                AddBodyTextCell(table, report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", highlight: false);
                 AddBodyTextCell(table, FormatPullRequestSize(report, PullRequestSizeMode.Lines), highlight: false);
             }
         });

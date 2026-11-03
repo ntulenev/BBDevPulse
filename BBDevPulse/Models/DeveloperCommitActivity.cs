@@ -22,7 +22,8 @@ public sealed class DeveloperCommitActivity
         string commitHash,
         string message,
         DateTimeOffset date,
-        PullRequestSizeSummary sizeSummary)
+        PullRequestSizeSummary sizeSummary,
+        bool hasSizeData = true)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(repositorySlug);
@@ -36,6 +37,7 @@ public sealed class DeveloperCommitActivity
         Message = message;
         Date = date;
         SizeSummary = sizeSummary;
+        HasSizeData = hasSizeData;
     }
 
     /// <summary>
@@ -73,6 +75,8 @@ public sealed class DeveloperCommitActivity
     /// </summary>
     public PullRequestSizeSummary SizeSummary { get; }
 
+    public bool HasSizeData { get; }
+
     /// <summary>
     /// Determines whether size data is available for the configured mode.
     /// </summary>
@@ -82,9 +86,9 @@ public sealed class DeveloperCommitActivity
     {
         return mode switch
         {
-            PullRequestSizeMode.Lines => SizeSummary.LineChurn > 0,
-            PullRequestSizeMode.Files => SizeSummary.FilesChanged > 0,
-            _ => SizeSummary.LineChurn > 0
+            PullRequestSizeMode.Lines => HasSizeData,
+            PullRequestSizeMode.Files => HasSizeData,
+            _ => HasSizeData
         };
     }
 

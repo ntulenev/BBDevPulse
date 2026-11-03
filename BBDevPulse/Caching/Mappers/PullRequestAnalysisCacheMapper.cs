@@ -20,7 +20,9 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             CorrectionCommits = [.. snapshot.CorrectionCommits.Select(MapCommit)],
             SizeSummary = MapSizeSummary(snapshot.SizeSummary),
             CommitActivities = [.. snapshot.CommitActivities.Select(MapCommitActivity)],
-            HasEnrichment = snapshot.HasEnrichment
+            HasEnrichment = snapshot.HasEnrichment,
+            HasCommits = snapshot.HasCommits,
+            HasSize = snapshot.HasSize
         };
     }
 
@@ -48,7 +50,9 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             correctionCommits,
             MapSizeSummary(snapshot.SizeSummary),
             commitActivities,
-            snapshot.HasEnrichment);
+            snapshot.HasEnrichment,
+            snapshot.HasCommits,
+            snapshot.HasSize);
 
         return mappedSnapshot.Activities.All(static activity => activity is not null) &&
                mappedSnapshot.CorrectionCommits.All(static commit => commit is not null) &&
@@ -108,7 +112,8 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             CommitHash = activity.CommitHash,
             Message = activity.Message,
             Date = activity.Date,
-            SizeSummary = MapSizeSummary(activity.SizeSummary)
+            SizeSummary = MapSizeSummary(activity.SizeSummary),
+            HasSizeData = activity.HasSizeData
         };
     }
 
@@ -121,7 +126,8 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             activity.CommitHash,
             activity.Message,
             activity.Date,
-            MapSizeSummary(activity.SizeSummary));
+            MapSizeSummary(activity.SizeSummary),
+            activity.HasSizeData);
     }
 
     private static CachedDeveloperIdentity MapIdentity(DeveloperIdentity identity)

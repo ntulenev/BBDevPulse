@@ -197,7 +197,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             return;
         }
 
-        if (!snapshot.HasEnrichment)
+        if (!snapshot.HasCommits || !snapshot.HasSize ||
+            (collectDeveloperDetails && snapshot.CommitActivities.Any(static activity => !activity.HasSizeData)))
         {
             snapshot = await EnrichAnalysisSnapshotAsync(
                 snapshot,
@@ -266,7 +267,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 sizeSummary.FilesChanged,
                 sizeSummary.LinesAdded,
                 sizeSummary.LinesRemoved,
-                isActivityOnlyMatch: !includeAuthoredPullRequest)
+                isActivityOnlyMatch: !includeAuthoredPullRequest,
+                hasSizeData: snapshot.HasSize,
+                hasCorrectionsData: snapshot.HasCommits)
             : null;
 
         lock (reportData)
@@ -284,7 +287,10 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                     authorStats.PrsMergedAfter++;
                 }
 
-                authorStats.Corrections += corrections;
+                if (snapshot.HasCommits)
+                {
+                    authorStats.Corrections += corrections;
+                }
                 if (collectDeveloperDetails && reportEntry is not null)
                 {
                     authorStats.AuthoredPullRequests.Add(reportEntry);
@@ -354,7 +360,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
     }
 
-    private async Task<IReadOnlyList<PullRequestCommitInfo>> GetCorrectionCommitsAsync(
+    private async Task<IReadOnlyList<PullRequestCommitInfo>?> GetCorrectionCommitsAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
@@ -389,7 +395,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         catch (InvalidOperationException)
         {
             // Correction commits are supplemental data and should not fail the whole report.
-            return [];
+            return null;
         }
     }
 
@@ -448,21 +454,17 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        var correctionCommits = await GetCorrectionCommitsAsync(
-            parameters.Workspace,
-            repo.Slug,
-            pr.Id,
-            pr.CreatedOn,
-            parameters,
-            cancellationToken).ConfigureAwait(false);
-        var sizeSummary = await GetPullRequestSizeSafeAsync(
-            parameters.Workspace,
-            repo.Slug,
-            pr.Id,
-            cancellationToken).ConfigureAwait(false);
+        var loadedCommits = snapshot.HasCommits ? snapshot.CorrectionCommits :
+            await GetCorrectionCommitsAsync(parameters.Workspace, repo.Slug, pr.Id,
+                pr.CreatedOn, parameters, cancellationToken).ConfigureAwait(false);
+        var correctionCommits = loadedCommits ?? snapshot.CorrectionCommits;
+        var loadedSize = snapshot.HasSize ? snapshot.SizeSummary :
+            await GetPullRequestSizeSafeAsync(parameters.Workspace, repo.Slug, pr.Id,
+                cancellationToken).ConfigureAwait(false);
+        var sizeSummary = loadedSize ?? snapshot.SizeSummary;
 
         IReadOnlyList<DeveloperCommitActivity> commitActivities = [];
-        if (collectDeveloperDetails && hasAuthorIdentity && correctionCommits.Count > 0)
+        if (collectDeveloperDetails && hasAuthorIdentity && loadedCommits is not null && correctionCommits.Count > 0)
         {
             commitActivities = await GetCommitActivitiesAsync(
                 repositoryName: repo.DisplayName,
@@ -478,7 +480,10 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             correctionCommits,
             sizeSummary,
             commitActivities,
-            hasEnrichment: true);
+            hasEnrichment: loadedCommits is not null && loadedSize is not null &&
+                commitActivities.All(static activity => activity.HasSizeData),
+            hasCommits: loadedCommits is not null,
+            hasSize: loadedSize is not null);
     }
 
     private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(
@@ -502,7 +507,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 commit.Hash,
                 commit.Message,
                 commit.Date,
-                sizeSummary));
+                sizeSummary ?? PullRequestSizeSummary.Empty,
+                sizeSummary is not null));
         }
 
         return activities;
@@ -523,7 +529,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         return activity.Approval is not null && reportData.IsDeveloperIncluded(activity.Approval.User);
     }
 
-    private async Task<PullRequestSizeSummary> GetPullRequestSizeSafeAsync(
+    private async Task<PullRequestSizeSummary?> GetPullRequestSizeSafeAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
@@ -539,11 +545,11 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
         catch (InvalidOperationException)
         {
-            return PullRequestSizeSummary.Empty;
+            return null;
         }
     }
 
-    private async Task<PullRequestSizeSummary> GetCommitSizeSafeAsync(
+    private async Task<PullRequestSizeSummary?> GetCommitSizeSafeAsync(
         Workspace workspace,
         RepoSlug repoSlug,
         string commitHash,
@@ -559,7 +565,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
         catch (InvalidOperationException)
         {
-            return PullRequestSizeSummary.Empty;
+            return null;
         }
     }
 

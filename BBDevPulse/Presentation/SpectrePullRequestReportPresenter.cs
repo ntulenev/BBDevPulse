@@ -84,7 +84,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
                 FormatCell(prAge, report.IsActivityOnlyMatch),
                 FormatCell(timeToMerge, report.IsActivityOnlyMatch),
                 FormatCell(report.Comments.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch),
-                FormatCell(report.Corrections.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch),
+                FormatCell(report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.IsActivityOnlyMatch),
                 FormatCell(size, report.IsActivityOnlyMatch),
                 FormatCell(report.Id.Value.ToString(CultureInfo.InvariantCulture), report.IsActivityOnlyMatch)
         );
@@ -115,7 +115,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
     {
         if (!report.HasSizeDataForMode(sizeMode))
         {
-            return "-";
+            return "Unavailable";
         }
 
         var sizeValue = report.GetSizeMetricValue(sizeMode);

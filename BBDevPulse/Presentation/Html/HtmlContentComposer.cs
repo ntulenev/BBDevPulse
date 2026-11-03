@@ -76,6 +76,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             "correction-stats",
             "Corrections Stats",
             metricReports
+                .Where(static report => report.HasCorrectionsData)
                 .Select(static report => (double)report.Corrections)
                 .OrderBy(static value => value)
                 .ToList(),
@@ -194,7 +195,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(prAgeDuration is null ? "-" : FormatDuration(prAgeDuration.Value), prAgeDuration?.TotalMinutes, prAgeDuration is null ? "-" : FormatDuration(prAgeDuration.Value)),
                 BuildTextCell(timeToMergeDuration is null ? "-" : FormatDuration(timeToMergeDuration.Value), timeToMergeDuration?.TotalMinutes, timeToMergeDuration is null ? "-" : FormatDuration(timeToMergeDuration.Value)),
                 BuildTextCell(report.Comments.ToString(CultureInfo.InvariantCulture), report.Comments),
-                BuildTextCell(report.Corrections.ToString(CultureInfo.InvariantCulture), report.Corrections),
+                BuildTextCell(report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.HasCorrectionsData ? report.Corrections : null),
                 BuildTextCell(FormatPullRequestSize(report, pullRequestSizeMode), report.HasSizeDataForMode(pullRequestSizeMode) ? report.GetSizeMetricValue(pullRequestSizeMode) : null),
                 BuildLinkCell(report.Id.Value.ToString(CultureInfo.InvariantCulture), pullRequestUrl, report.Id.Value)
             ], report.IsActivityOnlyMatch ? "activity-only" : null));
@@ -625,7 +626,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(report.State.ToString()),
                 BuildTextCell(HtmlPresentationHelpers.FormatDateTime(report.MergedOn), report.MergedOn?.ToUnixTimeSeconds()),
                 BuildTextCell(report.Comments.ToString(CultureInfo.InvariantCulture), report.Comments),
-                BuildTextCell(report.Corrections.ToString(CultureInfo.InvariantCulture), report.Corrections),
+                BuildTextCell(report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable", report.HasCorrectionsData ? report.Corrections : null),
                 BuildTextCell(FormatPullRequestSize(report, PullRequestSizeMode.Lines), report.HasSizeDataForMode(PullRequestSizeMode.Lines) ? report.GetSizeMetricValue(PullRequestSizeMode.Lines) : null)
             ]))
             .ToList();
@@ -957,7 +958,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
     {
         if (!report.HasSizeDataForMode(sizeMode))
         {
-            return "-";
+            return "Unavailable";
         }
 
         var sizeValue = report.GetSizeMetricValue(sizeMode);
