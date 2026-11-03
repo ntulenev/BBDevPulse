@@ -34,20 +34,21 @@ public sealed class HtmlOptionsTests
         Path.GetFileName(outputPath).Should().MatchRegex(@"^bbdevpulse-report_\d{2}_\d{2}_\d{4}\.html$");
     }
 
-    [Fact(DisplayName = "ResolveOutputPath preserves extension and trims relative path")]
+    [Fact(DisplayName = "ResolveOutputPath preserves the directory and extension and trims whitespace")]
     [Trait("Category", "Unit")]
     public void ResolveOutputPathWhenRelativePathHasExtensionPreservesExtension()
     {
         // Arrange
         var options = new HtmlOptions
         {
-            OutputPath = " reports\\summary.txt "
+            OutputPath = $" {Path.Combine("reports", "summary.txt")} "
         };
 
         // Act
         var outputPath = options.ResolveOutputPath();
 
         // Assert
+        Path.GetDirectoryName(outputPath).Should().Be(Path.GetFullPath("reports"));
         Path.GetFileName(outputPath).Should().MatchRegex(@"^summary_\d{2}_\d{2}_\d{4}\.txt$");
     }
 
@@ -58,13 +59,14 @@ public sealed class HtmlOptionsTests
         // Arrange
         var options = new HtmlOptions
         {
-            OutputPath = "reports\\summary"
+            OutputPath = Path.Combine("reports", "summary")
         };
 
         // Act
         var outputPath = options.ResolveOutputPath();
 
         // Assert
+        Path.GetDirectoryName(outputPath).Should().Be(Path.GetFullPath("reports"));
         Path.GetFileName(outputPath).Should().MatchRegex(@"^summary_\d{2}_\d{2}_\d{4}\.html$");
     }
 
