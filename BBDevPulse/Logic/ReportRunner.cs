@@ -92,6 +92,7 @@ internal sealed class ReportRunner : IReportRunner
                 reportData,
                 token).ConfigureAwait(false);
         }, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         if (reportData.DeveloperStats.Count > 0)
         {
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);

@@ -10,6 +10,43 @@ namespace BBDevPulse.Tests.Presentation;
 
 public sealed class SpectreRepositoryAnalysisPresenterTests
 {
+    [Fact]
+    public async Task AnalyzeRepositoriesAsyncWaitsForActiveHandlerOnCancellation()
+    {
+        var presenter = CreatePresenter();
+        using var cancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var processed = 0;
+
+        var run = TestConsoleRunner.RunAsync(async _ => await presenter.AnalyzeRepositoriesAsync(
+            [CreateRepository("RepoA"), CreateRepository("RepoB")],
+            async (_, token) =>
+            {
+                Interlocked.Increment(ref active);
+                Interlocked.Increment(ref processed);
+                started.SetResult();
+                try
+                {
+                    await finish.Task;
+                    token.ThrowIfCancellationRequested();
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref active);
+                }
+            }, cancellation.Token));
+
+        await started.Task;
+        cancellation.Cancel();
+        run.IsCompleted.Should().BeFalse();
+        finish.SetResult();
+        await FluentActions.Invoking(async () => await run).Should().ThrowAsync<OperationCanceledException>();
+        active.Should().Be(0);
+        processed.Should().Be(1);
+    }
+
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
     [Fact(DisplayName = "Constructor throws when options are null")]

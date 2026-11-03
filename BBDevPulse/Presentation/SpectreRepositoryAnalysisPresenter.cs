@@ -1,4 +1,5 @@
 using BBDevPulse.Abstractions;
+using System.Runtime.ExceptionServices;
 using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 
@@ -47,11 +48,14 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                 var inFlight = 0;
                 var uiLock = new object();
                 using var semaphore = new SemaphoreSlim(_maxConcurrentRepositories, _maxConcurrentRepositories);
+                using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 var repositoryTasks = new List<Task>(total);
-
-                foreach (var repository in repositories)
+                Exception? sourceError = null;
+                try
                 {
-                    await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    foreach (var repository in repositories)
+                    {
+                    await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
                     var running = Interlocked.Increment(ref inFlight);
 
                     lock (uiLock)
@@ -66,7 +70,7 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                     {
                         try
                         {
-                            await analyzeRepository(repository, cancellationToken).ConfigureAwait(false);
+                            await analyzeRepository(repository, stop.Token).ConfigureAwait(false);
                         }
                         finally
                         {
@@ -82,9 +86,27 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                             _ = semaphore.Release();
                         }
                     }
+                    }
                 }
-
-                await Task.WhenAll(repositoryTasks).ConfigureAwait(false);
+                catch (Exception exception)
+                {
+                    sourceError = exception;
+                    await stop.CancelAsync().ConfigureAwait(false);
+                }
+                finally
+                {
+                    try
+                    {
+                        await Task.WhenAll(repositoryTasks).ConfigureAwait(false);
+                    }
+                    catch when (sourceError is not null)
+                    {
+                    }
+                }
+                if (sourceError is not null)
+                {
+                    ExceptionDispatchInfo.Capture(sourceError).Throw();
+                }
 
                 lock (uiLock)
                 {

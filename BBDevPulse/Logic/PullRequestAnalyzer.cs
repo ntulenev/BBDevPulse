@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -56,14 +57,17 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var branchNameList = parameters.BranchNameList;
 
         using var semaphore = new SemaphoreSlim(_maxConcurrentPullRequests, _maxConcurrentPullRequests);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var analysisTasks = new List<Task>();
-
-        await foreach (var pr in _client.GetPullRequestsAsync(
+        Exception? sourceError = null;
+        try
+        {
+            await foreach (var pr in _client.GetPullRequestsAsync(
                            workspace,
                            repo.Slug,
                            pullRequest => pullRequest.ShouldStopByTimeFilter(filterDate, prTimeFilterMode),
                            cancellationToken).ConfigureAwait(false))
-        {
+            {
             if (!pr.MatchesBranchFilter(branchNameList))
             {
                 continue;
@@ -75,16 +79,35 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 continue;
             }
 
-            await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await semaphore.WaitAsync(stop.Token).ConfigureAwait(false);
             analysisTasks.Add(AnalyzePullRequestWithSemaphoreAsync(
                 repo,
                 reportData,
                 pr,
                 semaphore,
-                cancellationToken));
+                stop.Token));
+            }
         }
-
-        await Task.WhenAll(analysisTasks).ConfigureAwait(false);
+        catch (Exception exception)
+        {
+            sourceError = exception;
+            await stop.CancelAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            try
+            {
+                await Task.WhenAll(analysisTasks).ConfigureAwait(false);
+            }
+            catch when (sourceError is not null)
+            {
+                // Keep the source failure after all active handlers have stopped.
+            }
+        }
+        if (sourceError is not null)
+        {
+            ExceptionDispatchInfo.Capture(sourceError).Throw();
+        }
     }
 
     private async Task AnalyzePullRequestWithSemaphoreAsync(
