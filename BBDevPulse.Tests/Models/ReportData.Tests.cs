@@ -20,6 +20,26 @@ public sealed class ReportDataTests
         Assert.Empty(data.DeveloperStats);
     }
 
+    [Fact]
+    public void ConcurrentReadersSeeTheSamePublishedMetrics()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(new UserUuid("A"), new DisplayName("Alice"));
+        var stats = data.GetOrAddDeveloper(identity);
+        var created = data.Parameters.FilterDate;
+        var report = CreatePullRequestReport(1, created, created.AddHours(6));
+        data.Reports.Add(report);
+        stats.AuthoredPullRequests.Add(report);
+        data.Freeze();
+
+        Parallel.For(0, 128, _ =>
+        {
+            Assert.Equal(1, data.PullRequestsCreatedInRange);
+            Assert.Same(report, Assert.Single(data.DeveloperStats[DeveloperKey.FromIdentity(identity)].AuthoredPullRequests));
+            Assert.Equal(0.25, data.GetTtfrStatistics(new StatisticsCalculator()).MedianDays);
+        });
+    }
+
     [Theory]
     [InlineData(-1, 0, 0)]
     [InlineData(0, -1, 0)]
