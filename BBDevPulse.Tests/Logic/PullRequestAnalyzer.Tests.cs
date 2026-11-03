@@ -8,6 +8,7 @@ using BBDevPulse.Logic;
 using BBDevPulse.Models;
 
 using Microsoft.Extensions.Options;
+
 using Moq;
 
 using System.Reflection;

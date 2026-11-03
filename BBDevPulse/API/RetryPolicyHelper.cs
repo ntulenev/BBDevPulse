@@ -1,5 +1,6 @@
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
+
 using System.Globalization;
 
 using Microsoft.Extensions.Options;

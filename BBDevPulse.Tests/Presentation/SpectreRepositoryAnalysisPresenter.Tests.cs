@@ -4,6 +4,7 @@ using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 using BBDevPulse.Presentation;
 using BBDevPulse.Tests.TestInfrastructure;
+
 using Microsoft.Extensions.Options;
 
 namespace BBDevPulse.Tests.Presentation;

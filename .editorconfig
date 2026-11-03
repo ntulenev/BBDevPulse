@@ -91,7 +91,7 @@ csharp_prefer_simple_using_statement = true:suggestion
 
 #prefer block bodies for constructors
 csharp_style_expression_bodied_constructors = false:suggestion
-#prefer use standard consructor
+#prefer use standard constructor
 csharp_style_prefer_primary_constructors = false:suggestion
 #prefer expression-bodied members for methods when they will be a single line
 csharp_style_expression_bodied_methods = when_on_single_line:suggestion
@@ -101,7 +101,7 @@ csharp_style_expression_bodied_properties = when_on_single_line:suggestion
 csharp_style_expression_bodied_accessors = when_on_single_line:suggestion
 #prefer expression-bodied indexers when they will be a single line
 csharp_style_expression_bodied_indexers = when_on_single_line:suggestion
-#prefer expression-bodied lamdas when they will be a single line
+#prefer expression-bodied lambdas when they will be a single line
 csharp_style_expression_bodied_lambdas = when_on_single_line:suggestion
 #prefer block bodies for local functions
 csharp_style_expression_bodied_local_functions = false:warning
@@ -213,9 +213,9 @@ dotnet_naming_rule.const_should_be_upper_case.severity = warning
 dotnet_naming_rule.const_should_be_upper_case.symbols = constants
 dotnet_naming_rule.const_should_be_upper_case.style = capitalized_constants
 
-dotnet_naming_rule.async_methdos_should_ends_with_async_suffix.severity = warning
-dotnet_naming_rule.async_methdos_should_ends_with_async_suffix.symbols = async_method
-dotnet_naming_rule.async_methdos_should_ends_with_async_suffix.style = async_suffix
+dotnet_naming_rule.async_methods_should_ends_with_async_suffix.severity = warning
+dotnet_naming_rule.async_methods_should_ends_with_async_suffix.symbols = async_method
+dotnet_naming_rule.async_methods_should_ends_with_async_suffix.style = async_suffix
 
 # Symbol specifications
 
@@ -315,12 +315,3 @@ dotnet_diagnostic.IDE0270.severity = suggestion
 # IDE0290: Use primary constructor
 dotnet_diagnostic.IDE0290.severity = suggestion
 csharp_prefer_system_threading_lock = true:suggestion
-[*.{cs,vb}]
-dotnet_style_operator_placement_when_wrapping = beginning_of_line
-tab_width = 4
-indent_size = 4
-end_of_line = crlf
-dotnet_style_coalesce_expression = true:suggestion
-dotnet_style_null_propagation = true:warning
-dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
-dotnet_style_prefer_auto_properties = true:suggestion

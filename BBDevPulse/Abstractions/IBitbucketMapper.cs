@@ -1,5 +1,6 @@
 using BBDevPulse.Models;
 using BBDevPulse.Transport;
+
 using System.Text.Json;
 
 namespace BBDevPulse.Abstractions;

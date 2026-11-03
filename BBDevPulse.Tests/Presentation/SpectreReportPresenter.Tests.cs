@@ -6,6 +6,7 @@ using BBDevPulse.Presentation;
 using BBDevPulse.Tests.TestInfrastructure;
 
 using Moq;
+
 using Spectre.Console.Testing;
 
 namespace BBDevPulse.Tests.Presentation;

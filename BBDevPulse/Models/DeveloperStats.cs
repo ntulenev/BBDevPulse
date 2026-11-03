@@ -47,8 +47,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Pull requests opened since the filter date.
     /// </summary>
-    public int PrsOpenedSince
-    {
+    public int PrsOpenedSince {
         get;
         set
         {
@@ -61,8 +60,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Pull requests merged after the filter date.
     /// </summary>
-    public int PrsMergedAfter
-    {
+    public int PrsMergedAfter {
         get;
         set
         {
@@ -75,8 +73,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Comments added after the filter date.
     /// </summary>
-    public int CommentsAfter
-    {
+    public int CommentsAfter {
         get;
         set
         {
@@ -89,8 +86,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Comments added after the filter date on pull requests authored by other developers.
     /// </summary>
-    public int PeerCommentsAfter
-    {
+    public int PeerCommentsAfter {
         get;
         set
         {
@@ -103,8 +99,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Approvals added after the filter date.
     /// </summary>
-    public int ApprovalsAfter
-    {
+    public int ApprovalsAfter {
         get;
         set
         {
@@ -117,8 +112,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Corrections count across pull requests opened by the developer.
     /// </summary>
-    public int Corrections
-    {
+    public int Corrections {
         get;
         set
         {

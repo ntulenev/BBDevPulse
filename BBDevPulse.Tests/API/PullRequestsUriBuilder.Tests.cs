@@ -8,6 +8,7 @@ using BBDevPulse.Models;
 using Microsoft.Extensions.Options;
 
 using Moq;
+
 using System.Globalization;
 
 namespace BBDevPulse.Tests.API;

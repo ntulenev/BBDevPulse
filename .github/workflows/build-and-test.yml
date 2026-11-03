@@ -25,6 +25,9 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore BBDevPulse.slnx
 
+      - name: Verify C# formatting
+        run: dotnet format whitespace BBDevPulse.slnx --no-restore --verify-no-changes
+
       - name: Build
         run: dotnet build BBDevPulse.slnx --configuration Release --no-restore
 
