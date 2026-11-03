@@ -44,11 +44,15 @@ internal sealed class BitbucketTransport : IBitbucketTransport
                 _telemetryService.TrackRequest(requestUri);
                 using var response = await _httpClient.GetAsync(requestUri, token)
                     .ConfigureAwait(false);
-                if (response.StatusCode == HttpStatusCode.TooManyRequests)
+                if (response.StatusCode is HttpStatusCode.TooManyRequests or
+                    HttpStatusCode.BadGateway or HttpStatusCode.ServiceUnavailable or HttpStatusCode.GatewayTimeout)
                 {
                     var body = await response.Content.ReadAsStringAsync(token)
                         .ConfigureAwait(false);
-                    throw new RetryableBitbucketException(response.StatusCode, body);
+                    var retryAfter = response.Headers.TryGetValues("Retry-After", out var values)
+                        ? values.FirstOrDefault()
+                        : null;
+                    throw new RetryableBitbucketException(response.StatusCode, body, retryAfter);
                 }
 
                 if (!response.IsSuccessStatusCode)

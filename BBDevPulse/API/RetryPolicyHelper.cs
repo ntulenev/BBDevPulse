@@ -1,5 +1,6 @@
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
+using System.Globalization;
 
 using Microsoft.Extensions.Options;
 
@@ -11,15 +12,17 @@ namespace BBDevPulse.API;
 internal sealed class RetryPolicyHelper : IRetryPolicyHelper
 {
     private readonly BitbucketOptions _options;
+    private readonly TimeProvider _timeProvider;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="RetryPolicyHelper"/> class.
     /// </summary>
     /// <param name="options">Bitbucket options.</param>
-    public RetryPolicyHelper(IOptions<BitbucketOptions> options)
+    public RetryPolicyHelper(IOptions<BitbucketOptions> options, TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         _options = options.Value;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <inheritdoc />
@@ -45,7 +48,20 @@ internal sealed class RetryPolicyHelper : IRetryPolicyHelper
                                        retryAttempt < _options.MaxRetries)
             {
                 retryAttempt++;
-                ExtendGlobalCooldown(GetDelay(retryAttempt));
+                var delay = GetDelay(retryAttempt);
+                if (ex is RetryableBitbucketException retryable &&
+                    TryGetRetryAfterDelay(retryable.RetryAfter, out var serverDelay))
+                {
+                    if (serverDelay > TimeSpan.FromSeconds(_options.MaxRetryDelaySeconds))
+                    {
+                        throw new InvalidOperationException(
+                            $"Bitbucket API request failed ({retryable.StatusCode}): Retry-After exceeds the allowed wait.", ex);
+                    }
+
+                    delay = delay > serverDelay ? delay : serverDelay;
+                }
+
+                ExtendGlobalCooldown(delay);
             }
         }
     }
@@ -65,7 +81,7 @@ internal sealed class RetryPolicyHelper : IRetryPolicyHelper
             TimeSpan delay;
             lock (_sync)
             {
-                delay = _retryNotBeforeUtc - DateTimeOffset.UtcNow;
+                delay = _retryNotBeforeUtc - _timeProvider.GetUtcNow();
             }
 
             if (delay <= TimeSpan.Zero)
@@ -73,13 +89,13 @@ internal sealed class RetryPolicyHelper : IRetryPolicyHelper
                 return;
             }
 
-            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(delay, _timeProvider, cancellationToken).ConfigureAwait(false);
         }
     }
 
     private void ExtendGlobalCooldown(TimeSpan delay)
     {
-        var retryNotBeforeUtc = DateTimeOffset.UtcNow.Add(delay);
+        var retryNotBeforeUtc = _timeProvider.GetUtcNow().Add(delay);
         lock (_sync)
         {
             if (retryNotBeforeUtc > _retryNotBeforeUtc)
@@ -87,6 +103,32 @@ internal sealed class RetryPolicyHelper : IRetryPolicyHelper
                 _retryNotBeforeUtc = retryNotBeforeUtc;
             }
         }
+    }
+
+    private bool TryGetRetryAfterDelay(string? value, out TimeSpan delay)
+    {
+        delay = TimeSpan.Zero;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        if (long.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var seconds) && seconds > 0)
+        {
+            delay = seconds >= TimeSpan.MaxValue.TotalSeconds
+                ? TimeSpan.MaxValue
+                : TimeSpan.FromSeconds(seconds);
+            return true;
+        }
+
+        if (DateTimeOffset.TryParseExact(value, "r", CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal, out var deadline))
+        {
+            delay = deadline - _timeProvider.GetUtcNow();
+            return delay > TimeSpan.Zero;
+        }
+
+        return false;
     }
 
     private readonly Lock _sync = new();

@@ -10,6 +10,34 @@ namespace BBDevPulse.Tests.API;
 
 public sealed class RetryPolicyHelperTests
 {
+    [Theory]
+    [InlineData("120")]
+    [InlineData("Wed, 21 Oct 2099 07:28:00 GMT")]
+    public async Task ExecuteAsyncRejectsRetryAfterBeyondMaximum(string retryAfter)
+    {
+        var options = Options.Create(new BitbucketOptions
+        {
+            Days = 7, Workspace = "workspace", PageLength = 25,
+            MaxRetries = 1, MaxRetryDelaySeconds = 30,
+            Username = "user", AppPassword = "pass", RepoNameFilter = string.Empty,
+            RepoNameList = [], BranchNameList = [],
+            RepoSearchMode = RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly
+        });
+        var helper = new RetryPolicyHelper(options);
+        var attempts = 0;
+
+        Func<Task> act = () => helper.ExecuteAsync<int>(_ =>
+        {
+            attempts++;
+            throw new RetryableBitbucketException(System.Net.HttpStatusCode.TooManyRequests, "busy", retryAfter);
+        }, ex => ex is RetryableBitbucketException, CancellationToken.None);
+
+        var exception = await act.Should().ThrowAsync<InvalidOperationException>();
+        exception.Which.Message.Should().Contain("Retry-After");
+        attempts.Should().Be(1);
+    }
+
     [Fact(DisplayName = "Constructor throws when options are null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenOptionsAreNullThrowsArgumentNullException()

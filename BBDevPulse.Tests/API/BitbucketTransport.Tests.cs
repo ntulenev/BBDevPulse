@@ -151,9 +151,11 @@ public sealed class BitbucketTransportTests
         exception.Which.Message.Should().Contain("empty");
     }
 
-    [Fact(DisplayName = "GetAsync retries when Bitbucket returns too many requests and eventually succeeds")]
+    [Theory(DisplayName = "GetAsync retries transient responses and eventually succeeds")]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
     [Trait("Category", "Unit")]
-    public async Task GetAsyncWhenTooManyRequestsReturnedRetriesAndSucceeds()
+    public async Task GetAsyncWhenTransientStatusReturnedRetriesAndSucceeds(HttpStatusCode status)
     {
         // Arrange
         var callCount = 0;
@@ -161,7 +163,7 @@ public sealed class BitbucketTransportTests
         {
             callCount++;
             return callCount == 1
-                ? new HttpResponseMessage(HttpStatusCode.TooManyRequests)
+                ? new HttpResponseMessage(status)
                 {
                     Content = new StringContent(string.Empty, Encoding.UTF8, "text/plain")
                 }
