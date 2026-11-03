@@ -45,7 +45,7 @@ public readonly struct DeveloperKey : IEquatable<DeveloperKey>
     /// <returns>Developer key.</returns>
     public static DeveloperKey FromIdentity(DeveloperIdentity identity)
     {
-        ArgumentNullException.ThrowIfNull(identity.DisplayName);
+        ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         return identity.Uuid is not null
             ? new DeveloperKey(identity.Uuid)
             : new DeveloperKey(identity.DisplayName);

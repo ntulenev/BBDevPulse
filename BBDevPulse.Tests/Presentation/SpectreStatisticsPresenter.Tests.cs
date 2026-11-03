@@ -159,12 +159,13 @@ public sealed class SpectreStatisticsPresenterTests
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
         var reportData = CreateReportData();
 
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice")) { PrsOpenedSince = 1 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob")) { PrsOpenedSince = 4 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Reviewer")))] =
-            new DeveloperStats(new DisplayName("Reviewer")) { PrsOpenedSince = 0, CommentsAfter = 2 };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        alice.PrsOpenedSince = 1;
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.PrsOpenedSince = 4;
+        var reviewer = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Reviewer")));
+        reviewer.PrsOpenedSince = 0;
+        reviewer.CommentsAfter = 2;
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderPrsPerDeveloperStats(reportData));
@@ -261,10 +262,10 @@ public sealed class SpectreStatisticsPresenterTests
             statisticsCalculator.Object,
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
         var reportData = CreateReportData();
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice")) { PeerCommentsAfter = 1 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob")) { PeerCommentsAfter = 4 };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        alice.PeerCommentsAfter = 1;
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.PeerCommentsAfter = 4;
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderPeerCommentsStats(reportData));
@@ -938,25 +939,19 @@ public sealed class SpectreStatisticsPresenterTests
         var presenter = CreatePresenter();
         var reportData = CreateReportData();
 
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob"))
-            {
-                PrsOpenedSince = 1,
-                PrsMergedAfter = 1,
-                CommentsAfter = 1,
-                ApprovalsAfter = 1
-            };
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.PrsOpenedSince = 1;
+        bob.PrsMergedAfter = 1;
+        bob.CommentsAfter = 1;
+        bob.ApprovalsAfter = 1;
 
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice"))
-            {
-                Grade = "Senior",
-                Department = "Platform",
-                PrsOpenedSince = 2,
-                PrsMergedAfter = 3,
-                CommentsAfter = 4,
-                ApprovalsAfter = 5
-            };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        alice.Grade = "Senior";
+        alice.Department = "Platform";
+        alice.PrsOpenedSince = 2;
+        alice.PrsMergedAfter = 3;
+        alice.CommentsAfter = 4;
+        alice.ApprovalsAfter = 5;
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData));
@@ -981,20 +976,14 @@ public sealed class SpectreStatisticsPresenterTests
         var presenter = CreatePresenter();
         var reportData = CreateReportData(showDeveloperUuidInStats: true);
 
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice"), new UserUuid("{alice-1}"))
-            {
-                Grade = "Senior",
-                Department = "Platform",
-                PrsOpenedSince = 1,
-                PeerCommentsAfter = 2
-            };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")));
+        alice.Grade = "Senior";
+        alice.Department = "Platform";
+        alice.PrsOpenedSince = 1;
+        alice.PeerCommentsAfter = 2;
 
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob"))
-            {
-                Department = "Platform"
-            };
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.Department = "Platform";
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData));
@@ -1024,8 +1013,7 @@ public sealed class SpectreStatisticsPresenterTests
             [],
             toDateExclusive: new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero)));
 
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice"));
+        _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperStatsTable(reportData));
@@ -1041,7 +1029,7 @@ public sealed class SpectreStatisticsPresenterTests
         // Arrange
         var presenter = CreatePresenter();
         var reportData = CreateReportData(showAllDetailsForDevelopers: true);
-        var developer = new DeveloperStats(new DisplayName("Alice"));
+        var developer = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
         var report = CreateReport(
             id: 7,
             mergedOn: BaseDate.AddDays(2),
@@ -1061,7 +1049,7 @@ public sealed class SpectreStatisticsPresenterTests
             "Add follow-up commit size and message",
             BaseDate.AddHours(5),
             new PullRequestSizeSummary(FilesChanged: 17, LinesAdded: 80, LinesRemoved: 43)));
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] = developer;
+
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderDeveloperDetails(reportData));
@@ -1090,15 +1078,13 @@ public sealed class SpectreStatisticsPresenterTests
         var reportData = CreateReportData(
             pullRequestSizeMode: PullRequestSizeMode.Files,
             showAllDetailsForDevelopers: true);
-        var developer = new DeveloperStats(new DisplayName("Alice"));
+        var developer = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
         developer.AuthoredPullRequests.Add(CreateReport(
             id: 7, mergedOn: null, firstReactionOn: null,
             filesChanged: 4, linesAdded: 60, linesRemoved: 20));
         developer.AuthoredPullRequests.Add(CreateReport(
             id: 8, mergedOn: null, firstReactionOn: null,
             hasSizeData: false));
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(
-            new DeveloperIdentity(null, new DisplayName("Alice")))] = developer;
 
         var output = TestConsoleRunner.Run(console =>
         {

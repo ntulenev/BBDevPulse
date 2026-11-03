@@ -17,7 +17,7 @@ public sealed class ReportData
     /// <summary>Records a Bitbucket identity before developer statistics can merge it with another identity.</summary>
     public void ObserveDeveloperIdentity(DeveloperIdentity identity)
     {
-        ArgumentNullException.ThrowIfNull(identity.DisplayName);
+        ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         EnsureMutable();
         if (identity.Uuid is null || string.IsNullOrWhiteSpace(identity.DisplayName.Value))
         {
@@ -57,6 +57,7 @@ public sealed class ReportData
     {
         ArgumentNullException.ThrowIfNull(parameters);
         Parameters = parameters;
+        DeveloperStats = new System.Collections.ObjectModel.ReadOnlyDictionary<DeveloperKey, DeveloperStats>(_developers);
         _peopleByDisplayName = peopleByDisplayName is null
             ? new Dictionary<string, PersonCsvRow>(StringComparer.Ordinal)
             : peopleByDisplayName.ToDictionary(
@@ -95,7 +96,7 @@ public sealed class ReportData
     /// <summary>
     /// Gets the developer statistics keyed by identity.
     /// </summary>
-    public IDictionary<DeveloperKey, DeveloperStats> DeveloperStats { get; private set; } = new Dictionary<DeveloperKey, DeveloperStats>();
+    public IReadOnlyDictionary<DeveloperKey, DeveloperStats> DeveloperStats { get; }
 
     /// <summary>
     /// Gets the number of pull requests created inside the selected range.
@@ -149,7 +150,7 @@ public sealed class ReportData
     /// <returns>True when no team filter is active or the developer is in the selected team.</returns>
     public bool IsDeveloperIncluded(DeveloperIdentity identity)
     {
-        ArgumentNullException.ThrowIfNull(identity.DisplayName);
+        ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         if (!Parameters.HasTeamFilter)
         {
             return true;
@@ -174,16 +175,11 @@ public sealed class ReportData
     /// <returns>The current statistics entry.</returns>
     public DeveloperStats GetOrAddDeveloper(DeveloperIdentity identity)
     {
-        ArgumentNullException.ThrowIfNull(identity.DisplayName);
+        ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         ObserveDeveloperIdentity(identity);
         var key = DeveloperKey.FromIdentity(identity);
         if (DeveloperStats.TryGetValue(key, out var existing))
         {
-            if (existing.BitbucketUuid is null && identity.Uuid is not null)
-            {
-                existing.BitbucketUuid = identity.Uuid;
-            }
-
             return existing;
         }
 
@@ -196,13 +192,9 @@ public sealed class ReportData
             {
                 if (entry.Value.BitbucketUuid is null && identity.Uuid is not null)
                 {
-                    entry.Value.BitbucketUuid = identity.Uuid;
-                }
-
-                if (identity.Uuid is not null && entry.Key != key)
-                {
-                    _ = DeveloperStats.Remove(entry.Key);
-                    DeveloperStats[key] = entry.Value;
+                    entry.Value.AttachUuid(identity.Uuid);
+                    _developers.Remove(entry.Key);
+                    _developers.Add(key, entry.Value);
                 }
 
                 return entry.Value;
@@ -210,10 +202,11 @@ public sealed class ReportData
         }
 
         var created = new DeveloperStats(identity.DisplayName, identity.Uuid);
-        DeveloperStats[key] = created;
+        _developers.Add(key, created);
         return created;
     }
 
+    private readonly Dictionary<DeveloperKey, DeveloperStats> _developers = [];
     private readonly Dictionary<string, PersonCsvRow> _peopleByDisplayName;
     internal void ApplyAnalysis(Action update)
     {
@@ -239,8 +232,6 @@ public sealed class ReportData
         }
 
         Reports = Array.AsReadOnly(Reports.ToArray());
-        DeveloperStats = new System.Collections.ObjectModel.ReadOnlyDictionary<DeveloperKey, DeveloperStats>(
-            new Dictionary<DeveloperKey, DeveloperStats>(DeveloperStats));
         _frozen = true;
     }
 

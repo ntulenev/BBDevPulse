@@ -155,14 +155,9 @@ public sealed class HtmlContentComposerTests
             "Add follow-up commit size and message",
             filterDate.AddHours(7),
             new PullRequestSizeSummary(FilesChanged: 3, LinesAdded: 40, LinesRemoved: 10)));
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(
-            new UserUuid("{bob-1}"),
-            new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob"), new UserUuid("{bob-1}"))
-            {
-                PrsOpenedSince = 3,
-                PrsMergedAfter = 2
-            };
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{bob-1}"), new DisplayName("Bob")));
+        bob.PrsOpenedSince = 3;
+        bob.PrsMergedAfter = 2;
         return reportData;
     }
 }

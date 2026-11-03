@@ -27,7 +27,7 @@ public sealed class DeveloperStats
     /// <summary>
     /// Developer display name.
     /// </summary>
-    public DisplayName DisplayName { get; set { EnsureMutable(); field = value ?? throw new ArgumentNullException(nameof(value)); } }
+    public DisplayName DisplayName { get; }
 
     /// <summary>
     /// Developer grade from CSV enrichment.
@@ -37,7 +37,19 @@ public sealed class DeveloperStats
     /// <summary>
     /// Developer Bitbucket UUID.
     /// </summary>
-    public UserUuid? BitbucketUuid { get; set { EnsureMutable(); field = value; } }
+    public UserUuid? BitbucketUuid { get; private set; }
+
+    internal void AttachUuid(UserUuid uuid)
+    {
+        EnsureMutable();
+        ArgumentNullException.ThrowIfNull(uuid);
+        if (BitbucketUuid is not null)
+        {
+            throw new InvalidOperationException("The developer already has a UUID.");
+        }
+
+        BitbucketUuid = uuid;
+    }
 
     /// <summary>
     /// Developer department from CSV enrichment.

@@ -8,6 +8,19 @@ namespace BBDevPulse.Tests.Models;
 public sealed class ReportDataTests
 {
     [Theory]
+    [InlineData(null)]
+    [InlineData("Core")]
+    public void DefaultIdentityIsRejectedAtEachBoundary(string? teamFilter)
+    {
+        var data = new ReportData(CreateReportParameters(teamFilter: teamFilter));
+        Assert.Throws<ArgumentNullException>("identity", () => DeveloperKey.FromIdentity(default));
+        Assert.Throws<ArgumentNullException>("identity", () => data.IsDeveloperIncluded(default));
+        Assert.Throws<ArgumentNullException>("identity", () => data.ObserveDeveloperIdentity(default));
+        Assert.Throws<ArgumentNullException>("identity", () => data.GetOrAddDeveloper(default));
+        Assert.Empty(data.DeveloperStats);
+    }
+
+    [Theory]
     [InlineData(-1, 0, 0)]
     [InlineData(0, -1, 0)]
     [InlineData(0, 0, -1)]
@@ -72,6 +85,8 @@ public sealed class ReportDataTests
         data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{A}"), new DisplayName("alice")));
         data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Alice")));
         data.DeveloperStats.Should().HaveCount(1);
+        var entry = Assert.Single(data.DeveloperStats);
+        Assert.Equal(new DeveloperKey(entry.Value.BitbucketUuid!), entry.Key);
         var collision = data.GetIdentityCollisions().Should().ContainSingle().Subject;
         collision.Name.Should().Be("Alice");
         collision.Uuids.Should().Equal("{a}", "{B}");
@@ -373,12 +388,12 @@ public sealed class ReportDataTests
     {
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice")) { PrsOpenedSince = 3 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob")) { PrsOpenedSince = 0 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Carol")))] =
-            new DeveloperStats(new DisplayName("Carol")) { PrsOpenedSince = 1 };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        alice.PrsOpenedSince = 3;
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.PrsOpenedSince = 0;
+        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Carol")));
+        carol.PrsOpenedSince = 1;
 
         // Act
         var counts = reportData.GetOpenedPullRequestCountsPerDeveloper();
@@ -418,12 +433,12 @@ public sealed class ReportDataTests
     {
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice")) { PeerCommentsAfter = 3 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob")) { PeerCommentsAfter = 0 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Carol")))] =
-            new DeveloperStats(new DisplayName("Carol")) { PeerCommentsAfter = 1 };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        alice.PeerCommentsAfter = 3;
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.PeerCommentsAfter = 0;
+        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Carol")));
+        carol.PeerCommentsAfter = 1;
 
         // Act
         var counts = reportData.GetPeerCommentCountsPerDeveloper();
