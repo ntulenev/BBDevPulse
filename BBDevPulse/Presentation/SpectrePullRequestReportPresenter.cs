@@ -35,6 +35,7 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
         var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
+        var forcedIncludeDates = reportData.Parameters.ForcedIncludeDates;
         var table = new Table()
             .Border(TableBorder.Rounded)
             .AddColumn("#")
@@ -57,15 +58,15 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
         foreach (var report in reportData.Reports)
         {
             var timeToMerge = report.MergedOn.HasValue
-                ? FormatDuration(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays)
+                ? FormatDuration(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays, forcedIncludeDates)
                 : "-";
             var prAge = report.State == PullRequestState.Open
-                ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend, excludedDays)
+                ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend, excludedDays, forcedIncludeDates)
                     .TotalDays
                     .ToString("0.0", CultureInfo.InvariantCulture)
                 : "-";
             var ttfr = report.FirstReactionOn.HasValue
-                ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
+                ? FormatDuration(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays, forcedIncludeDates)
                 : "-";
             var size = FormatPullRequestSize(report, pullRequestSizeMode);
             var createdCell = report.CreatedOn < filterDate && !report.IsActivityOnlyMatch
@@ -127,9 +128,10 @@ public sealed class SpectrePullRequestReportPresenter : IPullRequestReportPresen
         DateTimeOffset start,
         DateTimeOffset end,
         bool excludeWeekend,
-        IReadOnlySet<DateOnly> excludedDays)
+        IReadOnlySet<DateOnly> excludedDays,
+        IReadOnlySet<DateOnly> forcedIncludeDates)
     {
-        var duration = WorkDurationCalculator.Calculate(start, end, excludeWeekend, excludedDays);
+        var duration = WorkDurationCalculator.Calculate(start, end, excludeWeekend, excludedDays, forcedIncludeDates);
         return _dateDiffFormatter.Format(DateTimeOffset.MinValue, DateTimeOffset.MinValue.Add(duration));
     }
 }

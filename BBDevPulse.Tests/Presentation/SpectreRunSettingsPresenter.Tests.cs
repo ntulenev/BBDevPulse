@@ -26,6 +26,26 @@ public sealed class SpectreRunSettingsPresenterTests
             new DateOnly(2026, 11, 9));
     }
 
+    [Fact(DisplayName = "Forced included Saturday is shown as working in startup date summary")]
+    public void GetExcludedDatesInWindowOmitsForcedIncludedSaturday()
+    {
+        var parameters = CreateParameters(
+            new DateTimeOffset(2026, 11, 6, 0, 0, 0, TimeSpan.Zero),
+            new DateTimeOffset(2026, 11, 10, 0, 0, 0, TimeSpan.Zero),
+            excludeWeekend: true,
+            excludedDays: [new DateOnly(2026, 11, 7)],
+            forcedIncludeDates: [new DateOnly(2026, 11, 7)]);
+
+        var excluded = SpectreRunSettingsPresenter.GetExcludedDatesInWindow(
+            parameters, new DateTimeOffset(2026, 11, 20, 0, 0, 0, TimeSpan.Zero));
+        var output = TestConsoleRunner.Run(_ => SpectreRunSettingsPresenter.Render(
+            parameters, "report-user", htmlFileName: null, pdfFileName: null));
+
+        excluded.Should().Equal(new DateOnly(2026, 11, 8));
+        output.Should().Contain("Forced included dates");
+        output.Should().Contain("2026-11-07");
+    }
+
     [Fact(DisplayName = "Startup summary highlights detailed developer output")]
     public void RenderWhenDeveloperDetailsEnabledShowsWarning()
     {
@@ -73,7 +93,8 @@ public sealed class SpectreRunSettingsPresenterTests
         DateTimeOffset end,
         bool excludeWeekend = false,
         IReadOnlyList<DateOnly>? excludedDays = null,
-        bool showAllDetailsForDevelopers = false) =>
+        bool showAllDetailsForDevelopers = false,
+        IReadOnlyList<DateOnly>? forcedIncludeDates = null) =>
         new(
             start,
             new Workspace("workspace"),
@@ -85,5 +106,6 @@ public sealed class SpectreRunSettingsPresenterTests
             excludeWeekend: excludeWeekend,
             excludedDays: excludedDays,
             showAllDetailsForDevelopers: showAllDetailsForDevelopers,
-            toDateExclusive: end);
+            toDateExclusive: end,
+            forcedIncludeDates: forcedIncludeDates);
 }

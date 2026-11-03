@@ -24,6 +24,7 @@ public sealed class ReportParameters
     /// <param name="showDeveloperUuidInStats">Whether to show Bitbucket UUIDs in developer stats.</param>
     /// <param name="showAllDetailsForDevelopers">Whether to append detailed per-developer activity sections after summary reports.</param>
     /// <param name="toDateExclusive">Optional exclusive upper bound for the report range.</param>
+    /// <param name="forcedIncludeDates">Dates counted as working days regardless of weekend or exclusion rules.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -39,7 +40,8 @@ public sealed class ReportParameters
         bool showDeveloperUuidInStats = false,
         bool showAllDetailsForDevelopers = false,
         DateTimeOffset? toDateExclusive = null,
-        bool isDemo = false)
+        bool isDemo = false,
+        IReadOnlyList<DateOnly>? forcedIncludeDates = null)
     {
         ArgumentNullException.ThrowIfNull(workspace);
         ArgumentNullException.ThrowIfNull(repoNameFilter);
@@ -65,6 +67,9 @@ public sealed class ReportParameters
         ExcludedDays = excludedDays is null
             ? new HashSet<DateOnly>().ToFrozenSet()
             : new HashSet<DateOnly>(excludedDays).ToFrozenSet();
+        ForcedIncludeDates = forcedIncludeDates is null
+            ? new HashSet<DateOnly>().ToFrozenSet()
+            : new HashSet<DateOnly>(forcedIncludeDates).ToFrozenSet();
     }
 
     /// <summary>
@@ -177,4 +182,9 @@ public sealed class ReportParameters
     /// Gets optional list of excluded days.
     /// </summary>
     public IReadOnlySet<DateOnly> ExcludedDays { get; }
+
+    /// <summary>
+    /// Gets dates that count as working days even if they are weekends or explicitly excluded.
+    /// </summary>
+    public IReadOnlySet<DateOnly> ForcedIncludeDates { get; }
 }

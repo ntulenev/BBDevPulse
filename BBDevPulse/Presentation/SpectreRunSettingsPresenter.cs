@@ -34,11 +34,14 @@ internal static class SpectreRunSettingsPresenter
             ("Window", window),
             ("Weekends", parameters.ExcludeWeekend ? "Excluded from duration calculations" : "Included in duration calculations"),
             ("Extra excluded days", parameters.ExcludedDays.Count == 0 ? "None configured" : $"{parameters.ExcludedDays.Count} configured"),
+            ("Forced included dates", parameters.ForcedIncludeDates.Count == 0
+                ? "None configured"
+                : string.Join(", ", parameters.ForcedIncludeDates.Order().Select(FormatDate))),
             ("Dates in this window", excludedDates.Count == 0
                 ? "None excluded"
                 : string.Join(", ", excludedDates.Select(FormatDate)))
         ]);
-        AnsiConsole.MarkupLine("[grey]Date exclusions change duration metrics only. PRs and activity on those dates remain eligible.[/]");
+        AnsiConsole.MarkupLine("[grey]Date rules change duration metrics only. Forced included dates override weekends and extra excluded days. PRs and activity remain eligible.[/]");
         AnsiConsole.WriteLine();
 
         WriteSection("02  Scope", [
@@ -90,8 +93,9 @@ internal static class SpectreRunSettingsPresenter
         var excluded = new List<DateOnly>();
         for (var day = first; day <= last; day = day.AddDays(1))
         {
-            if (parameters.ExcludedDays.Contains(day) ||
-                (parameters.ExcludeWeekend && day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday))
+            if (!parameters.ForcedIncludeDates.Contains(day) &&
+                (parameters.ExcludedDays.Contains(day) ||
+                 (parameters.ExcludeWeekend && day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)))
             {
                 excluded.Add(day);
             }

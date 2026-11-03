@@ -48,7 +48,7 @@ public sealed class ReportData
         var days = Reports
             .Where(static report => report.IncludeInMetrics && report.FirstReactionOn.HasValue)
             .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn!.Value,
-                Parameters.ExcludeWeekend, Parameters.ExcludedDays).TotalDays)
+                Parameters.ExcludeWeekend, Parameters.ExcludedDays, Parameters.ForcedIncludeDates).TotalDays)
             .OrderBy(static value => value)
             .ToArray();
         _ttfrStatistics = days.Length == 0

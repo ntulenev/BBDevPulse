@@ -47,6 +47,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
+        var forcedIncludeDates = reportData.Parameters.ForcedIncludeDates;
         var workspace = reportData.Parameters.Workspace.Value;
 
         var content = new StringBuilder(32 * 1024);
@@ -62,7 +63,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             "Merge Time Stats",
             metricReports
                 .Where(static report => report.MergedOn.HasValue)
-                .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays).TotalDays)
+                .Select(report => WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn!.Value, excludeWeekend, excludedDays, forcedIncludeDates).TotalDays)
                 .OrderBy(static days => days)
                 .ToList(),
             "Best Merge Time",
@@ -110,7 +111,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             "Count"));
         _ = content.Append(BuildPeerCommentsStatsTable(reportData));
         _ = content.AppendLine("</div>");
-        _ = content.Append(BuildWorstPullRequestsTable(metricReports, workspace, excludeWeekend, excludedDays, pullRequestSizeMode));
+        _ = content.Append(BuildWorstPullRequestsTable(metricReports, workspace, excludeWeekend, excludedDays, forcedIncludeDates, pullRequestSizeMode));
         _ = content.Append(BuildDeveloperStatsTable(reportData));
 
         if (reportData.Parameters.ShowAllDetailsForDevelopers)
@@ -142,6 +143,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         var filterDate = reportData.Parameters.FilterDate;
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;
         var excludedDays = reportData.Parameters.ExcludedDays;
+        var forcedIncludeDates = reportData.Parameters.ForcedIncludeDates;
         var pullRequestSizeMode = reportData.Parameters.PullRequestSizeMode;
         var columns = new[]
         {
@@ -169,13 +171,13 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             var repositoryUrl = HtmlPresentationHelpers.BuildRepositoryUrl(workspace, report.RepositorySlug);
             var pullRequestUrl = HtmlPresentationHelpers.BuildPullRequestUrl(workspace, report.RepositorySlug, report.Id.Value);
             var ttfrDuration = report.FirstReactionOn.HasValue
-                ? WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays)
+                ? WorkDurationCalculator.Calculate(report.CreatedOn, report.FirstReactionOn.Value, excludeWeekend, excludedDays, forcedIncludeDates)
                 : (TimeSpan?)null;
             var timeToMergeDuration = report.MergedOn.HasValue
-                ? WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays)
+                ? WorkDurationCalculator.Calculate(report.CreatedOn, report.MergedOn.Value, excludeWeekend, excludedDays, forcedIncludeDates)
                 : (TimeSpan?)null;
             var prAgeDuration = report.State == PullRequestState.Open
-                ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend, excludedDays)
+                ? WorkDurationCalculator.Calculate(report.CreatedOn, DateTimeOffset.UtcNow, excludeWeekend, excludedDays, forcedIncludeDates)
                 : (TimeSpan?)null;
             var createdLabel = HtmlPresentationHelpers.FormatDate(report.CreatedOn);
             if (report.CreatedOn < filterDate)
@@ -418,6 +420,7 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
         string workspace,
         bool excludeWeekend,
         IReadOnlySet<DateOnly> excludedDays,
+        IReadOnlySet<DateOnly> forcedIncludeDates,
         PullRequestSizeMode pullRequestSizeMode)
     {
         var columns = new[]
@@ -445,7 +448,8 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             reports.ToList(),
             excludeWeekend,
             excludedDays,
-            pullRequestSizeMode);
+            pullRequestSizeMode,
+            forcedIncludeDates);
         var rows = new List<TableRow>(selections.Count);
 
         foreach (var selection in selections)
