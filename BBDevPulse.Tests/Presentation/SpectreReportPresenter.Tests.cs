@@ -3,14 +3,89 @@ using FluentAssertions;
 using BBDevPulse.Abstractions;
 using BBDevPulse.Models;
 using BBDevPulse.Presentation;
+using BBDevPulse.Tests.TestInfrastructure;
 
 using Moq;
+using Spectre.Console.Testing;
 
 namespace BBDevPulse.Tests.Presentation;
 
 public sealed class SpectreReportPresenterTests
 {
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
+
+    [Fact(DisplayName = "Team menu shows counts and selected team members with grades")]
+    public void SelectTeamFilterWhenTeamChosenShowsMembers()
+    {
+        var presenter = CreateSut();
+        var team = new TeamFilterOption("Core", [
+            new TeamMember("Alice", "Senior"),
+            new TeamMember("Bob", "Middle")
+        ]);
+        string? selected = null;
+
+        var output = TestConsoleRunner.Run(console =>
+        {
+            _ = console.Interactive();
+            console.Input.PushKey(ConsoleKey.DownArrow);
+            console.Input.PushKey(ConsoleKey.Enter);
+            selected = presenter.SelectTeamFilter([team], totalPeople: 3);
+        });
+
+        selected.Should().Be("Core");
+        output.Should().Contain("All teams (3 people)");
+        output.Should().Contain("Core (2 people)");
+        output.Should().Contain("Alice");
+        output.Should().Contain("Senior");
+        output.Should().Contain("Bob");
+        output.Should().Contain("Middle");
+    }
+
+    [Fact(DisplayName = "All teams option does not show the member preview")]
+    public void SelectTeamFilterWhenAllChosenSkipsMembers()
+    {
+        var presenter = CreateSut();
+        string? selected = "not-null";
+
+        var output = TestConsoleRunner.Run(console =>
+        {
+            _ = console.Interactive();
+            console.Input.PushKey(ConsoleKey.Enter);
+            selected = presenter.SelectTeamFilter([
+                new TeamFilterOption("Core", [new TeamMember("Alice", "Senior")])
+            ], totalPeople: 2);
+        });
+
+        selected.Should().BeNull();
+        output.Should().Contain("All teams (2 people)");
+        output.Should().NotContain("Senior");
+    }
+
+    [Fact(DisplayName = "Long team list can be reviewed page by page")]
+    public void SelectTeamFilterWhenManyMembersAllowsNextPage()
+    {
+        var presenter = CreateSut();
+        var members = Enumerable.Range(1, 15)
+            .Select(index => new TeamMember($"Person {index:00}", "Middle"))
+            .ToList();
+        string? selected = null;
+
+        var output = TestConsoleRunner.Run(console =>
+        {
+            _ = console.Interactive();
+            console.Input.PushKey(ConsoleKey.DownArrow);
+            console.Input.PushKey(ConsoleKey.Enter);
+            console.Input.PushKey(ConsoleKey.Enter); // Next page
+            console.Input.PushKey(ConsoleKey.DownArrow);
+            console.Input.PushKey(ConsoleKey.Enter); // Done reviewing
+            selected = presenter.SelectTeamFilter([new TeamFilterOption("Core", members)], totalPeople: 15);
+        });
+
+        selected.Should().Be("Core");
+        output.Should().Contain("page 1 of 2");
+        output.Should().Contain("page 2 of 2");
+        output.Should().Contain("Person 15");
+    }
 
     [Fact(DisplayName = "Constructor throws when auth presenter is null")]
     [Trait("Category", "Unit")]

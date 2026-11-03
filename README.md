@@ -157,7 +157,7 @@ All settings are under the `Bitbucket` object.
   Supports `dd.MM.yyyy` and `yyyy-MM-dd` formats.
 - `PeopleCsvPath` (`string`): Optional path to a CSV file with developer metadata in format `Name;Grade;Department`.
   Name matching is exact against developer display names in report stats. Missing matches stay `N/A`.
-- Team selection: When `PeopleCsvPath` contains departments, the startup menu offers those teams and an unfiltered option.
+- Team selection: When `PeopleCsvPath` contains departments, the startup menu shows each team with its member count and an unfiltered option. Selecting a team displays its members and grades in pages of 12 before report collection begins.
 - `ShowDeveloperUuidInStats` (`bool`): Optional flag to include Bitbucket user UUIDs in developer stats output. Default is `false`.
 - `ShowAllDetailsForDevelopers` (`bool`): Optional flag to append detailed per-developer sections after the summary report. When enabled, the report includes authored PRs, comments, approvals, and follow-up commits for each developer. Default is `false`.
 - `Telemetry.Enabled` (`bool`): Enables/disables Bitbucket request telemetry in the console output. Default is `true`.

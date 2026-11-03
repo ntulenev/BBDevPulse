@@ -36,9 +36,10 @@ public interface IReportPresenter
     /// <summary>
     /// Lets the user choose one of the teams found in the people CSV, or all teams.
     /// </summary>
-    /// <param name="teams">Distinct team names.</param>
+    /// <param name="teams">Distinct teams and their members.</param>
+    /// <param name="totalPeople">Total number of people in the CSV, including those without a team.</param>
     /// <returns>The selected team, or null for no filter.</returns>
-    string? SelectTeamFilter(IReadOnlyList<string> teams);
+    string? SelectTeamFilter(IReadOnlyList<TeamFilterOption> teams, int totalPeople);
 
     /// <summary>
     /// Displays authentication status using the provided user fetcher.

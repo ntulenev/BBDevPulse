@@ -55,14 +55,18 @@ internal sealed class ReportRunner : IReportRunner
     public async Task RunAsync(CancellationToken cancellationToken)
     {
         var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
-        var teams = peopleByName.Values
-            .Select(static person => person.Department.Trim())
-            .Where(static team => !string.IsNullOrWhiteSpace(team) &&
-                !string.Equals(team, DeveloperStats.NOT_AVAILABLE, StringComparison.OrdinalIgnoreCase))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(static team => team, StringComparer.OrdinalIgnoreCase)
+        var teams = peopleByName
+            .Where(static entry => !string.IsNullOrWhiteSpace(entry.Value.Department) &&
+                !string.Equals(entry.Value.Department.Trim(), DeveloperStats.NOT_AVAILABLE, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(static entry => entry.Value.Department.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(static group => new TeamFilterOption(
+                group.Key,
+                group.Select(static entry => new TeamMember(entry.Key.Value, entry.Value.Grade))
+                    .OrderBy(static member => member.Name, StringComparer.OrdinalIgnoreCase)
+                    .ToList()))
+            .OrderBy(static team => team.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams);
+        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams, peopleByName.Count);
         var parameters = _options.CreateReportParameters(teamFilter);
         var htmlOptions = _options.Html ?? new HtmlOptions();
         var pdfOptions = _options.Pdf ?? new PdfOptions();
