@@ -15,6 +15,42 @@ public sealed class ReportRunnerTests
 {
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
+    [Fact(DisplayName = "RunAsync stops before Bitbucket requests when startup is declined")]
+    [Trait("Category", "Unit")]
+    public async Task RunAsyncWhenStartupIsDeclinedDoesNotLoadBitbucketData()
+    {
+        var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
+        var settingsShown = false;
+        presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()))
+            .Callback(() => settingsShown = true);
+        presenter.Setup(x => x.ConfirmStart())
+            .Returns(() =>
+            {
+                settingsShown.Should().BeTrue();
+                return false;
+            });
+
+        var peopleCsvProvider = new Mock<IPeopleCsvProvider>(MockBehavior.Strict);
+        peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(cancellationToken))
+            .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>());
+
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        var runner = new ReportRunner(
+            client.Object,
+            new Mock<IPullRequestAnalyzer>(MockBehavior.Strict).Object,
+            presenter.Object,
+            new Mock<IHtmlReportRenderer>(MockBehavior.Strict).Object,
+            new Mock<IPdfReportRenderer>(MockBehavior.Strict).Object,
+            peopleCsvProvider.Object,
+            new Mock<IBitbucketTelemetryService>(MockBehavior.Strict).Object,
+            Options.Create(CreateOptions()));
+
+        await runner.RunAsync(cancellationToken);
+
+        presenter.Verify(x => x.ConfirmStart(), Times.Once);
+        client.VerifyNoOtherCalls();
+    }
+
     [Fact(DisplayName = "Constructor throws when client is null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenClientIsNullThrowsArgumentNullException()
@@ -257,6 +293,7 @@ public sealed class ReportRunnerTests
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()))
             .Callback(() => authRequests.Should().Be(0));
+        presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
@@ -409,6 +446,7 @@ public sealed class ReportRunnerTests
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()));
+        presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.AnnounceAuthAsync(
                 It.Is<Func<CancellationToken, Task<AuthUser>>>(fetchUser => fetchUser != null),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
@@ -526,6 +564,7 @@ public sealed class ReportRunnerTests
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()));
+        presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
                 teams.Count == 1 && teams[0] == "Core Platform")))
             .Returns((string?)null);
@@ -645,6 +684,7 @@ public sealed class ReportRunnerTests
 
         var presenter = new Mock<IReportPresenter>(MockBehavior.Strict);
         presenter.Setup(x => x.RenderRunSettings(It.IsAny<ReportParameters>()));
+        presenter.Setup(x => x.ConfirmStart()).Returns(true);
         presenter.Setup(x => x.SelectTeamFilter(It.Is<IReadOnlyList<string>>(teams =>
                 teams.Count == 2 && teams[0] == "Core" && teams[1] == "Other")))
             .Returns("Core");

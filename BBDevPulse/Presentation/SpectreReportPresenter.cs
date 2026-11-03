@@ -15,6 +15,9 @@ public sealed class SpectreReportPresenter : IReportPresenter
         SpectreRunSettingsPresenter.Render(parameters);
 
     /// <inheritdoc />
+    public bool ConfirmStart() => AnsiConsole.Confirm("Start loading data from Bitbucket?", defaultValue: false);
+
+    /// <inheritdoc />
     public string? SelectTeamFilter(IReadOnlyList<string> teams)
     {
         ArgumentNullException.ThrowIfNull(teams);

@@ -14,6 +14,12 @@ public interface IReportPresenter
     void RenderRunSettings(ReportParameters parameters);
 
     /// <summary>
+    /// Waits for the user to approve starting Bitbucket data collection.
+    /// </summary>
+    /// <returns>True when the user confirms the run.</returns>
+    bool ConfirmStart();
+
+    /// <summary>
     /// Lets the user choose one of the teams found in the people CSV, or all teams.
     /// </summary>
     /// <param name="teams">Distinct team names.</param>
