@@ -425,17 +425,14 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                     {
                         correctionCommits.Add(commit);
                     }
-
-                    continue;
                 }
-
-                break;
             }
 
             return correctionCommits;
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Correction commits are supplemental data and should not fail the whole report.
             return null;
         }
@@ -605,6 +602,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return null;
         }
     }
@@ -625,6 +623,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             return null;
         }
     }

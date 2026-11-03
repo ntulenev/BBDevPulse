@@ -480,7 +480,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
         {
             AnsiConsole.Write(new Rule(stat.DisplayName.Value).RuleStyle("grey"));
 
-            RenderAuthoredPullRequests(stat);
+            RenderAuthoredPullRequests(stat, pullRequestSizeMode);
             RenderCommentActivities(stat);
             RenderApprovalActivities(stat);
             RenderCommitActivities(stat, reportData.Parameters.Workspace.Value, pullRequestSizeMode);
@@ -596,7 +596,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
     private static string BuildPrKey(PullRequestReport report) =>
         $"{report.RepositorySlug}:{report.Id.Value.ToString(CultureInfo.InvariantCulture)}";
 
-    private static void RenderAuthoredPullRequests(DeveloperStats stat)
+    private static void RenderAuthoredPullRequests(DeveloperStats stat, PullRequestSizeMode sizeMode)
     {
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -609,7 +609,7 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             .AddColumn("Merged")
             .AddColumn("Comments")
             .AddColumn("Corrections")
-            .AddColumn("Size");
+            .AddColumn(GetPullRequestSizeMetricLabel(sizeMode));
 
         if (stat.AuthoredPullRequests.Count == 0)
         {
@@ -630,9 +630,9 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
                 report.MergedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-",
                 report.Comments.ToString(CultureInfo.InvariantCulture),
                 report.HasCorrectionsData ? report.Corrections.ToString(CultureInfo.InvariantCulture) : "Unavailable",
-                report.HasSizeData
-                    ? $"{report.GetSizeMetricValue(PullRequestSizeMode.Lines).ToString(CultureInfo.InvariantCulture)} ({report.GetSizeTier(PullRequestSizeMode.Lines)})"
-                    : "-");
+                report.HasSizeDataForMode(sizeMode)
+                    ? $"{report.GetSizeMetricValue(sizeMode).ToString(CultureInfo.InvariantCulture)} ({report.GetSizeTier(sizeMode)})"
+                    : "Unavailable");
         }
 
         AnsiConsole.Write(table);

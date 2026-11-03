@@ -66,7 +66,30 @@ public sealed class HtmlContentComposerTests
         html.Should().Contain("No developer activity found in the report.");
     }
 
-    private static ReportParameters CreateParameters() =>
+    [Fact]
+    public void ComposeDeveloperDetailsUsesSelectedSizeModeAndMarksUnavailableSize()
+    {
+        var composer = new HtmlContentComposer(new DateDiffFormatter(), new StatisticsCalculator());
+        var reportData = CreateDetailedReportData(PullRequestSizeMode.Files);
+        var developer = reportData.DeveloperStats.Values.Single(stat => stat.DisplayName.Value == "Alice");
+        var created = reportData.Parameters.FilterDate;
+        developer.AuthoredPullRequests.Add(new PullRequestReport(
+            "Repo One", "repo-one", "Alice", "develop", created, created,
+            null, null, PullRequestState.Open, new PullRequestId(201), 0,
+            hasSizeData: false));
+
+        var html = composer.Compose(reportData);
+        var authoredStart = html.IndexOf("id=\"developer-1-authored\"", StringComparison.Ordinal);
+        var authoredEnd = html.IndexOf("id=\"developer-1-comments\"", authoredStart, StringComparison.Ordinal);
+        var authored = html[authoredStart..authoredEnd];
+
+        authored.Should().Contain("Files");
+        authored.Should().Contain("S (4)");
+        authored.Should().Contain("Unavailable");
+        authored.Should().NotContain("XS (80)");
+    }
+
+    private static ReportParameters CreateParameters(PullRequestSizeMode sizeMode = PullRequestSizeMode.Lines) =>
         new(
             new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero),
             new Workspace("workspace"),
@@ -75,12 +98,13 @@ public sealed class HtmlContentComposerTests
             RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode.CreatedOnOnly,
             branchNameList: [],
+            pullRequestSizeMode: sizeMode,
             showDeveloperUuidInStats: true,
             showAllDetailsForDevelopers: true);
 
-    private static ReportData CreateDetailedReportData()
+    private static ReportData CreateDetailedReportData(PullRequestSizeMode sizeMode = PullRequestSizeMode.Lines)
     {
-        var reportData = new ReportData(CreateParameters());
+        var reportData = new ReportData(CreateParameters(sizeMode));
         var filterDate = reportData.Parameters.FilterDate;
         var report = new PullRequestReport(
             repository: "Repo One",
