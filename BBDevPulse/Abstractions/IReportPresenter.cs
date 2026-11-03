@@ -8,6 +8,13 @@ namespace BBDevPulse.Abstractions;
 public interface IReportPresenter
 {
     /// <summary>
+    /// Lets the user choose one of the teams found in the people CSV, or all teams.
+    /// </summary>
+    /// <param name="teams">Distinct team names.</param>
+    /// <returns>The selected team, or null for no filter.</returns>
+    string? SelectTeamFilter(IReadOnlyList<string> teams);
+
+    /// <summary>
     /// Displays authentication status using the provided user fetcher.
     /// </summary>
     /// <param name="fetchUser">Function to retrieve the authenticated user.</param>

@@ -61,7 +61,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
         var metricReports = orderedReports
             .Where(static report => report.IncludeInMetrics)
             .ToList();
-        var outputPath = _pdfOptions.ResolveOutputPath();
+        var outputPath = _pdfOptions.ResolveOutputPath(reportData.Parameters.TeamFilter);
         var filterDate = reportData.Parameters.FilterDate;
         var dateWindowLabel = reportData.Parameters.GetDateWindowLabel();
         var excludeWeekend = reportData.Parameters.ExcludeWeekend;

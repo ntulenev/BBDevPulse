@@ -1,6 +1,8 @@
 using BBDevPulse.Abstractions;
 using BBDevPulse.Models;
 
+using Spectre.Console;
+
 namespace BBDevPulse.Presentation;
 
 /// <summary>
@@ -8,6 +10,24 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 public sealed class SpectreReportPresenter : IReportPresenter
 {
+    /// <inheritdoc />
+    public string? SelectTeamFilter(IReadOnlyList<string> teams)
+    {
+        ArgumentNullException.ThrowIfNull(teams);
+        if (teams.Count == 0)
+        {
+            return null;
+        }
+
+        var choices = new List<TeamChoice> { new("All teams", null) };
+        choices.AddRange(teams.Select(team => new TeamChoice(team, team)));
+        var prompt = new SelectionPrompt<TeamChoice>()
+            .Title("Filter report by team?")
+            .UseConverter(choice => Markup.Escape(choice.Label))
+            .AddChoices(choices);
+        return AnsiConsole.Prompt(prompt).Team;
+    }
+
     /// <summary>
     /// Initializes a new instance of the <see cref="SpectreReportPresenter"/> class.
     /// </summary>
@@ -113,4 +133,6 @@ public sealed class SpectreReportPresenter : IReportPresenter
     private readonly IBranchFilterPresenter _branchFilterPresenter;
     private readonly IPullRequestReportPresenter _pullRequestReportPresenter;
     private readonly IStatisticsPresenter _statisticsPresenter;
+
+    private sealed record TeamChoice(string Label, string? Team);
 }

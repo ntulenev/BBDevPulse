@@ -32,7 +32,6 @@ public sealed class BitbucketOptionsTests
             PullRequestSizeMode = PullRequestSizeMode.Files,
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026", "2026-02-04", " ", "", "03.02.2026"],
-            TeamFilter = "Core Team",
             ShowDeveloperUuidInStats = true,
             ShowAllDetailsForDevelopers = true,
             Pdf = new PdfOptions { Enabled = false, OutputPath = "report.pdf" }
@@ -41,7 +40,7 @@ public sealed class BitbucketOptionsTests
         var expectedUpperBound = DateTimeOffset.UtcNow.AddDays(-10).AddSeconds(2);
 
         // Act
-        var parameters = options.CreateReportParameters();
+        var parameters = options.CreateReportParameters("Core Team");
 
         // Assert
         parameters.FilterDate.Should().BeOnOrAfter(expectedLowerBound);
@@ -158,7 +157,6 @@ public sealed class BitbucketOptionsTests
             ExcludeWeekend = true,
             ExcludedDays = ["03.02.2026"],
             PeopleCsvPath = "people.csv",
-            TeamFilter = "Import",
             ShowDeveloperUuidInStats = true,
             ShowAllDetailsForDevelopers = true,
             Telemetry = new BitbucketTelemetryOptions { Enabled = false },
@@ -185,7 +183,6 @@ public sealed class BitbucketOptionsTests
         var excludeWeekend = options.ExcludeWeekend;
         var excludedDays = options.ExcludedDays;
         var peopleCsvPath = options.PeopleCsvPath;
-        var teamFilter = options.TeamFilter;
         var showDeveloperUuidInStats = options.ShowDeveloperUuidInStats;
         var showAllDetailsForDevelopers = options.ShowAllDetailsForDevelopers;
         var telemetry = options.Telemetry;
@@ -211,7 +208,6 @@ public sealed class BitbucketOptionsTests
         excludeWeekend.Should().BeTrue();
         excludedDays.Should().Equal("03.02.2026");
         peopleCsvPath.Should().Be("people.csv");
-        teamFilter.Should().Be("Import");
         showDeveloperUuidInStats.Should().BeTrue();
         showAllDetailsForDevelopers.Should().BeTrue();
         telemetry.Enabled.Should().BeFalse();

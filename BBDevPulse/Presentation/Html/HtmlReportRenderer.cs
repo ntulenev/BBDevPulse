@@ -45,7 +45,7 @@ public sealed class HtmlReportRenderer : IHtmlReportRenderer
             return;
         }
 
-        var outputPath = _htmlOptions.ResolveOutputPath();
+        var outputPath = _htmlOptions.ResolveOutputPath(reportData.Parameters.TeamFilter);
         var html = _htmlContentComposer.Compose(reportData);
 
         await _htmlReportFileStore.SaveAsync(outputPath, html, cancellationToken).ConfigureAwait(false);
