@@ -1,5 +1,3 @@
-using System.Reflection;
-
 using FluentAssertions;
 
 using BBDevPulse.Configuration;
@@ -8,6 +6,16 @@ namespace BBDevPulse.Tests.Configuration;
 
 public sealed class HtmlOptionsTests
 {
+    [Fact(DisplayName = "ResolveOutputPath prefixes a safe team name")]
+    public void ResolveOutputPathWhenTeamSelectedPrefixesSlug()
+    {
+        var options = new HtmlOptions { OutputPath = "reports/bbdevpulse-report.html" };
+
+        var outputPath = options.ResolveOutputPath("Core / Platform Team");
+
+        Path.GetFileName(outputPath).Should().MatchRegex(@"^core-platform-team-bbdevpulse-report_\d{2}_\d{2}_\d{4}\.html$");
+    }
+
     [Fact(DisplayName = "ResolveOutputPath uses default file name when output path is blank")]
     [Trait("Category", "Unit")]
     public void ResolveOutputPathWhenOutputPathIsBlankUsesDefaultNameWithDateSuffix()
@@ -58,23 +66,6 @@ public sealed class HtmlOptionsTests
 
         // Assert
         Path.GetFileName(outputPath).Should().MatchRegex(@"^summary_\d{2}_\d{2}_\d{4}\.html$");
-    }
-
-    [Fact(DisplayName = "AppendDateSuffix throws when absolute path is blank")]
-    [Trait("Category", "Unit")]
-    public void AppendDateSuffixWhenPathIsBlankThrowsArgumentException()
-    {
-        // Arrange
-        var method = typeof(HtmlOptions).GetMethod(
-            "AppendDateSuffix",
-            BindingFlags.NonPublic | BindingFlags.Static)!;
-
-        // Act
-        Action act = () => _ = method.Invoke(null, [" ", new DateTime(2026, 2, 21)]);
-
-        // Assert
-        var exception = act.Should().Throw<TargetInvocationException>().Which;
-        exception.InnerException.Should().BeOfType<ArgumentException>();
     }
 
     [Fact(DisplayName = "Enabled is true by default")]

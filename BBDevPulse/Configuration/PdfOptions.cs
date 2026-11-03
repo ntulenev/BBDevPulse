@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace BBDevPulse.Configuration;
 
 /// <summary>
@@ -20,39 +18,12 @@ public sealed class PdfOptions
     public string OutputPath { get; init; } = DEFAULT_OUTPUT_PATH;
 
     /// <summary>
-    /// Resolves output path to absolute path and appends date suffix.
+    /// Resolves output path with optional team prefix and date suffix.
     /// </summary>
+    /// <param name="teamFilter">Selected team, if any.</param>
     /// <returns>Absolute dated output path.</returns>
-    public string ResolveOutputPath()
+    public string ResolveOutputPath(string? teamFilter = null)
     {
-        var candidatePath = string.IsNullOrWhiteSpace(OutputPath)
-            ? DEFAULT_OUTPUT_PATH
-            : OutputPath.Trim();
-
-        var absolutePath = Path.IsPathRooted(candidatePath)
-            ? Path.GetFullPath(candidatePath)
-            : Path.GetFullPath(candidatePath, Directory.GetCurrentDirectory());
-
-        return AppendDateSuffix(absolutePath, DateTime.Now);
-    }
-
-    private static string AppendDateSuffix(string absolutePath, DateTime currentDate)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(absolutePath);
-
-        var directoryPath = Path.GetDirectoryName(absolutePath);
-        var extension = Path.GetExtension(absolutePath);
-        if (string.IsNullOrWhiteSpace(extension))
-        {
-            extension = ".pdf";
-        }
-
-        var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(absolutePath);
-        var dateSuffix = currentDate.ToString("dd_MM_yyyy", CultureInfo.InvariantCulture);
-        var datedFileName = fileNameWithoutExtension + "_" + dateSuffix + extension;
-
-        return string.IsNullOrWhiteSpace(directoryPath)
-            ? datedFileName
-            : Path.Combine(directoryPath, datedFileName);
+        return ReportOutputPath.Resolve(OutputPath, DEFAULT_OUTPUT_PATH, ".pdf", teamFilter);
     }
 }
