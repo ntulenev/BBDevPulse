@@ -11,7 +11,8 @@ public interface IReportPresenter
     /// Shows the effective report settings before data collection starts.
     /// </summary>
     /// <param name="parameters">Resolved report parameters.</param>
-    void RenderRunSettings(ReportParameters parameters);
+    /// <param name="username">Bitbucket account used for the run.</param>
+    void RenderRunSettings(ReportParameters parameters, string username);
 
     /// <summary>
     /// Waits for the user to approve starting Bitbucket data collection.

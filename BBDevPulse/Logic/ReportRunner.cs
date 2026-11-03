@@ -64,7 +64,7 @@ internal sealed class ReportRunner : IReportRunner
             .ToList();
         var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams);
         var parameters = _options.CreateReportParameters(teamFilter);
-        _presenter.RenderRunSettings(parameters);
+        _presenter.RenderRunSettings(parameters, _options.Username);
         if (!_presenter.ConfirmStart())
         {
             return;

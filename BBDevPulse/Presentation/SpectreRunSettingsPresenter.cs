@@ -11,9 +11,10 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 internal static class SpectreRunSettingsPresenter
 {
-    public static void Render(ReportParameters parameters)
+    public static void Render(ReportParameters parameters, string username)
     {
         ArgumentNullException.ThrowIfNull(parameters);
+        ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
         var excludedDates = GetExcludedDatesInWindow(parameters, DateTimeOffset.UtcNow);
         var window = parameters.ToDateExclusive is { } end
@@ -36,6 +37,8 @@ internal static class SpectreRunSettingsPresenter
         AnsiConsole.WriteLine();
 
         WriteSection("02  Scope", [
+            ("Workspace", parameters.Workspace.Value),
+            ("Bitbucket user", username),
             ("Repositories", DescribeRepositorySearch(parameters)),
             ("Merge targets", parameters.BranchNameList.Count == 0
                 ? "All target branches"

@@ -34,11 +34,15 @@ public sealed class SpectreRunSettingsPresenterTests
             new DateTimeOffset(2026, 11, 4, 0, 0, 0, TimeSpan.Zero),
             showAllDetailsForDevelopers: true);
 
-        var output = TestConsoleRunner.Run(_ => SpectreRunSettingsPresenter.Render(parameters));
+        var output = TestConsoleRunner.Run(_ => SpectreRunSettingsPresenter.Render(parameters, "report-user"));
 
         output.Should().Contain("BBDevPulse  /  Review run");
         output.Should().Contain("01  Date range");
         output.Should().Contain("02  Scope");
+        output.Should().Contain("Workspace");
+        output.Should().Contain("workspace");
+        output.Should().Contain("Bitbucket user");
+        output.Should().Contain("report-user");
         output.Should().Contain("03  Report behavior");
         output.Should().Contain("Developer details");
         output.Should().Contain("TIME WARNING");
