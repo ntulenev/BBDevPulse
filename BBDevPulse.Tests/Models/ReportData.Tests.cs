@@ -7,6 +7,95 @@ namespace BBDevPulse.Tests.Models;
 
 public sealed class ReportDataTests
 {
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Core")]
+    public void DefaultIdentityIsRejectedAtEachBoundary(string? teamFilter)
+    {
+        var data = new ReportData(CreateReportParameters(teamFilter: teamFilter));
+        Assert.Throws<ArgumentNullException>("identity", () => DeveloperKey.FromIdentity(default));
+        Assert.Throws<ArgumentNullException>("identity", () => data.IsDeveloperIncluded(default));
+        Assert.Throws<ArgumentNullException>("identity", () => data.ObserveDeveloperIdentity(default));
+        Assert.Throws<ArgumentNullException>("identity", () => data.GetOrAddDeveloper(default));
+        Assert.Empty(data.DeveloperStats);
+    }
+
+    [Fact]
+    public void ConcurrentReadersSeeTheSamePublishedMetrics()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(new UserUuid("A"), new DisplayName("Alice"));
+        var stats = data.GetOrAddDeveloper(identity);
+        var created = data.Parameters.FilterDate;
+        var report = CreatePullRequestReport(1, created, created.AddHours(6));
+        data.Reports.Add(report);
+        stats.AuthoredPullRequests.Add(report);
+        data.Freeze();
+
+        Parallel.For(0, 128, _ =>
+        {
+            Assert.Equal(1, data.PullRequestsCreatedInRange);
+            Assert.Same(report, Assert.Single(data.DeveloperStats[DeveloperKey.FromIdentity(identity)].AuthoredPullRequests));
+            Assert.Equal(0.25, data.GetTtfrStatistics(new StatisticsCalculator()).MedianDays);
+        });
+    }
+
+    [Theory]
+    [InlineData(-1, 0, 0)]
+    [InlineData(0, -1, 0)]
+    [InlineData(0, 0, -1)]
+    [InlineData(1, int.MaxValue, 1)]
+    public void DiffstatRejectsUnrepresentableSizes(int files, int additions, int removals)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new PullRequestSizeSummary(files, additions, removals));
+    }
+
+    [Fact]
+    public void RemovingAReportAndChangingCalculatorAffectTtfr()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var created = DateTimeOffset.UnixEpoch;
+        data.Reports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
+        data.Reports.Add(CreatePullRequestReport(2, created, created.AddDays(3)));
+        data.GetTtfrStatistics(new StatisticsCalculator()).Count.Should().Be(2);
+        data.Reports.RemoveAt(1);
+        var calculator = new Moq.Mock<BBDevPulse.Abstractions.IStatisticsCalculator>();
+        calculator.Setup(x => x.Percentile(Moq.It.IsAny<IReadOnlyList<double>>(), 50)).Returns(0.5);
+        var result = data.GetTtfrStatistics(calculator.Object);
+        result.Count.Should().Be(1);
+        result.MedianDays.Should().Be(0.5);
+    }
+
+    [Fact]
+    public void ParallelAnalysisUpdatesArePreservedOnPublication()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(null, new DisplayName("Alice"));
+        Parallel.For(0, 200, _ => data.ApplyAnalysis(() => data.GetOrAddDeveloper(identity).CommentsAfter++));
+        data.Freeze();
+        data.DeveloperStats.Values.Single().CommentsAfter.Should().Be(200);
+    }
+
+    [Fact]
+    public void PublishedReportIsIndependentOfCollectionReferencesHeldByProducer()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var list = data.Reports;
+        var stats = data.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var details = stats.AuthoredPullRequests;
+        var report = CreatePullRequestReport(1, DateTimeOffset.UnixEpoch);
+        list.Add(report);
+        details.Add(report);
+        data.Freeze();
+
+        list.Clear();
+        details.Clear();
+        data.Reports.Should().ContainSingle();
+        stats.AuthoredPullRequests.Should().ContainSingle();
+        Assert.Throws<NotSupportedException>(() => data.Reports.Clear());
+        Assert.Throws<InvalidOperationException>(() => stats.CommentsAfter++);
+    }
+
     [Fact]
     public void CollisionsUseObservedIdentitiesEvenAfterStatisticsAreMerged()
     {
@@ -16,6 +105,8 @@ public sealed class ReportDataTests
         data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{A}"), new DisplayName("alice")));
         data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Alice")));
         data.DeveloperStats.Should().HaveCount(1);
+        var entry = Assert.Single(data.DeveloperStats);
+        Assert.Equal(new DeveloperKey(entry.Value.BitbucketUuid!), entry.Key);
         var collision = data.GetIdentityCollisions().Should().ContainSingle().Subject;
         collision.Name.Should().Be("Alice");
         collision.Uuids.Should().Equal("{a}", "{B}");
@@ -45,7 +136,7 @@ public sealed class ReportDataTests
         statistics.Count.Should().Be(3);
         statistics.MedianDays.Should().BeApproximately(2d / 24, 0.000001);
         statistics.P75Days.Should().BeApproximately(3d / 24, 0.000001);
-        data.GetTtfrStatistics(new StatisticsCalculator()).Should().BeSameAs(statistics);
+        data.GetTtfrStatistics(new StatisticsCalculator()).Should().BeEquivalentTo(statistics);
     }
 
     [Fact]
@@ -56,6 +147,17 @@ public sealed class ReportDataTests
         statistics.Count.Should().Be(0);
         statistics.MedianDays.Should().Be(0);
         statistics.P75Days.Should().Be(0);
+    }
+
+    [Fact]
+    public void GetTtfrStatisticsReflectsReportsAddedAfterPreviousCalculation()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var calculator = new StatisticsCalculator();
+        data.GetTtfrStatistics(calculator).Count.Should().Be(0);
+        var created = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        data.Reports.Add(CreatePullRequestReport(1, created, created.AddHours(2)));
+        data.GetTtfrStatistics(calculator).Count.Should().Be(1);
     }
 
     [Fact(DisplayName = "TTFR statistics count a forced included Saturday")]
@@ -306,12 +408,12 @@ public sealed class ReportDataTests
     {
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice")) { PrsOpenedSince = 3 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob")) { PrsOpenedSince = 0 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Carol")))] =
-            new DeveloperStats(new DisplayName("Carol")) { PrsOpenedSince = 1 };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        alice.PrsOpenedSince = 3;
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.PrsOpenedSince = 0;
+        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Carol")));
+        carol.PrsOpenedSince = 1;
 
         // Act
         var counts = reportData.GetOpenedPullRequestCountsPerDeveloper();
@@ -351,12 +453,12 @@ public sealed class ReportDataTests
     {
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Alice")))] =
-            new DeveloperStats(new DisplayName("Alice")) { PeerCommentsAfter = 3 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Bob")))] =
-            new DeveloperStats(new DisplayName("Bob")) { PeerCommentsAfter = 0 };
-        reportData.DeveloperStats[DeveloperKey.FromIdentity(new DeveloperIdentity(null, new DisplayName("Carol")))] =
-            new DeveloperStats(new DisplayName("Carol")) { PeerCommentsAfter = 1 };
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        alice.PeerCommentsAfter = 3;
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        bob.PeerCommentsAfter = 0;
+        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Carol")));
+        carol.PeerCommentsAfter = 1;
 
         // Act
         var counts = reportData.GetPeerCommentCountsPerDeveloper();

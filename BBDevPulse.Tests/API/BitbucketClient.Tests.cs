@@ -29,12 +29,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             options,
-            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new BitbucketResponseReader(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new PaginatorHelper()),
             CreatePassThroughUriBuilder(),
             CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
-            new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Assert
@@ -51,12 +50,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
-            transport,
+            new BitbucketResponseReader(transport, new PaginatorHelper()),
             CreatePassThroughUriBuilder(),
             CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
-            new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Assert
@@ -73,12 +71,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
-            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new BitbucketResponseReader(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new PaginatorHelper()),
             uriBuilder,
             CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
-            new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Assert
@@ -95,12 +92,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
-            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new BitbucketResponseReader(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new PaginatorHelper()),
             CreatePassThroughUriBuilder(),
             repositoriesUriBuilder,
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
-            new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Assert
@@ -117,12 +113,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
-            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new BitbucketResponseReader(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new PaginatorHelper()),
             CreatePassThroughUriBuilder(),
             CreatePassThroughRepositoriesUriBuilder(),
             pullRequestsUriBuilder,
             new PullRequestCommitRangeCache(),
-            new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Assert
@@ -139,12 +134,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
-            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new BitbucketResponseReader(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new PaginatorHelper()),
             CreatePassThroughUriBuilder(),
             CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             pullRequestCommitRangeCache,
-            new PaginatorHelper(),
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Assert
@@ -161,12 +155,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
-            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new BitbucketResponseReader(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, paginatorHelper),
             CreatePassThroughUriBuilder(),
             CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
-            paginatorHelper,
             new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
 
         // Assert
@@ -183,12 +176,11 @@ public sealed class BitbucketClientTests
         // Act
         Action act = () => _ = new BitbucketClient(
             Options.Create(CreateOptions()),
-            new Mock<IBitbucketTransport>(MockBehavior.Strict).Object,
+            new BitbucketResponseReader(new Mock<IBitbucketTransport>(MockBehavior.Strict).Object, new PaginatorHelper()),
             CreatePassThroughUriBuilder(),
             CreatePassThroughRepositoriesUriBuilder(),
             CreatePassThroughPullRequestsUriBuilder(),
             new PullRequestCommitRangeCache(),
-            new PaginatorHelper(),
             mapper);
 
         // Assert
@@ -1363,12 +1355,11 @@ public sealed class BitbucketClientTests
         var resolvedOptions = options ?? CreateOptions();
         return new BitbucketClient(
             Options.Create(resolvedOptions),
-            transport,
+            new BitbucketResponseReader(transport, new PaginatorHelper()),
             resolvedUriBuilder,
             repositoriesUriBuilder ?? new RepositoriesUriBuilder(resolvedUriBuilder, Options.Create(resolvedOptions)),
             pullRequestsUriBuilder ?? new PullRequestsUriBuilder(resolvedUriBuilder, Options.Create(resolvedOptions)),
             pullRequestCommitRangeCache ?? new PullRequestCommitRangeCache(),
-            new PaginatorHelper(),
             mapper);
     }
 

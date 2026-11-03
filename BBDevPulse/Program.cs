@@ -55,6 +55,7 @@ using var host = Host.CreateDefaultBuilder(args)
                 new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         });
+        _ = services.AddTransient<BitbucketResponseReader>();
         _ = services.AddTransient<IBitbucketClient, BitbucketClient>();
 
         _ = services.AddSingleton<IReportPresenter, SpectreReportPresenter>();
@@ -77,6 +78,7 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IPeopleCsvProvider, PeopleCsvProvider>();
         _ = services.AddSingleton<IActivityAnalyzer, ActivityAnalyzer>();
         _ = services.AddSingleton<IPullRequestAnalyzer, PullRequestAnalyzer>();
+        _ = services.AddSingleton<ReportFilePublisher>();
         _ = services.AddSingleton<ReportRunner>();
         _ = services.AddSingleton<DemoReportRunner>();
         _ = services.AddSingleton<IReportRunner>(sp =>

@@ -5,6 +5,7 @@ using BBDevPulse.Configuration;
 using BBDevPulse.Models;
 
 using Microsoft.Extensions.Options;
+
 using System.Globalization;
 
 namespace BBDevPulse.Tests.API;
@@ -69,10 +70,16 @@ public sealed class RetryPolicyHelperTests
 
     private static IOptions<BitbucketOptions> CreateRetryOptions() => Options.Create(new BitbucketOptions
     {
-        Days = 7, Workspace = "workspace", PageLength = 25,
-        MaxRetries = 1, MaxRetryDelaySeconds = 30,
-        Username = "user", AppPassword = "pass", RepoNameFilter = string.Empty,
-        RepoNameList = [], BranchNameList = [],
+        Days = 7,
+        Workspace = "workspace",
+        PageLength = 25,
+        MaxRetries = 1,
+        MaxRetryDelaySeconds = 30,
+        Username = "user",
+        AppPassword = "pass",
+        RepoNameFilter = string.Empty,
+        RepoNameList = [],
+        BranchNameList = [],
         RepoSearchMode = RepoSearchMode.FilterFromTheList,
         PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly
     });
@@ -139,9 +146,15 @@ public sealed class RetryPolicyHelperTests
     {
         var options = Options.Create(new BitbucketOptions
         {
-            Days = 7, Workspace = "workspace", PageLength = 25,
-            MaxRetries = 0, Username = "user", AppPassword = "pass",
-            RepoNameFilter = string.Empty, RepoNameList = [], BranchNameList = [],
+            Days = 7,
+            Workspace = "workspace",
+            PageLength = 25,
+            MaxRetries = 0,
+            Username = "user",
+            AppPassword = "pass",
+            RepoNameFilter = string.Empty,
+            RepoNameList = [],
+            BranchNameList = [],
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly
         });
@@ -163,10 +176,16 @@ public sealed class RetryPolicyHelperTests
     {
         var options = Options.Create(new BitbucketOptions
         {
-            Days = 7, Workspace = "workspace", PageLength = 25,
-            MaxRetries = 1, MaxRetryDelaySeconds = 30,
-            Username = "user", AppPassword = "pass", RepoNameFilter = string.Empty,
-            RepoNameList = [], BranchNameList = [],
+            Days = 7,
+            Workspace = "workspace",
+            PageLength = 25,
+            MaxRetries = 1,
+            MaxRetryDelaySeconds = 30,
+            Username = "user",
+            AppPassword = "pass",
+            RepoNameFilter = string.Empty,
+            RepoNameList = [],
+            BranchNameList = [],
             RepoSearchMode = RepoSearchMode.FilterFromTheList,
             PrTimeFilterMode = PrTimeFilterMode.CreatedOnOnly
         });

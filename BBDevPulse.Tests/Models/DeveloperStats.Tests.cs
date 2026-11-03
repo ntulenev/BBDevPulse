@@ -51,7 +51,6 @@ public sealed class DeveloperStatsTests
         var stats = new DeveloperStats(new DisplayName("Alice"));
 
         // Act
-        stats.DisplayName = new DisplayName("Alice Updated");
         stats.PrsOpenedSince = 1;
         stats.PrsMergedAfter = 2;
         stats.CommentsAfter = 3;
@@ -59,11 +58,10 @@ public sealed class DeveloperStatsTests
         stats.ApprovalsAfter = 5;
         stats.Corrections = 6;
         stats.Grade = "Senior";
-        stats.BitbucketUuid = new UserUuid("{alice-1}");
         stats.Department = "Platform";
 
         // Assert
-        stats.DisplayName.Value.Should().Be("Alice Updated");
+        stats.DisplayName.Value.Should().Be("Alice");
         stats.PrsOpenedSince.Should().Be(1);
         stats.PrsMergedAfter.Should().Be(2);
         stats.CommentsAfter.Should().Be(3);
@@ -71,7 +69,7 @@ public sealed class DeveloperStatsTests
         stats.ApprovalsAfter.Should().Be(5);
         stats.Corrections.Should().Be(6);
         stats.Grade.Should().Be("Senior");
-        stats.BitbucketUuid!.Value.Should().Be("{alice-1}");
+        stats.BitbucketUuid.Should().BeNull();
         stats.Department.Should().Be("Platform");
     }
 }

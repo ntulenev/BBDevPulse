@@ -15,6 +15,7 @@ public sealed class DeveloperCommitActivity
     /// <param name="message">Commit message.</param>
     /// <param name="date">Commit timestamp.</param>
     /// <param name="sizeSummary">Commit diffstat summary.</param>
+    /// <param name="hasSizeData">Whether the commit size was measured.</param>
     public DeveloperCommitActivity(
         string repository,
         string repositorySlug,
@@ -75,6 +76,7 @@ public sealed class DeveloperCommitActivity
     /// </summary>
     public PullRequestSizeSummary SizeSummary { get; }
 
+    /// <summary>Whether the commit size was measured.</summary>
     public bool HasSizeData { get; }
 
     /// <summary>

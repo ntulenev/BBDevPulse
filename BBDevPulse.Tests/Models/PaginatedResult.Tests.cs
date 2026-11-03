@@ -11,14 +11,15 @@ public sealed class PaginatedResultTests
     public void ConstructorWhenArgumentsAreValidSetsProperties()
     {
         // Arrange
-        IReadOnlyList<int> items = [1, 2, 3];
+        List<int> items = [1, 2, 3];
         var nextPage = new Uri("https://example.test/page/2", UriKind.Absolute);
 
         // Act
         var result = new PaginatedResult<int>(items, nextPage);
 
         // Assert
-        result.Items.Should().BeSameAs(items);
+        items.Clear();
+        result.Items.Should().Equal(1, 2, 3);
         result.NextPage.Should().Be(nextPage);
     }
 

@@ -51,7 +51,7 @@ public sealed class DemoReportRunnerTests
                 .Returns(Task.CompletedTask);
         }
 
-        var runner = new DemoReportRunner(presenter.Object, html.Object, pdf.Object);
+        var runner = new DemoReportRunner(presenter.Object, new ReportFilePublisher(html.Object, pdf.Object));
         await runner.RunAsync(CancellationToken.None);
 
         presenter.Verify(x => x.SelectTeamFilter(It.IsAny<IReadOnlyList<TeamFilterOption>>(), 4), Times.Once);
@@ -89,7 +89,7 @@ public sealed class DemoReportRunnerTests
         pdf.Setup(x => x.RenderReportAsync(It.Is<ReportData>(report => report.Parameters.TeamFilter == "Platform"),
             It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
-        await new DemoReportRunner(presenter.Object, html.Object, pdf.Object).RunAsync(CancellationToken.None);
+        await new DemoReportRunner(presenter.Object, new ReportFilePublisher(html.Object, pdf.Object)).RunAsync(CancellationToken.None);
 
         presenter.VerifyAll();
         html.VerifyAll();

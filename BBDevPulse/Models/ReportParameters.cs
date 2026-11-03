@@ -25,6 +25,7 @@ public sealed class ReportParameters
     /// <param name="showAllDetailsForDevelopers">Whether to append detailed per-developer activity sections after summary reports.</param>
     /// <param name="toDateExclusive">Optional exclusive upper bound for the report range.</param>
     /// <param name="forcedIncludeDates">Dates counted as working days regardless of weekend or exclusion rules.</param>
+    /// <param name="isDemo">Whether the report uses built-in synthetic data.</param>
     public ReportParameters(
         DateTimeOffset filterDate,
         Workspace workspace,
@@ -47,14 +48,43 @@ public sealed class ReportParameters
         ArgumentNullException.ThrowIfNull(repoNameFilter);
         ArgumentNullException.ThrowIfNull(repoNameList);
         ArgumentNullException.ThrowIfNull(branchNameList);
+        if (toDateExclusive.HasValue && toDateExclusive.Value <= filterDate)
+        {
+            throw new ArgumentOutOfRangeException(nameof(toDateExclusive));
+        }
+
+        if (!Enum.IsDefined(repoSearchMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(repoSearchMode));
+        }
+
+        if (!Enum.IsDefined(prTimeFilterMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(prTimeFilterMode));
+        }
+
+        if (!Enum.IsDefined(pullRequestSizeMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(pullRequestSizeMode));
+        }
+
+        if (repoNameList.Any(static name => name is null))
+        {
+            throw new ArgumentException("Repository filter contains a null name.", nameof(repoNameList));
+        }
+
+        if (branchNameList.Any(static name => name is null))
+        {
+            throw new ArgumentException("Branch filter contains a null name.", nameof(branchNameList));
+        }
 
         FilterDate = filterDate;
         Workspace = workspace;
         RepoNameFilter = repoNameFilter;
-        RepoNameList = repoNameList;
+        RepoNameList = Array.AsReadOnly(repoNameList.ToArray());
         RepoSearchMode = repoSearchMode;
         PrTimeFilterMode = prTimeFilterMode;
-        BranchNameList = branchNameList;
+        BranchNameList = Array.AsReadOnly(branchNameList.ToArray());
         ExcludeWeekend = excludeWeekend;
         PullRequestSizeMode = pullRequestSizeMode;
         TeamFilter = string.IsNullOrWhiteSpace(teamFilter)

@@ -10,15 +10,12 @@ internal sealed class DemoReportRunner : IReportRunner
 {
     public DemoReportRunner(
         IReportPresenter presenter,
-        IHtmlReportRenderer htmlReportRenderer,
-        IPdfReportRenderer pdfReportRenderer)
+        ReportFilePublisher publisher)
     {
         ArgumentNullException.ThrowIfNull(presenter);
-        ArgumentNullException.ThrowIfNull(htmlReportRenderer);
-        ArgumentNullException.ThrowIfNull(pdfReportRenderer);
+        ArgumentNullException.ThrowIfNull(publisher);
         _presenter = presenter;
-        _htmlReportRenderer = htmlReportRenderer;
-        _pdfReportRenderer = pdfReportRenderer;
+        _publisher = publisher;
     }
 
     public async Task RunAsync(CancellationToken cancellationToken)
@@ -37,12 +34,11 @@ internal sealed class DemoReportRunner : IReportRunner
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        reportData.Freeze();
         _presenter.RenderReport(reportData);
-        await _htmlReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
-        await _pdfReportRenderer.RenderReportAsync(reportData, cancellationToken).ConfigureAwait(false);
+        await _publisher.PublishAsync(reportData, cancellationToken).ConfigureAwait(false);
     }
 
     private readonly IReportPresenter _presenter;
-    private readonly IHtmlReportRenderer _htmlReportRenderer;
-    private readonly IPdfReportRenderer _pdfReportRenderer;
+    private readonly ReportFilePublisher _publisher;
 }

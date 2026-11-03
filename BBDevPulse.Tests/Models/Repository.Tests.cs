@@ -219,21 +219,11 @@ public sealed class RepositoryTests
         result.Should().BeFalse();
     }
 
-    [Fact(DisplayName = "MatchesFilter throws when search mode is unknown")]
-    [Trait("Category", "Unit")]
-    public void MatchesFilterWhenSearchModeIsUnknownThrowsNotImplementedException()
+    [Fact]
+    public void ReportParametersRejectUnknownRepositorySearchMode()
     {
-        // Arrange
-        var repository = new Repository(new RepoName("BBDevPulse"), new RepoSlug("bbdevpulse"));
-        var parameters = CreateReportParameters(
-            repoSearchMode: (RepoSearchMode)999,
-            repoNameFilter: "pulse");
-
-        // Act
-        Action act = () => _ = repository.MatchesFilter(parameters);
-
-        // Assert
-        act.Should().Throw<NotImplementedException>();
+        Action act = () => CreateReportParameters((RepoSearchMode)999);
+        act.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("repoSearchMode");
     }
 
     private static ReportParameters CreateReportParameters(

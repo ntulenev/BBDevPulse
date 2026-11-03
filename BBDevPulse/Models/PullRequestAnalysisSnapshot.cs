@@ -13,6 +13,8 @@ public sealed class PullRequestAnalysisSnapshot
     /// <param name="sizeSummary">Pull request size summary.</param>
     /// <param name="commitActivities">Detailed correction commit activities.</param>
     /// <param name="hasEnrichment">Whether correction commits and size data were loaded for this snapshot.</param>
+    /// <param name="hasCommits">Commit availability, defaulting to hasEnrichment.</param>
+    /// <param name="hasSize">Size availability, defaulting to hasEnrichment.</param>
     public PullRequestAnalysisSnapshot(
         IReadOnlyList<PullRequestActivity> activities,
         IReadOnlyList<PullRequestCommitInfo> correctionCommits,
@@ -60,7 +62,9 @@ public sealed class PullRequestAnalysisSnapshot
     /// </summary>
     public bool HasEnrichment { get; }
 
+    /// <summary>Whether the snapshot includes commit data.</summary>
     public bool HasCommits { get; }
 
+    /// <summary>Whether the snapshot includes diffstat data.</summary>
     public bool HasSize { get; }
 }

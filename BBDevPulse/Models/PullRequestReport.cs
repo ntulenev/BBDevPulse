@@ -25,6 +25,8 @@ public sealed class PullRequestReport
     /// <param name="linesAdded">Total added lines in pull request diffstat.</param>
     /// <param name="linesRemoved">Total removed lines in pull request diffstat.</param>
     /// <param name="isActivityOnlyMatch">Whether this pull request is shown because the selected team was active on it.</param>
+    /// <param name="hasSizeData">Whether diffstat size data is available.</param>
+    /// <param name="hasCorrectionsData">Whether correction data is available.</param>
     public PullRequestReport(
         string repository,
         string repositorySlug,
@@ -46,10 +48,14 @@ public sealed class PullRequestReport
         bool? hasSizeData = null,
         bool hasCorrectionsData = true)
     {
-        ArgumentNullException.ThrowIfNull(repository);
-        ArgumentNullException.ThrowIfNull(repositorySlug);
-        ArgumentNullException.ThrowIfNull(author);
-        ArgumentNullException.ThrowIfNull(targetBranch);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repository);
+        ArgumentException.ThrowIfNullOrWhiteSpace(repositorySlug);
+        ArgumentException.ThrowIfNullOrWhiteSpace(author);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetBranch);
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentOutOfRangeException.ThrowIfNegative(comments);
+        ArgumentOutOfRangeException.ThrowIfNegative(corrections);
+        var size = new PullRequestSizeSummary(filesChanged, linesAdded, linesRemoved);
 
         Repository = repository;
         RepositorySlug = repositorySlug;
@@ -59,14 +65,19 @@ public sealed class PullRequestReport
         LastActivity = lastActivity;
         MergedOn = mergedOn;
         RejectedOn = rejectedOn;
+        if (!Enum.IsDefined(state))
+        {
+            throw new ArgumentOutOfRangeException(nameof(state));
+        }
+
         State = state;
         Id = id;
         Comments = comments;
         Corrections = corrections;
         FirstReactionOn = firstReactionOn;
-        FilesChanged = filesChanged;
-        LinesAdded = linesAdded;
-        LinesRemoved = linesRemoved;
+        FilesChanged = size.FilesChanged;
+        LinesAdded = size.LinesAdded;
+        LinesRemoved = size.LinesRemoved;
         IsActivityOnlyMatch = isActivityOnlyMatch;
         HasSizeData = hasSizeData ?? (filesChanged > 0 || linesAdded > 0 || linesRemoved > 0);
         HasCorrectionsData = hasCorrectionsData;
@@ -172,6 +183,7 @@ public sealed class PullRequestReport
     /// </summary>
     public bool HasSizeData { get; }
 
+    /// <summary>Indicates whether correction data was available for this pull request.</summary>
     public bool HasCorrectionsData { get; }
 
     /// <summary>

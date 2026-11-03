@@ -19,6 +19,9 @@ public interface IReportPresenter
     /// <summary>
     /// Shows the settings for a synthetic demo report.
     /// </summary>
+    /// <param name="parameters">Resolved demo report parameters.</param>
+    /// <param name="htmlFileName">Planned HTML file name.</param>
+    /// <param name="pdfFileName">Planned PDF file name.</param>
     void RenderDemoSettings(ReportParameters parameters, string htmlFileName, string pdfFileName);
 
     /// <summary>

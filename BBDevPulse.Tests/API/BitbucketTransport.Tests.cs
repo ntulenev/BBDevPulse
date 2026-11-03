@@ -44,7 +44,8 @@ public sealed class BitbucketTransportTests
         {
             sent = true;
             return new HttpResponseMessage(HttpStatusCode.OK);
-        })) { BaseAddress = new Uri("https://api.bitbucket.org/2.0/") };
+        }))
+        { BaseAddress = new Uri("https://api.bitbucket.org/2.0/") };
         var transport = new BitbucketTransport(client, CreatePassthroughRetryPolicyHelper(), CreateTelemetryService().Object);
 
         Func<Task> act = () => transport.GetAsync<SampleDto>(new Uri(next, UriKind.RelativeOrAbsolute), CancellationToken.None);

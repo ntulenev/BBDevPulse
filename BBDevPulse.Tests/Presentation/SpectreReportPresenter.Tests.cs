@@ -6,6 +6,7 @@ using BBDevPulse.Presentation;
 using BBDevPulse.Tests.TestInfrastructure;
 
 using Moq;
+
 using Spectre.Console.Testing;
 
 namespace BBDevPulse.Tests.Presentation;
@@ -381,7 +382,7 @@ public sealed class SpectreReportPresenterTests
 
     [Fact(DisplayName = "RenderReport sorts reports and delegates to pull request and statistics presenters")]
     [Trait("Category", "Unit")]
-    public void RenderReportWhenCalledSortsAndDelegates()
+    public void RenderReportPreservesInputOrderAndDelegates()
     {
         // Arrange
         var parameters = CreateReportParameters();
@@ -434,7 +435,7 @@ public sealed class SpectreReportPresenterTests
         sut.RenderReport(reportData);
 
         // Assert
-        reportData.Reports.Select(report => report.Id.Value).Should().Equal(1, 2);
+        reportData.Reports.Select(report => report.Id.Value).Should().Equal(2, 1);
         renderPullRequestCalls.Should().Be(1);
         renderPrThroughputStatsCalls.Should().Be(1);
         renderPrsPerDeveloperStatsCalls.Should().Be(1);
