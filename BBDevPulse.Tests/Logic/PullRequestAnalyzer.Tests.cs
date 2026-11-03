@@ -18,6 +18,33 @@ namespace BBDevPulse.Tests.Logic;
 public sealed class PullRequestAnalyzerTests
 {
     [Fact]
+    public async Task AnalyzeAsyncStopsSchedulingAfterHandlerFailure()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var pullRequests = Enumerable.Range(1, 2).Select(id => new PullRequest(
+            new PullRequestId(id), PullRequestState.Open, closedOn: null,
+            createdOn: date, updatedOn: null, mergedOn: null, author: null, destination: null)).ToArray();
+        var failure = new InvalidOperationException("activity failed");
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable(pullRequests));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Throws(failure);
+
+        var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
+        var report = new ReportData(CreateParameters(date.AddDays(-1)));
+        var thrown = await FluentActions.Invoking(() => analyzer.AnalyzeAsync(repository, report, CancellationToken.None))
+            .Should().ThrowAsync<InvalidOperationException>();
+
+        thrown.Which.Should().BeSameAs(failure);
+        client.Verify(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task AnalyzeAsyncDoesNotTreatPartialCommitPageAsComplete()
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
@@ -25,7 +52,7 @@ public sealed class PullRequestAnalyzerTests
         var data = new ReportData(CreateParameters(date.AddDays(-1)));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
             closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
-            author: null, destination: null);
+            author: new User(new DisplayName("Alice"), new UserUuid("{alice-1}")), destination: null);
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
         client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
                 It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
@@ -52,6 +79,7 @@ public sealed class PullRequestAnalyzerTests
 
         data.Reports.Single().HasCorrectionsData.Should().BeFalse();
         data.Reports.Single().HasSizeData.Should().BeTrue();
+        data.DeveloperStats.Values.Single().HasCompleteCorrectionsData.Should().BeFalse();
     }
 
     [Fact]
@@ -61,11 +89,11 @@ public sealed class PullRequestAnalyzerTests
         try
         {
             var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
-            var parameters = CreateParameters(date.AddDays(-1));
+            var parameters = CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true);
             var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
             var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
                 closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
-                author: null, destination: null);
+                author: new User(new DisplayName("Alice"), new UserUuid("{alice-1}")), destination: null);
             var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
             client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
                     It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
@@ -75,11 +103,22 @@ public sealed class PullRequestAnalyzerTests
                 .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
             client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
                     It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
-                .Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+                .Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>(
+                [
+                    new PullRequestCommitInfo("first", date.AddHours(2), "first correction"),
+                    new PullRequestCommitInfo("second", date.AddHours(1), "second correction")
+                ]));
             client.SetupSequence(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
                     It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new InvalidOperationException("diffstat unavailable"))
                 .ReturnsAsync(new PullRequestSizeSummary(2, 4, 1));
+            client.Setup(x => x.GetCommitSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    "first", It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PullRequestSizeSummary(1, 3, 1));
+            client.SetupSequence(x => x.GetCommitSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    "second", It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new InvalidOperationException("commit diffstat unavailable"))
+                .ReturnsAsync(new PullRequestSizeSummary(1, 2, 0));
             var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(),
                 new Mock<IBitbucketTelemetryService>().Object, cacheDirectory);
             var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
@@ -98,8 +137,14 @@ public sealed class PullRequestAnalyzerTests
             var third = new ReportData(parameters);
             await analyzer.AnalyzeAsync(repository, third, CancellationToken.None);
             third.Reports.Single().FilesChanged.Should().Be(2);
+            second.DeveloperStats.Values.Single().CommitActivities.Should()
+                .OnlyContain(activity => activity.HasSizeData);
             client.Verify(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
                 It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+            client.Verify(x => x.GetCommitSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                "first", It.IsAny<CancellationToken>()), Times.Once);
+            client.Verify(x => x.GetCommitSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                "second", It.IsAny<CancellationToken>()), Times.Exactly(2));
         }
         finally
         {

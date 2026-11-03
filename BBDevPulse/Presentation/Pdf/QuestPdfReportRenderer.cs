@@ -476,7 +476,9 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 _ = table.Cell().Element(BodyCell).Text(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture));
                 _ = table.Cell().Element(BodyCell).Text(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
-                _ = table.Cell().Element(BodyCell).Text(stat.Corrections.ToString(CultureInfo.InvariantCulture));
+                var corrections = stat.Corrections.ToString(CultureInfo.InvariantCulture);
+                _ = table.Cell().Element(BodyCell).Text(stat.HasCompleteCorrectionsData
+                    ? corrections : $"{corrections} (partial)");
                 index++;
             }
         });

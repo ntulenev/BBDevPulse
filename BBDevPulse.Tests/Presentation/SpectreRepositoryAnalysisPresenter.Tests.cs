@@ -11,6 +11,27 @@ namespace BBDevPulse.Tests.Presentation;
 public sealed class SpectreRepositoryAnalysisPresenterTests
 {
     [Fact]
+    public async Task AnalyzeRepositoriesAsyncStopsSchedulingAfterHandlerFailure()
+    {
+        var presenter = CreatePresenter();
+        var failure = new InvalidOperationException("repository failed");
+        var processed = 0;
+
+        var run = TestConsoleRunner.RunAsync(async _ => await presenter.AnalyzeRepositoriesAsync(
+            [CreateRepository("RepoA"), CreateRepository("RepoB")],
+            (_, _) =>
+            {
+                Interlocked.Increment(ref processed);
+                return Task.FromException(failure);
+            }, CancellationToken.None));
+
+        var thrown = await FluentActions.Invoking(async () => await run)
+            .Should().ThrowAsync<InvalidOperationException>();
+        thrown.Which.Should().BeSameAs(failure);
+        processed.Should().Be(1);
+    }
+
+    [Fact]
     public async Task AnalyzeRepositoriesAsyncWaitsForActiveHandlerOnCancellation()
     {
         var presenter = CreatePresenter();

@@ -445,7 +445,8 @@ public sealed class SpectreStatisticsPresenter : IStatisticsPresenter
             row.Add(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture));
             row.Add(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture));
-            row.Add(stat.Corrections.ToString(CultureInfo.InvariantCulture));
+            var corrections = stat.Corrections.ToString(CultureInfo.InvariantCulture);
+            row.Add(stat.HasCompleteCorrectionsData ? corrections : $"{corrections} (partial)");
             _ = table.AddRow([.. row]);
             index++;
         }

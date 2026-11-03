@@ -60,13 +60,14 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var analysisTasks = new List<Task>();
         Exception? sourceError = null;
+        Exception? handlerError = null;
         try
         {
             await foreach (var pr in _client.GetPullRequestsAsync(
                 workspace,
                 repo.Slug,
                 pullRequest => pullRequest.ShouldStopByTimeFilter(filterDate, prTimeFilterMode),
-                cancellationToken).ConfigureAwait(false))
+                stop.Token).ConfigureAwait(false))
             {
                 if (!pr.MatchesBranchFilter(branchNameList))
                 {
@@ -85,12 +86,19 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                     reportData,
                     pr,
                     semaphore,
+                    exception =>
+                    {
+                        Interlocked.CompareExchange(ref handlerError, exception, null);
+                        stop.Cancel();
+                    },
                     stop.Token));
             }
         }
         catch (Exception exception)
         {
-            sourceError = exception;
+            sourceError = exception is OperationCanceledException &&
+                !cancellationToken.IsCancellationRequested && handlerError is not null
+                ? handlerError : exception;
             await stop.CancelAsync().ConfigureAwait(false);
         }
         finally
@@ -116,11 +124,17 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         ReportData reportData,
         PullRequest pr,
         SemaphoreSlim semaphore,
+        Action<Exception> onError,
         CancellationToken cancellationToken)
     {
         try
         {
             await AnalyzePullRequestAsync(repo, reportData, pr, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            onError(exception);
+            throw;
         }
         finally
         {
@@ -315,6 +329,10 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 {
                     authorStats.Corrections += corrections;
                 }
+                else
+                {
+                    authorStats.HasCompleteCorrectionsData = false;
+                }
                 if (collectDeveloperDetails && reportEntry is not null)
                 {
                     authorStats.AuthoredPullRequests.Add(reportEntry);
@@ -496,6 +514,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 repo.Slug,
                 pr.Id,
                 correctionCommits,
+                snapshot.CommitActivities,
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -516,14 +535,31 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         RepoSlug repoSlug,
         PullRequestId pullRequestId,
         IReadOnlyList<PullRequestCommitInfo> correctionCommits,
+        IReadOnlyList<DeveloperCommitActivity> cachedActivities,
         CancellationToken cancellationToken)
     {
         var activities = new List<DeveloperCommitActivity>(correctionCommits.Count);
+        var cachedSizes = new Dictionary<string, PullRequestSizeSummary>(StringComparer.Ordinal);
+        foreach (var activity in cachedActivities)
+        {
+            if (activity.HasSizeData)
+            {
+                cachedSizes.TryAdd(activity.CommitHash, activity.SizeSummary);
+            }
+        }
 
         foreach (var commit in correctionCommits)
         {
-            var sizeSummary = await GetCommitSizeSafeAsync(workspace, repoSlug, commit.Hash, cancellationToken)
-                .ConfigureAwait(false);
+            PullRequestSizeSummary? sizeSummary;
+            if (cachedSizes.TryGetValue(commit.Hash, out var cachedSize))
+            {
+                sizeSummary = cachedSize;
+            }
+            else
+            {
+                sizeSummary = await GetCommitSizeSafeAsync(workspace, repoSlug, commit.Hash, cancellationToken)
+                    .ConfigureAwait(false);
+            }
             activities.Add(new DeveloperCommitActivity(
                 repositoryName,
                 repoSlug.Value,

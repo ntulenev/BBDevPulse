@@ -51,6 +51,7 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                 using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                 var repositoryTasks = new List<Task>(total);
                 Exception? sourceError = null;
+                Exception? handlerError = null;
                 try
                 {
                     foreach (var repository in repositories)
@@ -72,6 +73,12 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                             {
                                 await analyzeRepository(repository, stop.Token).ConfigureAwait(false);
                             }
+                            catch (Exception exception) when (!stop.IsCancellationRequested)
+                            {
+                                Interlocked.CompareExchange(ref handlerError, exception, null);
+                                stop.Cancel();
+                                throw;
+                            }
                             finally
                             {
                                 var finished = Interlocked.Increment(ref completed);
@@ -90,7 +97,9 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                 }
                 catch (Exception exception)
                 {
-                    sourceError = exception;
+                    sourceError = exception is OperationCanceledException &&
+                        !cancellationToken.IsCancellationRequested && handlerError is not null
+                        ? handlerError : exception;
                     await stop.CancelAsync().ConfigureAwait(false);
                 }
                 finally

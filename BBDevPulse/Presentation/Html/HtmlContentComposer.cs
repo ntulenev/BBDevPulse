@@ -539,7 +539,10 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
                 BuildTextCell(stat.CommentsAfter.ToString(CultureInfo.InvariantCulture), stat.CommentsAfter),
                 BuildTextCell(stat.PeerCommentsAfter.ToString(CultureInfo.InvariantCulture), stat.PeerCommentsAfter),
                 BuildTextCell(stat.ApprovalsAfter.ToString(CultureInfo.InvariantCulture), stat.ApprovalsAfter),
-                BuildTextCell(stat.Corrections.ToString(CultureInfo.InvariantCulture), stat.Corrections)
+                BuildTextCell(stat.HasCompleteCorrectionsData
+                    ? stat.Corrections.ToString(CultureInfo.InvariantCulture)
+                    : $"{stat.Corrections.ToString(CultureInfo.InvariantCulture)} (partial)",
+                    stat.HasCompleteCorrectionsData ? stat.Corrections : null)
             ]);
 
             rows.Add(new TableRow(cells));
