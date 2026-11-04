@@ -1,5 +1,6 @@
 using BBDevPulse.Abstractions;
 using BBDevPulse.Models;
+using BBDevPulse.Presentation.Formatters;
 
 using Spectre.Console;
 
@@ -103,6 +104,11 @@ public sealed class SpectreReportPresenter : IReportPresenter
         if (reportData.HasMissingUserUuid)
         {
             AnsiConsole.MarkupLine("[bold red]" + Markup.Escape(ReportData.MissingUserUuidWarning) + "[/]");
+        }
+
+        foreach (var mismatch in reportData.GetNameMismatches())
+        {
+            AnsiConsole.MarkupLine("[yellow]" + Markup.Escape(NameMismatchFormatter.Format(mismatch)) + "[/]");
         }
 
         foreach (var collision in reportData.GetIdentityCollisionNotices())

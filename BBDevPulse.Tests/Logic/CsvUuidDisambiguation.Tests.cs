@@ -35,39 +35,60 @@ public sealed class CsvUuidDisambiguationTests
     }
 
     [Fact]
-    public async Task NameInSelectedTeamWithoutUuidWarnsRedAndIncludesBoth()
+    public async Task DifferentNameStillMatchesUuidAndIsReported()
     {
-        var people = await ReadCsv("Name;Grade;Department\nAlex Kim;Senior;Platform\n");
+        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex CSV;Senior;Platform;A\n");
         var data = CreateReport(people, "Platform");
         data.IsDeveloperIncluded(First).Should().BeTrue();
-        data.IsDeveloperIncluded(Second).Should().BeTrue();
-        var notice = data.GetIdentityCollisionNotices().Should().ContainSingle().Subject;
-        notice.IsError.Should().BeTrue();
-        notice.Message.Should().Contain("without a UUID");
-        Render(data).Should().Contain("#b91c1c").And.Contain(notice.Message);
+        data.TryGetPerson(First, out var person).Should().BeTrue();
+        person.Grade.Should().Be("Senior");
+        data.GetNameMismatches().Should().ContainSingle().Which.Should().Be(("{a}", "Alex Kim", "Alex CSV"));
+        Render(data).Should().Contain("Bitbucket: Alex Kim; CSV: Alex CSV");
+    }
+
+    [Theory]
+    [InlineData("Alex Kim", false)]
+    [InlineData("alex Kim", true)]
+    [InlineData("Alex Kimm", true)]
+    public async Task NameComparisonDoesNotAffectUuidFiltering(string bitbucketName, bool mismatch)
+    {
+        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Platform;{a}\n");
+        var parameters = new ReportParameters(DateTimeOffset.UnixEpoch, new Workspace("ws"), new RepoNameFilter(""), [],
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, [], teamFilter: "Platform");
+        var accumulator = new ReportAccumulator(parameters, people);
+        var identity = new DeveloperIdentity(new UserUuid("A"), new DisplayName(bitbucketName));
+        accumulator.IsDeveloperIncluded(identity).Should().BeTrue();
+        accumulator.RegisterDeveloper(identity);
+        accumulator.EnrichDevelopers();
+        var report = accumulator.Build();
+        report.DeveloperStats.Values.Should().ContainSingle().Which.Grade.Should().Be("Senior");
+        report.GetNameMismatches().Count.Should().Be(mismatch ? 1 : 0);
     }
 
     [Fact]
-    public async Task NameOutsideSelectedTeamWarnsYellowAndExcludesBoth()
+    public async Task AllDistinctObservedNamesSurvivePublicationWithoutDuplicateUuidVariants()
     {
-        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Other;\n");
-        var data = CreateReport(people, "Platform");
-        data.IsDeveloperIncluded(First).Should().BeFalse();
-        data.IsDeveloperIncluded(Second).Should().BeFalse();
-        var notice = data.GetIdentityCollisionNotices().Should().ContainSingle().Subject;
-        notice.IsError.Should().BeFalse();
-        notice.Message.Should().Contain("not in the selected team");
-        Render(data).Should().Contain("#d97706").And.Contain(notice.Message);
+        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Platform;a\n");
+        var parameters = new ReportParameters(DateTimeOffset.UnixEpoch, new Workspace("ws"), new RepoNameFilter(""), [],
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, []);
+        var accumulator = new ReportAccumulator(parameters, people);
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("a"), new DisplayName("Alex Kim")));
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("{A}"), new DisplayName("alex Kim")));
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("a"), new DisplayName("alex Kim")));
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("a"), new DisplayName("Alex Kimm")));
+        var report = accumulator.Build();
+        report.GetNameMismatches().Select(x => x.BitbucketName).Should().BeEquivalentTo("alex Kim", "Alex Kimm");
     }
 
     [Fact]
-    public async Task ExactUuidTakesPrecedenceOverNameOnlyFallback()
+    public async Task UnmatchedUuidAndMissingUuidDoNotCreateNameMismatch()
     {
-        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Platform;\nAlex Kim;Junior;Other;b\n");
+        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Platform;a\n");
         var data = CreateReport(people, "Platform");
-        data.IsDeveloperIncluded(First).Should().BeTrue();
-        data.IsDeveloperIncluded(Second).Should().BeFalse();
-        data.GetIdentityCollisionNotices().Single().IsError.Should().BeTrue();
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Wrong name")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("unmatched"), new DisplayName("Wrong name")));
+        data.GetNameMismatches().Should().BeEmpty();
+        data.IsDeveloperIncluded(new DeveloperIdentity(new UserUuid("unmatched"), new DisplayName("Alex Kim"))).Should().BeFalse();
     }
 
     [Fact]
@@ -85,7 +106,7 @@ public sealed class CsvUuidDisambiguationTests
     [InlineData("Alex Kim;Senior;Import;\nAlex Kim;Senior;Export;UUID1\nAlex Kim;Senior;Export;\n", false)]
     [InlineData("Alex Kim;Senior;Import;UUID1\nAlex Kim;Senior;Export;UUID1\nAlex Kim;Senior;Export;\n", false)]
     [InlineData("Alex Kim;Senior;Import;\nAlex Kim;Senior;Export;UUID1\nAlex Kim;Senior;Export;UUID1\n", false)]
-    [InlineData("Alex Kim;Senior;Import;\nAlex Kim;Senior;Export;UUID1\nAlex Kim;Senior;Export;UUID2\n", true)]
+    [InlineData("Alex Kim;Senior;Import;\nAlex Kim;Senior;Export;UUID1\nAlex Kim;Senior;Export;UUID2\n", false)]
     [InlineData("Alex Kim;Senior;Import;UUID2\nAlex Kim;Senior;Export;UUID1\nAlex Kim;Senior;Export;UUID2\n", false)]
     [InlineData("Alex Kim;Senior;Import;UUID3\nAlex Kim;Senior;Export;UUID1\nAlex Kim;Senior;Export;UUID2\n", true)]
     public async Task ValidatesRequestedDuplicateCases(string rows, bool valid)
@@ -99,7 +120,7 @@ public sealed class CsvUuidDisambiguationTests
         }
         else
         {
-            (await read.Should().ThrowAsync<PeopleCsvFormatException>()).Which.Message.Should().Contain("lines");
+            (await read.Should().ThrowAsync<PeopleCsvFormatException>()).Which.Message.Should().Contain("line");
         }
     }
 
@@ -110,25 +131,15 @@ public sealed class CsvUuidDisambiguationTests
         (await read.Should().ThrowAsync<PeopleCsvFormatException>()).Which.Message.Should().Contain("lines 2 and 3");
     }
 
-    [Fact]
-    public async Task SameNameWithoutUuidsAcrossDifferentTeamsRetainsBothAndWarns()
+    [Theory]
+    [InlineData("Name;Grade;Department\nAlex;Senior;Core\n")]
+    [InlineData("Name;Grade;Department;UUID\nAlex;Senior;Core;\n")]
+    [InlineData("Name;Grade;Department;UUID\nAlex;Senior;Core;{}\n")]
+    [InlineData("Name;Grade;Department;UUID\nAlex;Senior;Core;   \n")]
+    public async Task MissingUuidIsRejected(string csv)
     {
-        var people = await ReadCsv("Name;Grade;Department\nAlex Kim;Senior;Import\nAlex Kim;Junior;Export\n");
-        people.Single().Value.Rows.Should().HaveCount(2);
-        var import = CreateReport(people, "Import");
-        var export = CreateReport(people, "Export");
-        import.IsDeveloperIncluded(First).Should().BeTrue();
-        export.IsDeveloperIncluded(First).Should().BeTrue();
-        import.TryGetPerson(First, out _).Should().BeFalse();
-        import.GetIdentityCollisionNotices().Single().IsError.Should().BeTrue();
-        export.GetIdentityCollisionNotices().Single().IsError.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task DuplicateNamesAndTeamsCompareIgnoringCase()
-    {
-        Func<Task> read = async () => { _ = await ReadCsv("Name;Grade;Department\nAlex Kim;Senior;Export\naLEX KIM;Junior;export\n"); };
-        (await read.Should().ThrowAsync<PeopleCsvFormatException>()).Which.Message.Should().Contain("Every such entry must have a unique UUID");
+        Func<Task> read = async () => { _ = await ReadCsv(csv); };
+        await read.Should().ThrowAsync<PeopleCsvFormatException>();
     }
 
     private static async Task<Dictionary<DisplayName, PersonCsvRow>> ReadCsv(string csv)

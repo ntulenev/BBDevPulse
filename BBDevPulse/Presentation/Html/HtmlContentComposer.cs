@@ -4,6 +4,7 @@ using System.Text;
 using BBDevPulse.Abstractions;
 using BBDevPulse.Math;
 using BBDevPulse.Models;
+using BBDevPulse.Presentation.Formatters;
 using BBDevPulse.Presentation.Pdf;
 
 namespace BBDevPulse.Presentation.Html;
@@ -57,6 +58,12 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             _ = warning.Append("<div role=\"alert\" style=\"padding:12px 16px;border:2px solid #b91c1c;background:#fef2f2;color:#991b1b;margin-bottom:16px\"><strong>");
             _ = warning.Append(HtmlPresentationHelpers.Encode(ReportData.MissingUserUuidWarning));
             _ = warning.AppendLine("</strong></div>");
+        }
+        foreach (var mismatch in reportData.GetNameMismatches())
+        {
+            _ = warning.Append("<div role=\"alert\" style=\"padding:12px 16px;border:2px solid #d97706;background:#fffbeb;color:#92400e;margin-bottom:16px\">");
+            _ = warning.Append(HtmlPresentationHelpers.Encode(NameMismatchFormatter.Format(mismatch)));
+            _ = warning.AppendLine("</div>");
         }
         foreach (var collision in reportData.GetIdentityCollisionNotices())
         {

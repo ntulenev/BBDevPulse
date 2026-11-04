@@ -176,6 +176,26 @@ public sealed class QuestPdfReportRendererTests
         saveCalls.Should().Be(1);
     }
 
+    [Fact]
+    public async Task RenderReportIncludesNameMismatchInPdf()
+    {
+        byte[]? pdf = null;
+        var store = new Mock<IPdfReportFileStore>();
+        store.Setup(x => x.SaveAsync(It.IsAny<string>(), It.IsAny<QuestPDF.Infrastructure.IDocument>(), It.IsAny<CancellationToken>()))
+            .Callback<string, QuestPDF.Infrastructure.IDocument, CancellationToken>((_, document, _) => pdf = document.GeneratePdf())
+            .Returns(Task.CompletedTask);
+        var renderer = new QuestPdfReportRenderer(Options.Create(CreateOptions(new PdfOptions { Enabled = true })),
+            new Mock<IDateDiffFormatter>().Object, new Mock<IStatisticsCalculator>().Object, store.Object);
+        var people = new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice CSV")] = new("Senior", "Core", "a") };
+        var report = new ReportData(CreateParameters(), people);
+        report.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice BB")));
+        await renderer.RenderReportAsync(report);
+        pdf.Should().NotBeNull();
+        using var document = UglyToad.PdfPig.PdfDocument.Open(pdf!);
+        var text = string.Join(" ", document.GetPages().Select(page => page.Text));
+        text.Should().Contain("CSV name mismatch").And.Contain("Alice BB").And.Contain("Alice CSV").And.Contain("{a}");
+    }
+
     [Fact(DisplayName = "RenderReport saves populated report and uses formatter/statistics collaborators")]
     [Trait("Category", "Unit")]
     public async Task RenderReportAsyncWhenDataExistsBuildsAllSectionsAndPersistsPdf()

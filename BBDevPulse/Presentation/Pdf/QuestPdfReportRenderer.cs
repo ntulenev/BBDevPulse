@@ -4,6 +4,7 @@ using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
 using BBDevPulse.Math;
 using BBDevPulse.Models;
+using BBDevPulse.Presentation.Formatters;
 
 using Microsoft.Extensions.Options;
 
@@ -110,6 +111,12 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     {
                         _ = column.Item().Border(1).BorderColor(Colors.Red.Medium).Padding(6)
                             .Text(ReportData.MissingUserUuidWarning).Bold().FontColor(Colors.Red.Darken3);
+                    }
+                    foreach (var mismatch in reportData.GetNameMismatches())
+                    {
+                        _ = column.Item().Border(1).BorderColor(Colors.Orange.Darken3).Padding(6)
+                            .Text(NameMismatchFormatter.Format(mismatch))
+                            .FontColor(Colors.Orange.Darken3);
                     }
                     foreach (var collision in reportData.GetIdentityCollisionNotices())
                     {

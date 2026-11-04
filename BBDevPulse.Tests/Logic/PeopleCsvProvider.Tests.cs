@@ -62,10 +62,10 @@ public sealed class PeopleCsvProviderTests
         File.WriteAllLines(
             csvPath,
             [
-                "Name;Grade;Department",
-                "Alice;Senior;Platform",
-                "Bob;;",
-                "Alice;Lead;Core"
+                "Name;Grade;Department;UUID",
+                "Alice;Senior;Platform;alice",
+                "Bob;;;bob",
+                "Alice;Lead;Core;alice2"
             ]);
 
         try
@@ -102,7 +102,7 @@ public sealed class PeopleCsvProviderTests
         File.WriteAllLines(
             csvPath,
             [
-                "Name;Grade;Department",
+                "Name;Grade;Department;UUID",
                 "Alice;Senior"
             ]);
 
@@ -115,7 +115,7 @@ public sealed class PeopleCsvProviderTests
 
             // Assert
             (await act.Should().ThrowAsync<FormatException>())
-                .WithMessage("Invalid people CSV format at line 2. Expected 'Name;Grade;Department[;UUID]'.");
+                .WithMessage("Invalid people CSV format at line 2. Expected 'Name;Grade;Department;UUID'.");
         }
         finally
         {

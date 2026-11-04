@@ -91,58 +91,46 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
             }
 
             var trimmedLine = line.Trim();
-            if (lineNumber == 1 && (trimmedLine.Equals(BasicHeader, StringComparison.OrdinalIgnoreCase) ||
-                trimmedLine.Equals(BasicHeader + ";UUID", StringComparison.OrdinalIgnoreCase)))
+            if (lineNumber == 1 && trimmedLine.Equals(BasicHeader + ";UUID", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
             var parts = trimmedLine.Split(';');
-            if (parts.Length is not 3 and not 4)
+            if (parts.Length != 4)
             {
                 throw new PeopleCsvFormatException(
-                    $"Invalid people CSV format at line {lineNumber}. Expected '{BasicHeader}[;UUID]'.");
+                    $"Invalid people CSV format at line {lineNumber}. Expected '{BasicHeader};UUID'.");
             }
 
             var name = parts[0].Trim();
             if (string.IsNullOrWhiteSpace(name))
             {
-                continue;
+                throw new PeopleCsvFormatException($"Missing name at line {lineNumber}.");
             }
 
             var grade = string.IsNullOrWhiteSpace(parts[1]) ? DeveloperStats.NOT_AVAILABLE : parts[1].Trim();
             var department = string.IsNullOrWhiteSpace(parts[2]) ? DeveloperStats.NOT_AVAILABLE : parts[2].Trim();
-            var uuid = parts.Length == 4 && !string.IsNullOrWhiteSpace(parts[3]) ? parts[3].Trim() : null;
+            var uuid = parts[3].Trim();
+            if (string.IsNullOrWhiteSpace(uuid) || string.IsNullOrWhiteSpace(uuid.Trim('{', '}')))
+            {
+                throw new PeopleCsvFormatException($"Missing UUID at line {lineNumber}.");
+            }
+
             entries.Add((name, new PersonCsvRow(grade, department, uuid), lineNumber));
         }
 
         var uuids = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in entries)
         {
-            if (entry.Row.Uuid is null)
-            {
-                continue;
-            }
-
-            var uuidKey = entry.Row.Uuid.Trim().Trim('{', '}');
+            // Each entry has a UUID validated while reading its line.
+            var uuidKey = entry.Row.Uuid!.Trim().Trim('{', '}');
             if (uuids.TryGetValue(uuidKey, out var previousLine))
             {
                 throw new PeopleCsvFormatException(
                     $"Duplicate UUID '{entry.Row.Uuid}' at lines {previousLine} and {entry.Line}. Each UUID must be unique in the CSV.");
             }
             uuids.Add(uuidKey, entry.Line);
-        }
-
-        var groups = entries.GroupBy(entry => (Name: entry.Name.ToUpperInvariant(),
-            Team: entry.Row.Department.ToUpperInvariant()));
-        foreach (var group in groups)
-        {
-            var rows = group.ToArray();
-            if (rows.Length > 1 && rows.Any(entry => entry.Row.Uuid is null))
-            {
-                throw new PeopleCsvFormatException(
-                    $"Name '{rows[0].Name}' appears more than once in team '{rows[0].Row.Department}' (lines {string.Join(", ", rows.Select(entry => entry.Line))}). Every such entry must have a unique UUID.");
-            }
         }
 
         foreach (var entry in entries)

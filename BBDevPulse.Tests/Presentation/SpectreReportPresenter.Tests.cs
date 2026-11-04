@@ -53,6 +53,19 @@ public sealed class SpectreReportPresenterTests
     }
 
     [Fact]
+    public void RenderReportShowsBothNamesAndUuidForMismatch()
+    {
+        var people = new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice [CSV]")] = new("Senior", "Core", "a") };
+        var data = new ReportData(CreateReportParameters(), people);
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice [BB]")));
+        var presenter = CreateSut(pullRequestReportPresenter: new Mock<IPullRequestReportPresenter>().Object,
+            statisticsPresenter: new Mock<IStatisticsPresenter>().Object);
+        var output = string.Join(" ", TestConsoleRunner.Run(_ => presenter.RenderReport(data))
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        output.Should().Contain("CSV name mismatch (UUID: {a}): Bitbucket: Alice [BB]; CSV: Alice [CSV]");
+    }
+
+    [Fact]
     public void RenderReportShowsMissingUuidWarning()
     {
         var data = new ReportData(CreateReportParameters());

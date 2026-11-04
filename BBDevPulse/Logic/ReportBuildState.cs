@@ -20,6 +20,7 @@ internal sealed class ReportBuildState
     public bool HasMissingUserUuid { get; private set; }
 
     private readonly Dictionary<string, HashSet<string>> _observedIdentities = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<(string Name, string Uuid), string> _observedNamesByIdentity = [];
 
     /// <summary>Records a Bitbucket identity before developer statistics can merge it with another identity.</summary>
     internal void ObserveDeveloperIdentity(DeveloperIdentity identity)
@@ -38,6 +39,10 @@ internal sealed class ReportBuildState
             {
                 return;
             }
+
+            var uuidKey = identity.Uuid.Value.Trim().Trim('{', '}').ToUpperInvariant();
+            _ = _observedNamesByIdentity.TryAdd((identity.DisplayName.Value, uuidKey), identity.Uuid.Value);
+
             if (!_observedIdentities.TryGetValue(identity.DisplayName.Value, out var uuids))
             {
                 uuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -201,15 +206,7 @@ internal sealed class ReportBuildState
             return true;
         }
 
-        if (!_peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var entries))
-        {
-            return false;
-        }
-
-        var exact = entries.Rows.Where(row => row.MatchesUuid(identity.Uuid)).ToArray();
-        return exact.Length > 0
-            ? exact.Any(row => row.IsInTeam(Parameters.TeamFilter!))
-            : entries.Rows.Any(row => string.IsNullOrWhiteSpace(row.Uuid) && row.IsInTeam(Parameters.TeamFilter!));
+        return TryGetPerson(identity, out var person) && person.IsInTeam(Parameters.TeamFilter!);
     }
 
     /// <summary>Looks up CSV enrichment by display name.</summary>
@@ -222,31 +219,45 @@ internal sealed class ReportBuildState
         return _peopleByDisplayName.TryGetValue(displayName.Value, out person);
     }
 
-    /// <summary>Resolves CSV metadata by name and, when provided, UUID.</summary>
+    /// <summary>Resolves CSV metadata by UUID.</summary>
     public bool TryGetPerson(DeveloperIdentity identity, out PersonCsvRow person)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         person = default;
-        if (identity.Uuid is null || !_peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var rows))
+        if (identity.Uuid is null)
         {
             return false;
         }
 
-        foreach (var row in rows.Rows)
+        foreach (var rows in _peopleByDisplayName.Values)
         {
-            if (row.MatchesUuid(identity.Uuid))
+            foreach (var row in rows.Rows)
             {
-                person = row;
-                return true;
+                if (row.MatchesUuid(identity.Uuid))
+                {
+                    person = row;
+                    return true;
+                }
             }
         }
-        var fallbackRows = rows.Rows.Where(row => string.IsNullOrWhiteSpace(row.Uuid)).ToArray();
-        if (fallbackRows.Length == 1)
-        {
-            person = fallbackRows[0];
-            return true;
-        }
+
         return false;
+    }
+
+    /// <summary>Returns observed Bitbucket names that differ from the CSV name for the same UUID.</summary>
+    /// <returns>UUIDs and their differing Bitbucket and CSV names.</returns>
+    public IReadOnlyList<(string Uuid, string BitbucketName, string CsvName)> GetNameMismatches()
+    {
+        lock (_identityLock)
+        {
+            return (from observed in _observedNamesByIdentity
+                    let uuid = observed.Value
+                    from entry in _peopleByDisplayName
+                    from row in entry.Value.Rows
+                    where row.MatchesUuid(new UserUuid(uuid)) && !string.Equals(observed.Key.Name, entry.Key, StringComparison.Ordinal)
+                    orderby observed.Key.Name, uuid
+                    select (uuid, observed.Key.Name, entry.Key)).ToArray();
+        }
     }
 
     /// <summary>Classifies duplicate-name warnings for the selected team.</summary>
@@ -261,7 +272,7 @@ internal sealed class ReportBuildState
                 : [];
             var unresolved = selected.Any(row => string.IsNullOrWhiteSpace(row.Uuid));
             var message = !Parameters.HasTeamFilter
-                ? "No team filter is selected. CSV enrichment may still be ambiguous when UUID is missing."
+                ? "No team filter is selected. CSV matching uses UUIDs."
                 : selected.Length == 0
                     ? "This name is not in the selected team in the CSV, so it does not affect team selection."
                     : unresolved
@@ -538,6 +549,10 @@ internal sealed class ReportBuildState
             foreach (var entry in _observedIdentities)
             {
                 snapshot._observedIdentities.Add(entry.Key, new HashSet<string>(entry.Value, StringComparer.OrdinalIgnoreCase));
+            }
+            foreach (var entry in _observedNamesByIdentity)
+            {
+                snapshot._observedNamesByIdentity.Add(entry.Key, entry.Value);
             }
             snapshot.Freeze();
             Freeze();

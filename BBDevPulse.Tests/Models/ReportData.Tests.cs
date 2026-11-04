@@ -416,7 +416,7 @@ public sealed class ReportDataTests
             parameters,
             new Dictionary<DisplayName, PersonCsvRow>
             {
-                [new DisplayName("Alice")] = new("Senior", "Core")
+                [new DisplayName("Alice")] = new("Senior", "Core", "alice")
             });
         var identity = new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice"));
 
