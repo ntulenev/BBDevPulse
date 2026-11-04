@@ -275,10 +275,12 @@ public sealed class ReportData
         {
             EnsureMutable();
             var key = (result.Workspace.Value.ToUpperInvariant(), result.Repository.Value.ToUpperInvariant(), result.Id.Value);
-            if (!_appliedPullRequests.Add(key))
+            if (_appliedPullRequests.Contains(key))
             {
                 throw new InvalidOperationException("The pull request result has already been applied.");
             }
+            ValidateResult(result);
+            _appliedPullRequests.Add(key);
 
             foreach (var identity in result.ObservedIdentities)
             {
@@ -359,6 +361,90 @@ public sealed class ReportData
             }
             Reports.Add(report);
         }
+    }
+
+    private void ValidateResult(PullRequestAnalysisResult result)
+    {
+        foreach (var identity in result.ObservedIdentities)
+        {
+            ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(result));
+        }
+        if (result.Report is null)
+        {
+            return;
+        }
+
+        var increments = new Dictionary<DeveloperKey, PendingCounts>();
+        PendingCounts For(DeveloperIdentity identity)
+        {
+            var key = DeveloperKey.FromIdentity(identity);
+            if (!increments.TryGetValue(key, out var value))
+            {
+                value = new PendingCounts();
+                increments.Add(key, value);
+            }
+            return value;
+        }
+
+        if (result.Author.HasValue && result.IncludeAuthoredPullRequest)
+        {
+            var pending = For(result.Author.Value);
+            pending.Opened = Parameters.IsInRange(result.CreatedOn) ? 1 : 0;
+            pending.Merged = Parameters.IsInRange(result.MergedOn) ? 1 : 0;
+            pending.Corrections = result.HasCommits ? result.Corrections : 0;
+            ArgumentOutOfRangeException.ThrowIfNegative(pending.Corrections);
+        }
+        foreach (var entry in result.CommentCounts)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(entry.Value);
+            if (result.Participants.TryGetValue(entry.Key, out var participant) && IsDeveloperIncluded(participant))
+            {
+                var pending = For(participant);
+                pending.Comments = checked(pending.Comments + entry.Value);
+                if (result.Author.HasValue && !participant.IsSameIdentity(result.Author.Value))
+                {
+                    pending.PeerComments = checked(pending.PeerComments + entry.Value);
+                }
+            }
+        }
+        foreach (var entry in result.ApprovalCounts)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(entry.Value);
+            if (result.Participants.TryGetValue(entry.Key, out var participant) && IsDeveloperIncluded(participant))
+            {
+                var pending = For(participant);
+                pending.Approvals = checked(pending.Approvals + entry.Value);
+            }
+        }
+        if (result.Comments is not null)
+        {
+            foreach (var detail in result.Comments)
+                ArgumentNullException.ThrowIfNull(detail.User.DisplayName, nameof(result));
+            foreach (var detail in result.Approvals!)
+                ArgumentNullException.ThrowIfNull(detail.User.DisplayName, nameof(result));
+        }
+        foreach (var (key, delta) in increments)
+        {
+            if (_developers.TryGetValue(key, out var stats))
+            {
+                _ = checked(stats.PrsOpenedSince + delta.Opened);
+                _ = checked(stats.PrsMergedAfter + delta.Merged);
+                _ = checked(stats.Corrections + delta.Corrections);
+                _ = checked(stats.CommentsAfter + delta.Comments);
+                _ = checked(stats.PeerCommentsAfter + delta.PeerComments);
+                _ = checked(stats.ApprovalsAfter + delta.Approvals);
+            }
+        }
+    }
+
+    private sealed class PendingCounts
+    {
+        public int Opened { get; set; }
+        public int Merged { get; set; }
+        public int Corrections { get; set; }
+        public int Comments { get; set; }
+        public int PeerComments { get; set; }
+        public int Approvals { get; set; }
     }
 
     internal ReportData CreatePublishedSnapshot()

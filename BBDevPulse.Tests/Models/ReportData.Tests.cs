@@ -138,6 +138,35 @@ public sealed class ReportDataTests
     }
 
     [Fact]
+    public void FailedResultLeavesNoPartialUpdatesAndCanBeRetried()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        var stats = data.GetOrAddDeveloper(identity);
+        stats.PrsOpenedSince = int.MaxValue;
+        var created = data.Parameters.FilterDate;
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, created, null, null,
+            new User(identity.DisplayName, identity.Uuid), null);
+        var analysis = new ActivityAnalysisState(created, identity, true);
+        var result = new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr,
+            [new DeveloperIdentity(null, new DisplayName("unknown")), identity], identity, true,
+            CreatePullRequestReport(1, created), null, 0, true, analysis, [], null, null);
+
+        Action apply = () => data.ApplyResult(result);
+        apply.Should().Throw<OverflowException>();
+        data.HasMissingUserUuid.Should().BeFalse();
+        data.Reports.Should().BeEmpty();
+        stats.PrsOpenedSince.Should().Be(int.MaxValue);
+
+        stats.PrsOpenedSince = 0;
+        apply.Should().NotThrow();
+        stats.PrsOpenedSince.Should().Be(1);
+        data.HasMissingUserUuid.Should().BeTrue();
+        data.Reports.Should().ContainSingle();
+    }
+
+    [Fact]
     public void PublishedReportIsIndependentOfCollectionReferencesHeldByProducer()
     {
         var data = new ReportData(CreateReportParameters());

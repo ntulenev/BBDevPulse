@@ -24,6 +24,13 @@ internal sealed class PullRequestAnalysisResult
         IReadOnlyList<(DeveloperIdentity User, DateTimeOffset Date)>? approvals)
         : this(workspace, repository.Slug, pr.Id, observedIdentities)
     {
+        ArgumentNullException.ThrowIfNull(report);
+        ArgumentNullException.ThrowIfNull(analysis);
+        ArgumentNullException.ThrowIfNull(commits);
+        if ((comments is null) != (approvals is null))
+        {
+            throw new ArgumentException("Comment and approval details must have the same availability.");
+        }
         Author = author;
         IncludeAuthoredPullRequest = includeAuthoredPullRequest;
         Report = report;
