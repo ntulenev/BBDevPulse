@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
+<title id="title">Matching a CSV name typo by UUID</title>
+<desc id="desc">Avery Stone in Bitbucket and Avery Stonne in the CSV share a UUID. The Platform filter includes the developer and the report warns about the names.</desc>
+<rect width="1200" height="440" rx="18" fill="#f4f6fa"/>
+<text x="42" y="55" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#17243b">Name discrepancy: UUID still identifies the developer</text>
+<rect x="42" y="82" width="510" height="146" rx="10" fill="white" stroke="#cbd5e1"/>
+<text x="64" y="119" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#42526b">BITBUCKET</text>
+<text x="64" y="157" font-family="Arial, sans-serif" font-size="22" fill="#17243b">Name: Avery Stone</text>
+<text x="64" y="196" font-family="monospace" font-size="20" fill="#175a9c">UUID: demo:Avery Stone</text>
+<rect x="648" y="82" width="510" height="146" rx="10" fill="white" stroke="#cbd5e1"/>
+<text x="670" y="119" font-family="Arial, sans-serif" font-size="19" font-weight="700" fill="#42526b">PEOPLE CSV · PLATFORM</text>
+<text x="670" y="157" font-family="Arial, sans-serif" font-size="22" fill="#17243b">Name: Avery Stonne</text>
+<text x="670" y="196" font-family="monospace" font-size="20" fill="#175a9c">UUID: demo:Avery Stone</text>
+<path d="M 562 193 L 638 193" stroke="#175a9c" stroke-width="3"/>
+<text x="600" y="181" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="700" fill="#175a9c">MATCH</text>
+<rect x="42" y="252" width="1116" height="112" rx="10" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+<text x="64" y="288" font-family="Arial, sans-serif" font-size="20" font-weight="700" fill="#92400e">REPORT WARNING</text>
+<text x="64" y="323" font-family="Arial, sans-serif" font-size="20" fill="#92400e">CSV name mismatch (UUID: demo:Avery Stone): Bitbucket: Avery Stone; CSV: Avery Stonne</text>
+<text x="42" y="407" font-family="Arial, sans-serif" font-size="19" fill="#334155">The Platform filter includes Avery by UUID. Review the warning to confirm the mapping.</text>
+</svg>

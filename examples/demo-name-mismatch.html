@@ -1,0 +1,1884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BBDevPulse Report - demo-workspace</title>
+  <style>
+    :root {
+      --bg: #111827;
+      --bg-alt: #0f172a;
+      --panel: rgba(15, 23, 42, 0.92);
+      --panel-soft: rgba(30, 41, 59, 0.82);
+      --border: rgba(148, 163, 184, 0.2);
+      --text: #e5eefb;
+      --muted: #9fb0c6;
+      --accent: #60a5fa;
+      --accent-soft: rgba(96, 165, 250, 0.15);
+      --warning: #f59e0b;
+      --warning-soft: rgba(245, 158, 11, 0.18);
+      --shadow: 0 24px 60px rgba(2, 6, 23, 0.45);
+      --font: "Segoe UI", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(96, 165, 250, 0.22), transparent 26%),
+        radial-gradient(circle at top right, rgba(245, 158, 11, 0.14), transparent 24%),
+        linear-gradient(180deg, var(--bg-alt) 0%, var(--bg) 100%);
+      font-family: var(--font);
+      line-height: 1.45;
+    }
+
+    a {
+      color: #93c5fd;
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .page {
+      width: min(1880px, calc(100vw - 28px));
+      margin: 10px auto 28px;
+    }
+
+    .hero {
+      padding: 18px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(96, 165, 250, 0.18), rgba(15, 23, 42, 0.96));
+      box-shadow: var(--shadow);
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: clamp(1.4rem, 1.6vw, 2rem);
+      letter-spacing: -0.03em;
+    }
+
+    .hero-subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .summary-card {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .summary-label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .summary-value {
+      display: block;
+      margin-top: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .report-section {
+      margin-top: 18px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .section-header h2,
+    .developer-card h3 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+    }
+
+    .table-panel {
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .nested-section .table-panel {
+      background: var(--panel-soft);
+      box-shadow: none;
+    }
+
+    .compact-section {
+      min-width: 0;
+    }
+
+    .table-controls {
+      display: flex;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.74);
+    }
+
+    .search,
+    .filter-input,
+    .button {
+      font: inherit;
+      border-radius: 10px;
+    }
+
+    .search,
+    .filter-input {
+      width: 100%;
+      color: var(--text);
+      background: rgba(2, 6, 23, 0.68);
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .search:focus,
+    .filter-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-soft);
+    }
+
+    .button {
+      border: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.9);
+      color: var(--text);
+      padding: 8px 12px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .button:hover {
+      background: rgba(51, 65, 85, 0.95);
+    }
+
+    .table-wrap {
+      overflow: hidden;
+    }
+
+    .scroll {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 780px;
+      border-collapse: collapse;
+    }
+
+    .compact-section table {
+      min-width: 100%;
+      table-layout: fixed;
+    }
+
+    .compact-section .scroll {
+      overflow-x: hidden;
+    }
+
+    .compact-section th,
+    .compact-section td {
+      padding: 8px 14px;
+      font-size: 0.82rem;
+      white-space: normal;
+    }
+
+    .compact-section th:first-child,
+    .compact-section td:first-child {
+      width: 62%;
+    }
+
+    .compact-section th:last-child,
+    .compact-section td:last-child {
+      width: 38%;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      text-align: left;
+      vertical-align: top;
+      white-space: nowrap;
+      font-size: 0.84rem;
+    }
+
+    th.repo-column,
+    td.repo-column {
+      min-width: 160px;
+      white-space: normal;
+    }
+
+    th.narrow,
+    td.narrow {
+      width: 76px;
+    }
+
+    thead tr:first-child th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: rgba(30, 41, 59, 0.98);
+    }
+
+    thead tr.filters th {
+      position: sticky;
+      top: 42px;
+      z-index: 2;
+      background: rgba(15, 23, 42, 0.96);
+    }
+
+    tbody tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.018);
+    }
+
+    tbody tr:hover {
+      background: rgba(96, 165, 250, 0.08);
+    }
+
+    tbody tr.activity-only {
+      background: var(--warning-soft);
+    }
+
+    tbody tr.activity-only td,
+    tbody tr.activity-only a {
+      color: #ffd58a;
+    }
+
+    .th-button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .sort-indicator {
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+
+    .section-note {
+      margin: 10px 12px 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .activity-note {
+      color: #ffd58a;
+    }
+
+    .empty-cell,
+    .empty-section {
+      padding: 18px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .developer-card {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.58);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    @media (max-width: 980px) {
+      .page {
+        width: calc(100vw - 14px);
+      }
+
+      .table-controls {
+        flex-direction: column;
+      }
+
+      thead tr:first-child th,
+      thead tr.filters th {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+<div role="alert" style="padding:12px 16px;border:2px solid #d97706;background:#fffbeb;color:#92400e;margin-bottom:16px">CSV name mismatch (UUID: demo:Avery Stone): Bitbucket: Avery Stone; CSV: Avery Stonne</div>
+
+    <section class="hero">
+      <h1>BBDevPulse HTML Report</h1>
+      <div class="hero-subtitle">Interactive copy of the PDF report with per-table sorting and filtering.</div>
+      <div class="summary-grid">
+        <div class="summary-card">
+          <span class="summary-label">Generated</span>
+          <span class="summary-value">2026-11-04 11:12:42 +01:00</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Workspace</span>
+          <span class="summary-value">demo-workspace</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Date Window</span>
+          <span class="summary-value">2026-10-05 to 2026-11-04</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Repositories</span>
+          <span class="summary-value">3</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">PRs In Report</span>
+          <span class="summary-value">12</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">PR Metrics Base</span>
+          <span class="summary-value">6</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Developers</span>
+          <span class="summary-value">2</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">PR Size Metric</span>
+          <span class="summary-value">Files</span>
+        </div>
+        <div class="summary-card">
+          <span class="summary-label">Team Filter</span>
+          <span class="summary-value">Platform</span>
+        </div>
+      </div>
+    </section>
+
+<p role="note" style="padding:10px 14px;border:1px solid #d97706;color:#92400e;font-weight:700">DEMO MODE · Synthetic sample data</p>
+<section class="table-section" id="pull-requests">
+  <div class="section-header">
+    <h2>Pull Requests</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="4" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th class="narrow"><button class="th-button" data-sort-column="0" data-sort-type="number" type="button"><span>#</span><span class="sort-indicator"></span></button></th>
+              <th class="repo-column"><button class="th-button" data-sort-column="1" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>Author</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="text" type="button"><span>Target</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="4" data-sort-type="number" type="button"><span>Created</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="5" data-sort-type="number" type="button"><span>TTFR</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="6" data-sort-type="number" type="button"><span>Last Activity</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="7" data-sort-type="number" type="button"><span>Merged</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="8" data-sort-type="number" type="button"><span>Rejected</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="9" data-sort-type="number" type="button"><span>PR Age</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="10" data-sort-type="number" type="button"><span>Time to Merge</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="11" data-sort-type="number" type="button"><span>Comments</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="12" data-sort-type="number" type="button"><span>Corrections</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="13" data-sort-type="number" type="button"><span>Size</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="14" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="#" type="search"></th>
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Author" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Target branch" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Created" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="TTFR" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Last activity" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Merged" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Rejected" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="PR age" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Time to merge" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Comments" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Corrections" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Size" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='Avery Stone' data-filter='Avery Stone'>Avery Stone</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1791450000' data-filter='2026-10-08'>2026-10-08</td>
+              <td data-sort='120' data-filter='2.0 hours'>2.0 hours</td>
+              <td data-sort='1791550800' data-filter='2026-10-09'>2026-10-09</td>
+              <td data-sort='1791550800' data-filter='2026-10-09 13:00'>2026-10-09 13:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='1680' data-filter='1.2 days (28.0 hours)'>1.2 days (28.0 hours)</td>
+              <td data-sort='4' data-filter='4'>4</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='3' data-filter='S (3)'>S (3)</td>
+              <td data-sort='101' data-filter='101'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/101" target="_blank" rel="noreferrer">101</a></td>
+            </tr>
+            <tr class="activity-only">
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1791626400' data-filter='2026-10-10'>2026-10-10</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+              <td data-sort='1791806400' data-filter='2026-10-12'>2026-10-12</td>
+              <td data-sort='1791806400' data-filter='2026-10-12 12:00'>2026-10-12 12:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='720' data-filter='12.0 hours'>12.0 hours</td>
+              <td data-sort='6' data-filter='6'>6</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='7' data-filter='M (7)'>M (7)</td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+            </tr>
+            <tr>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='Morgan Vale' data-filter='Morgan Vale'>Morgan Vale</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1791802800' data-filter='2026-10-12'>2026-10-12</td>
+              <td data-sort='240' data-filter='4.0 hours'>4.0 hours</td>
+              <td data-sort='1791918000' data-filter='2026-10-13'>2026-10-13</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='1791918000' data-filter='2026-10-13 19:00'>2026-10-13 19:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='2' data-filter='XS (2)'>XS (2)</td>
+              <td data-sort='103' data-filter='103'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/103" target="_blank" rel="noreferrer">103</a></td>
+            </tr>
+            <tr class="activity-only">
+              <td data-sort='4' data-filter='4'>4</td>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1791979200' data-filter='2026-10-14'>2026-10-14</td>
+              <td data-sort='300' data-filter='5.0 hours'>5.0 hours</td>
+              <td data-sort='1792252800' data-filter='2026-10-17'>2026-10-17</td>
+              <td data-sort='1792252800' data-filter='2026-10-17 16:00'>2026-10-17 16:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='2160' data-filter='1.5 days (36.0 hours)'>1.5 days (36.0 hours)</td>
+              <td data-sort='8' data-filter='8'>8</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='12' data-filter='L (12)'>L (12)</td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+            </tr>
+            <tr>
+              <td data-sort='5' data-filter='5'>5</td>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='Avery Stone' data-filter='Avery Stone'>Avery Stone</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792155600' data-filter='2026-10-16'>2026-10-16</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+              <td data-sort='1792224000' data-filter='2026-10-17'>2026-10-17</td>
+              <td data-sort='1792224000' data-filter='2026-10-17 08:00'>2026-10-17 08:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='0' data-filter='0'>0</td>
+              <td data-sort='1' data-filter='XS (1)'>XS (1)</td>
+              <td data-sort='105' data-filter='105'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/105" target="_blank" rel="noreferrer">105</a></td>
+            </tr>
+            <tr class="activity-only">
+              <td data-sort='6' data-filter='6'>6</td>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792314000' data-filter='2026-10-18'>2026-10-18</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+              <td data-sort='1792422000' data-filter='2026-10-19'>2026-10-19</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='17892.703578923334' data-filter='12.4 days (298.2 hours)'>12.4 days (298.2 hours)</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='5' data-filter='5'>5</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='5' data-filter='S (5)'>S (5)</td>
+              <td data-sort='106' data-filter='106'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/106" target="_blank" rel="noreferrer">106</a></td>
+            </tr>
+            <tr>
+              <td data-sort='7' data-filter='7'>7</td>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='Morgan Vale' data-filter='Morgan Vale'>Morgan Vale</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792490400' data-filter='2026-10-20'>2026-10-20</td>
+              <td data-sort='180' data-filter='3.0 hours'>3.0 hours</td>
+              <td data-sort='1792648800' data-filter='2026-10-22'>2026-10-22</td>
+              <td data-sort='1792648800' data-filter='2026-10-22 06:00'>2026-10-22 06:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='2640' data-filter='1.8 days (44.0 hours)'>1.8 days (44.0 hours)</td>
+              <td data-sort='7' data-filter='7'>7</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='9' data-filter='M (9)'>M (9)</td>
+              <td data-sort='107' data-filter='107'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/107" target="_blank" rel="noreferrer">107</a></td>
+            </tr>
+            <tr class="activity-only">
+              <td data-sort='8' data-filter='8'>8</td>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792666800' data-filter='2026-10-22'>2026-10-22</td>
+              <td data-sort='240' data-filter='4.0 hours'>4.0 hours</td>
+              <td data-sort='1792760400' data-filter='2026-10-23'>2026-10-23</td>
+              <td data-sort='1792760400' data-filter='2026-10-23 13:00'>2026-10-23 13:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='1560' data-filter='1.1 days (26.0 hours)'>1.1 days (26.0 hours)</td>
+              <td data-sort='4' data-filter='4'>4</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='4' data-filter='S (4)'>S (4)</td>
+              <td data-sort='108' data-filter='108'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/108" target="_blank" rel="noreferrer">108</a></td>
+            </tr>
+            <tr>
+              <td data-sort='9' data-filter='9'>9</td>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='Avery Stone' data-filter='Avery Stone'>Avery Stone</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792843200' data-filter='2026-10-24'>2026-10-24</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+              <td data-sort='1792922400' data-filter='2026-10-25'>2026-10-25</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='1792922400' data-filter='2026-10-25 10:00'>2026-10-25 10:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='2' data-filter='XS (2)'>XS (2)</td>
+              <td data-sort='109' data-filter='109'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/109" target="_blank" rel="noreferrer">109</a></td>
+            </tr>
+            <tr class="activity-only">
+              <td data-sort='10' data-filter='10'>10</td>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1793019600' data-filter='2026-10-26'>2026-10-26</td>
+              <td data-sort='360' data-filter='6.0 hours'>6.0 hours</td>
+              <td data-sort='1793246400' data-filter='2026-10-29'>2026-10-29</td>
+              <td data-sort='1793246400' data-filter='2026-10-29 04:00'>2026-10-29 04:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='3780' data-filter='2.6 days (63.0 hours)'>2.6 days (63.0 hours)</td>
+              <td data-sort='9' data-filter='9'>9</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='15' data-filter='L (15)'>L (15)</td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+            </tr>
+            <tr>
+              <td data-sort='11' data-filter='11'>11</td>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='Morgan Vale' data-filter='Morgan Vale'>Morgan Vale</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1793178000' data-filter='2026-10-28'>2026-10-28</td>
+              <td data-sort='120' data-filter='2.0 hours'>2.0 hours</td>
+              <td data-sort='1793275200' data-filter='2026-10-29'>2026-10-29</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='7272.7035798766665' data-filter='5.1 days (121.2 hours)'>5.1 days (121.2 hours)</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='6' data-filter='M (6)'>M (6)</td>
+              <td data-sort='111' data-filter='111'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/111" target="_blank" rel="noreferrer">111</a></td>
+            </tr>
+            <tr class="activity-only">
+              <td data-sort='12' data-filter='12'>12</td>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1793440800' data-filter='2026-10-31'>2026-10-31</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+              <td data-sort='1793577600' data-filter='2026-11-02'>2026-11-02</td>
+              <td data-sort='1793577600' data-filter='2026-11-02 00:00'>2026-11-02 00:00</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+              <td data-sort='5' data-filter='5'>5</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='8' data-filter='M (8)'>M (8)</td>
+              <td data-sort='112' data-filter='112'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/112" target="_blank" rel="noreferrer">112</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+<p class="section-note activity-note">Orange rows indicate PRs authored outside the selected team but with team activity. They do not count in PR metrics and are used only for comment and approval counts in developer stats.</p>
+
+  </div>
+</section>
+<div class="stat-grid">
+<section class="table-section compact-section" id="merge-time-stats">
+  <div class="section-header">
+    <h2>Merge Time Stats</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Best Merge Time' data-filter='Best Merge Time'>Best Merge Time</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+            </tr>
+            <tr>
+              <td data-sort='Longest Merge Time' data-filter='Longest Merge Time'>Longest Merge Time</td>
+              <td data-sort='1.8333333333333333' data-filter='1.8 days (44.0 hours)'>1.8 days (44.0 hours)</td>
+            </tr>
+            <tr>
+              <td data-sort='Median' data-filter='Median'>Median</td>
+              <td data-sort='1.1666666666666667' data-filter='1.2 days (28.0 hours)'>1.2 days (28.0 hours)</td>
+            </tr>
+            <tr>
+              <td data-sort='75P' data-filter='75P'>75P</td>
+              <td data-sort='1.5' data-filter='1.5 days (36.0 hours)'>1.5 days (36.0 hours)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section compact-section" id="ttfr-stats">
+  <div class="section-header">
+    <h2>TTFR Stats</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Best TTFR' data-filter='Best TTFR'>Best TTFR</td>
+              <td data-sort='0' data-filter='&lt;1h'>&lt;1h</td>
+            </tr>
+            <tr>
+              <td data-sort='Longest TTFR' data-filter='Longest TTFR'>Longest TTFR</td>
+              <td data-sort='0.16666666666666666' data-filter='4.0 hours'>4.0 hours</td>
+            </tr>
+            <tr>
+              <td data-sort='Median' data-filter='Median'>Median</td>
+              <td data-sort='0.08333333333333333' data-filter='2.0 hours'>2.0 hours</td>
+            </tr>
+            <tr>
+              <td data-sort='75P' data-filter='75P'>75P</td>
+              <td data-sort='0.11458333333333333' data-filter='2.8 hours'>2.8 hours</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section compact-section" id="correction-stats">
+  <div class="section-header">
+    <h2>Corrections Stats</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Min Corrections' data-filter='Min Corrections'>Min Corrections</td>
+              <td data-sort='0' data-filter='0'>0</td>
+            </tr>
+            <tr>
+              <td data-sort='Max Corrections' data-filter='Max Corrections'>Max Corrections</td>
+              <td data-sort='2' data-filter='2'>2</td>
+            </tr>
+            <tr>
+              <td data-sort='Median' data-filter='Median'>Median</td>
+              <td data-sort='1' data-filter='1'>1</td>
+            </tr>
+            <tr>
+              <td data-sort='75P' data-filter='75P'>75P</td>
+              <td data-sort='1.75' data-filter='1.75'>1.75</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section compact-section" id="pr-size-stats">
+  <div class="section-header">
+    <h2>PR Size Stats</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Files</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Smallest PR' data-filter='Smallest PR'>Smallest PR</td>
+              <td data-sort='1' data-filter='1'>1</td>
+            </tr>
+            <tr>
+              <td data-sort='Biggest PR' data-filter='Biggest PR'>Biggest PR</td>
+              <td data-sort='9' data-filter='9'>9</td>
+            </tr>
+            <tr>
+              <td data-sort='Median' data-filter='Median'>Median</td>
+              <td data-sort='2.5' data-filter='2.5'>2.5</td>
+            </tr>
+            <tr>
+              <td data-sort='75P' data-filter='75P'>75P</td>
+              <td data-sort='5.25' data-filter='5.25'>5.25</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section compact-section" id="pr-throughput-stats">
+  <div class="section-header">
+    <h2>PR Throughput</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='PRs Created' data-filter='PRs Created'>PRs Created</td>
+              <td data-sort='6' data-filter='6'>6</td>
+            </tr>
+            <tr>
+              <td data-sort='PRs Merged' data-filter='PRs Merged'>PRs Merged</td>
+              <td data-sort='3' data-filter='3'>3</td>
+            </tr>
+            <tr>
+              <td data-sort='PRs Rejected' data-filter='PRs Rejected'>PRs Rejected</td>
+              <td data-sort='2' data-filter='2'>2</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section compact-section" id="prs-per-developer-stats">
+  <div class="section-header">
+    <h2>PRs per Developer</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Min PRs/Developer' data-filter='Min PRs/Developer'>Min PRs/Developer</td>
+              <td data-sort='3' data-filter='3'>3</td>
+            </tr>
+            <tr>
+              <td data-sort='Max PRs/Developer' data-filter='Max PRs/Developer'>Max PRs/Developer</td>
+              <td data-sort='3' data-filter='3'>3</td>
+            </tr>
+            <tr>
+              <td data-sort='Median' data-filter='Median'>Median</td>
+              <td data-sort='3' data-filter='3'>3</td>
+            </tr>
+            <tr>
+              <td data-sort='75P' data-filter='75P'>75P</td>
+              <td data-sort='3' data-filter='3'>3</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section compact-section" id="comments-stats">
+  <div class="section-header">
+    <h2>Comments Stats</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Min Comments' data-filter='Min Comments'>Min Comments</td>
+              <td data-sort='1' data-filter='1'>1</td>
+            </tr>
+            <tr>
+              <td data-sort='Max Comments' data-filter='Max Comments'>Max Comments</td>
+              <td data-sort='7' data-filter='7'>7</td>
+            </tr>
+            <tr>
+              <td data-sort='Median' data-filter='Median'>Median</td>
+              <td data-sort='3' data-filter='3'>3</td>
+            </tr>
+            <tr>
+              <td data-sort='75P' data-filter='75P'>75P</td>
+              <td data-sort='3.75' data-filter='3.75'>3.75</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section compact-section" id="peer-comments-stats">
+  <div class="section-header">
+    <h2>Peer Comments Stats</h2>
+  </div>
+  <div class="table-panel">
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="1" data-default-sort-direction="asc">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Min Peer Comments' data-filter='Min Peer Comments'>Min Peer Comments</td>
+              <td data-sort='17' data-filter='17'>17</td>
+            </tr>
+            <tr>
+              <td data-sort='Max Peer Comments' data-filter='Max Peer Comments'>Max Peer Comments</td>
+              <td data-sort='20' data-filter='20'>20</td>
+            </tr>
+            <tr>
+              <td data-sort='Median' data-filter='Median'>Median</td>
+              <td data-sort='18.5' data-filter='18.5'>18.5</td>
+            </tr>
+            <tr>
+              <td data-sort='75P' data-filter='75P'>75P</td>
+              <td data-sort='19.25' data-filter='19.25'>19.25</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+<section class="table-section" id="worst-prs">
+  <div class="section-header">
+    <h2>Worst PRs by Metric</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="4" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Metric</span><span class="sort-indicator"></span></button></th>
+              <th class="repo-column"><button class="th-button" data-sort-column="1" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="2" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="text" type="button"><span>Author</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="4" data-sort-type="number" type="button"><span>Value</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th><input class="filter-input" data-filter-column placeholder="Metric" type="search"></th>
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Author" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Value" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Longest Merge Time' data-filter='Longest Merge Time'>Longest Merge Time</td>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='107' data-filter='107'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/107" target="_blank" rel="noreferrer">107</a></td>
+              <td data-sort='Morgan Vale' data-filter='Morgan Vale'>Morgan Vale</td>
+              <td data-sort='1.8333333333333333' data-filter='1.8 days (44.0 hours)'>1.8 days (44.0 hours)</td>
+            </tr>
+            <tr>
+              <td data-sort='Longest TTFR' data-filter='Longest TTFR'>Longest TTFR</td>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='103' data-filter='103'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/103" target="_blank" rel="noreferrer">103</a></td>
+              <td data-sort='Morgan Vale' data-filter='Morgan Vale'>Morgan Vale</td>
+              <td data-sort='0.16666666666666666' data-filter='4.0 hours'>4.0 hours</td>
+            </tr>
+            <tr>
+              <td data-sort='Most Comments' data-filter='Most Comments'>Most Comments</td>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='101' data-filter='101'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/101" target="_blank" rel="noreferrer">101</a></td>
+              <td data-sort='Avery Stone' data-filter='Avery Stone'>Avery Stone</td>
+              <td data-sort='4' data-filter='4'>4</td>
+            </tr>
+            <tr>
+              <td data-sort='Most Corrections' data-filter='Most Corrections'>Most Corrections</td>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='109' data-filter='109'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/109" target="_blank" rel="noreferrer">109</a></td>
+              <td data-sort='Avery Stone' data-filter='Avery Stone'>Avery Stone</td>
+              <td data-sort='1' data-filter='1'>1</td>
+            </tr>
+            <tr>
+              <td data-sort='Biggest PR' data-filter='Biggest PR'>Biggest PR</td>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='111' data-filter='111'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/111" target="_blank" rel="noreferrer">111</a></td>
+              <td data-sort='Morgan Vale' data-filter='Morgan Vale'>Morgan Vale</td>
+              <td data-sort='6' data-filter='6 (M)'>6 (M)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section" id="developer-stats">
+  <div class="section-header">
+    <h2>Developer Stats (2026-10-05 to 2026-11-04)</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="4" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="narrow"><button class="th-button" data-sort-column="0" data-sort-type="number" type="button"><span>#</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="1" data-sort-type="text" type="button"><span>Developer</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>Grade</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="text" type="button"><span>Department</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="4" data-sort-type="number" type="button"><span>PRs Opened</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="5" data-sort-type="number" type="button"><span>PRs Merged</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="6" data-sort-type="number" type="button"><span>Comments</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="7" data-sort-type="number" type="button"><span>Peer Comments</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="8" data-sort-type="number" type="button"><span>Approvals</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="9" data-sort-type="number" type="button"><span>Corrections</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="#" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Developer" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Grade" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Department" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="PRs opened" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="PRs merged" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Comments" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Peer comments" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Approvals" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Corrections" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='Avery Stone' data-filter='Avery Stone'>Avery Stone</td>
+              <td data-sort='Senior' data-filter='Senior'>Senior</td>
+              <td data-sort='Platform' data-filter='Platform'>Platform</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='17' data-filter='17'>17</td>
+              <td data-sort='17' data-filter='17'>17</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='3' data-filter='3'>3</td>
+            </tr>
+            <tr>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='Morgan Vale' data-filter='Morgan Vale'>Morgan Vale</td>
+              <td data-sort='Lead' data-filter='Lead'>Lead</td>
+              <td data-sort='Platform' data-filter='Platform'>Platform</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='20' data-filter='20'>20</td>
+              <td data-sort='20' data-filter='20'>20</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='4' data-filter='4'>4</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="report-section">
+  <div class="section-header"><h2>Developer Details</h2></div>
+  <section class="developer-card" id="developer-0">
+    <h3>Avery Stone</h3>
+<section class="table-section nested-section" id="developer-0-authored">
+  <div class="section-header">
+    <h2>Authored PRs</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="3" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>Target</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="number" type="button"><span>Created</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="4" data-sort-type="text" type="button"><span>State</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="5" data-sort-type="number" type="button"><span>Merged</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="6" data-sort-type="number" type="button"><span>Comments</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="7" data-sort-type="number" type="button"><span>Fixes</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="8" data-sort-type="number" type="button"><span>Files</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Target" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Created" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="State" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Merged" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Comments" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Fixes" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Files" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='109' data-filter='109'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/109" target="_blank" rel="noreferrer">109</a></td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792843200' data-filter='2026-10-24'>2026-10-24</td>
+              <td data-sort='Superseded' data-filter='Superseded'>Superseded</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='2' data-filter='XS (2)'>XS (2)</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='105' data-filter='105'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/105" target="_blank" rel="noreferrer">105</a></td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792155600' data-filter='2026-10-16'>2026-10-16</td>
+              <td data-sort='Merged' data-filter='Merged'>Merged</td>
+              <td data-sort='1792224000' data-filter='2026-10-17 08:00'>2026-10-17 08:00</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='0' data-filter='0'>0</td>
+              <td data-sort='1' data-filter='XS (1)'>XS (1)</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='101' data-filter='101'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/101" target="_blank" rel="noreferrer">101</a></td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1791450000' data-filter='2026-10-08'>2026-10-08</td>
+              <td data-sort='Merged' data-filter='Merged'>Merged</td>
+              <td data-sort='1791550800' data-filter='2026-10-09 13:00'>2026-10-09 13:00</td>
+              <td data-sort='4' data-filter='4'>4</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='3' data-filter='S (3)'>S (3)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section nested-section" id="developer-0-comments">
+  <div class="section-header">
+    <h2>Comments</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="3" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>PR Author</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="number" type="button"><span>Date</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="PR author" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Date" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='112' data-filter='112'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/112" target="_blank" rel="noreferrer">112</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1793466000' data-filter='2026-10-31 17:00'>2026-10-31 17:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='112' data-filter='112'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/112" target="_blank" rel="noreferrer">112</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1793462400' data-filter='2026-10-31 16:00'>2026-10-31 16:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='112' data-filter='112'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/112" target="_blank" rel="noreferrer">112</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1793458800' data-filter='2026-10-31 15:00'>2026-10-31 15:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='112' data-filter='112'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/112" target="_blank" rel="noreferrer">112</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1793455200' data-filter='2026-10-31 14:00'>2026-10-31 14:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='112' data-filter='112'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/112" target="_blank" rel="noreferrer">112</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1793451600' data-filter='2026-10-31 13:00'>2026-10-31 13:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='108' data-filter='108'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/108" target="_blank" rel="noreferrer">108</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792688400' data-filter='2026-10-22 17:00'>2026-10-22 17:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='108' data-filter='108'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/108" target="_blank" rel="noreferrer">108</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792684800' data-filter='2026-10-22 16:00'>2026-10-22 16:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='108' data-filter='108'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/108" target="_blank" rel="noreferrer">108</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792681200' data-filter='2026-10-22 15:00'>2026-10-22 15:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='108' data-filter='108'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/108" target="_blank" rel="noreferrer">108</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792677600' data-filter='2026-10-22 14:00'>2026-10-22 14:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792015200' data-filter='2026-10-14 22:00'>2026-10-14 22:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792011600' data-filter='2026-10-14 21:00'>2026-10-14 21:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792008000' data-filter='2026-10-14 20:00'>2026-10-14 20:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792004400' data-filter='2026-10-14 19:00'>2026-10-14 19:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792000800' data-filter='2026-10-14 18:00'>2026-10-14 18:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1791997200' data-filter='2026-10-14 17:00'>2026-10-14 17:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1791993600' data-filter='2026-10-14 16:00'>2026-10-14 16:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1791990000' data-filter='2026-10-14 15:00'>2026-10-14 15:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section nested-section" id="developer-0-approvals">
+  <div class="section-header">
+    <h2>Approvals</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="3" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>PR Author</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="number" type="button"><span>Date</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="PR author" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Date" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='112' data-filter='112'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/112" target="_blank" rel="noreferrer">112</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1793458800' data-filter='2026-10-31 15:00'>2026-10-31 15:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='108' data-filter='108'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/108" target="_blank" rel="noreferrer">108</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1792684800' data-filter='2026-10-22 16:00'>2026-10-22 16:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='104' data-filter='104'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/104" target="_blank" rel="noreferrer">104</a></td>
+              <td data-sort='Taylor Quinn' data-filter='Taylor Quinn'>Taylor Quinn</td>
+              <td data-sort='1791997200' data-filter='2026-10-14 17:00'>2026-10-14 17:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section nested-section" id="developer-0-commits">
+  <div class="section-header">
+    <h2>Follow-up Commits</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="5" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>Commit</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="text" type="button"><span>Message</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="4" data-sort-type="number" type="button"><span>Files</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="5" data-sort-type="number" type="button"><span>Date</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Commit" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Message" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Files" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Date" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='109' data-filter='109'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/109" target="_blank" rel="noreferrer">109</a></td>
+              <td data-sort='000000000000' data-filter='000000000000'><a href="https://bitbucket.org/demo-workspace/orbit-worker/commits/000000000000000000000000000000000000006d" target="_blank" rel="noreferrer">000000000000</a></td>
+              <td data-sort='Refine synthetic implementation' data-filter='Refine synthetic implementation'>Refine synthetic implementation</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='1792872000' data-filter='2026-10-24 20:00'>2026-10-24 20:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='101' data-filter='101'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/101" target="_blank" rel="noreferrer">101</a></td>
+              <td data-sort='000000000000' data-filter='000000000000'><a href="https://bitbucket.org/demo-workspace/atlas-api/commits/0000000000000000000000000000000000000065" target="_blank" rel="noreferrer">000000000000</a></td>
+              <td data-sort='Refine synthetic implementation' data-filter='Refine synthetic implementation'>Refine synthetic implementation</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='1791478800' data-filter='2026-10-08 17:00'>2026-10-08 17:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+  </section>
+  <section class="developer-card" id="developer-1">
+    <h3>Morgan Vale</h3>
+<section class="table-section nested-section" id="developer-1-authored">
+  <div class="section-header">
+    <h2>Authored PRs</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="3" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>Target</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="number" type="button"><span>Created</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="4" data-sort-type="text" type="button"><span>State</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="5" data-sort-type="number" type="button"><span>Merged</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="6" data-sort-type="number" type="button"><span>Comments</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="7" data-sort-type="number" type="button"><span>Fixes</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="8" data-sort-type="number" type="button"><span>Files</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Target" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Created" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="State" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Merged" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Comments" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Fixes" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Files" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='111' data-filter='111'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/111" target="_blank" rel="noreferrer">111</a></td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1793178000' data-filter='2026-10-28'>2026-10-28</td>
+              <td data-sort='Open' data-filter='Open'>Open</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='6' data-filter='M (6)'>M (6)</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='107' data-filter='107'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/107" target="_blank" rel="noreferrer">107</a></td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1792490400' data-filter='2026-10-20'>2026-10-20</td>
+              <td data-sort='Merged' data-filter='Merged'>Merged</td>
+              <td data-sort='1792648800' data-filter='2026-10-22 06:00'>2026-10-22 06:00</td>
+              <td data-sort='7' data-filter='7'>7</td>
+              <td data-sort='1' data-filter='1'>1</td>
+              <td data-sort='9' data-filter='M (9)'>M (9)</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='103' data-filter='103'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/103" target="_blank" rel="noreferrer">103</a></td>
+              <td data-sort='main' data-filter='main'>main</td>
+              <td data-sort='1791802800' data-filter='2026-10-12'>2026-10-12</td>
+              <td data-sort='Declined' data-filter='Declined'>Declined</td>
+              <td data-sort='-' data-filter='-'>-</td>
+              <td data-sort='3' data-filter='3'>3</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='2' data-filter='XS (2)'>XS (2)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section nested-section" id="developer-1-comments">
+  <div class="section-header">
+    <h2>Comments</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="3" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>PR Author</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="number" type="button"><span>Date</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="PR author" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Date" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793059200' data-filter='2026-10-27 00:00'>2026-10-27 00:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793055600' data-filter='2026-10-26 23:00'>2026-10-26 23:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793052000' data-filter='2026-10-26 22:00'>2026-10-26 22:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793048400' data-filter='2026-10-26 21:00'>2026-10-26 21:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793044800' data-filter='2026-10-26 20:00'>2026-10-26 20:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793041200' data-filter='2026-10-26 19:00'>2026-10-26 19:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793037600' data-filter='2026-10-26 18:00'>2026-10-26 18:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793034000' data-filter='2026-10-26 17:00'>2026-10-26 17:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793030400' data-filter='2026-10-26 16:00'>2026-10-26 16:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='106' data-filter='106'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/106" target="_blank" rel="noreferrer">106</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1792339200' data-filter='2026-10-18 16:00'>2026-10-18 16:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='106' data-filter='106'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/106" target="_blank" rel="noreferrer">106</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1792335600' data-filter='2026-10-18 15:00'>2026-10-18 15:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='106' data-filter='106'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/106" target="_blank" rel="noreferrer">106</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1792332000' data-filter='2026-10-18 14:00'>2026-10-18 14:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='106' data-filter='106'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/106" target="_blank" rel="noreferrer">106</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1792328400' data-filter='2026-10-18 13:00'>2026-10-18 13:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='106' data-filter='106'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/106" target="_blank" rel="noreferrer">106</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1792324800' data-filter='2026-10-18 12:00'>2026-10-18 12:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1791655200' data-filter='2026-10-10 18:00'>2026-10-10 18:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1791651600' data-filter='2026-10-10 17:00'>2026-10-10 17:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1791648000' data-filter='2026-10-10 16:00'>2026-10-10 16:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1791644400' data-filter='2026-10-10 15:00'>2026-10-10 15:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1791640800' data-filter='2026-10-10 14:00'>2026-10-10 14:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1791637200' data-filter='2026-10-10 13:00'>2026-10-10 13:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section nested-section" id="developer-1-approvals">
+  <div class="section-header">
+    <h2>Approvals</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="3" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>PR Author</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="number" type="button"><span>Date</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="PR author" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Date" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='110' data-filter='110'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/110" target="_blank" rel="noreferrer">110</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1793037600' data-filter='2026-10-26 18:00'>2026-10-26 18:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='106' data-filter='106'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/106" target="_blank" rel="noreferrer">106</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1792332000' data-filter='2026-10-18 14:00'>2026-10-18 14:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='102' data-filter='102'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/102" target="_blank" rel="noreferrer">102</a></td>
+              <td data-sort='Jordan Lee' data-filter='Jordan Lee'>Jordan Lee</td>
+              <td data-sort='1791644400' data-filter='2026-10-10 15:00'>2026-10-10 15:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="table-section nested-section" id="developer-1-commits">
+  <div class="section-header">
+    <h2>Follow-up Commits</h2>
+  </div>
+  <div class="table-panel" data-table-panel>
+    <div class="table-controls">
+      <input class="search" data-table-search type="search" placeholder="Search this table">
+      <button class="button" data-table-reset type="button">Reset Filters</button>
+    </div>
+    <div class="table-wrap">
+      <div class="scroll">
+        <table class="report-table" data-default-sort-column="5" data-default-sort-direction="desc">
+          <thead>
+            <tr>
+              <th class="repo-column"><button class="th-button" data-sort-column="0" data-sort-type="text" type="button"><span>Repository</span><span class="sort-indicator"></span></button></th>
+              <th class="narrow"><button class="th-button" data-sort-column="1" data-sort-type="number" type="button"><span>PR ID</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="2" data-sort-type="text" type="button"><span>Commit</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="3" data-sort-type="text" type="button"><span>Message</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="4" data-sort-type="number" type="button"><span>Files</span><span class="sort-indicator"></span></button></th>
+              <th><button class="th-button" data-sort-column="5" data-sort-type="number" type="button"><span>Date</span><span class="sort-indicator"></span></button></th>
+            </tr>
+            <tr class="filters">
+              <th class="repo-column"><input class="filter-input" data-filter-column placeholder="Repository" type="search"></th>
+              <th class="narrow"><input class="filter-input" data-filter-column placeholder="PR ID" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Commit" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Message" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Files" type="search"></th>
+              <th><input class="filter-input" data-filter-column placeholder="Date" type="search"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td data-sort='Northstar Web' data-filter='Northstar Web'><a href="https://bitbucket.org/demo-workspace/northstar-web/" target="_blank" rel="noreferrer">Northstar Web</a></td>
+              <td data-sort='111' data-filter='111'><a href="https://bitbucket.org/demo-workspace/northstar-web/pull-requests/111" target="_blank" rel="noreferrer">111</a></td>
+              <td data-sort='000000000000' data-filter='000000000000'><a href="https://bitbucket.org/demo-workspace/northstar-web/commits/000000000000000000000000000000000000006f" target="_blank" rel="noreferrer">000000000000</a></td>
+              <td data-sort='Refine synthetic implementation' data-filter='Refine synthetic implementation'>Refine synthetic implementation</td>
+              <td data-sort='6' data-filter='6'>6</td>
+              <td data-sort='1793206800' data-filter='2026-10-28 17:00'>2026-10-28 17:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Atlas API' data-filter='Atlas API'><a href="https://bitbucket.org/demo-workspace/atlas-api/" target="_blank" rel="noreferrer">Atlas API</a></td>
+              <td data-sort='107' data-filter='107'><a href="https://bitbucket.org/demo-workspace/atlas-api/pull-requests/107" target="_blank" rel="noreferrer">107</a></td>
+              <td data-sort='000000000000' data-filter='000000000000'><a href="https://bitbucket.org/demo-workspace/atlas-api/commits/000000000000000000000000000000000000006b" target="_blank" rel="noreferrer">000000000000</a></td>
+              <td data-sort='Refine synthetic implementation' data-filter='Refine synthetic implementation'>Refine synthetic implementation</td>
+              <td data-sort='9' data-filter='9'>9</td>
+              <td data-sort='1792519200' data-filter='2026-10-20 18:00'>2026-10-20 18:00</td>
+            </tr>
+            <tr>
+              <td data-sort='Orbit Worker' data-filter='Orbit Worker'><a href="https://bitbucket.org/demo-workspace/orbit-worker/" target="_blank" rel="noreferrer">Orbit Worker</a></td>
+              <td data-sort='103' data-filter='103'><a href="https://bitbucket.org/demo-workspace/orbit-worker/pull-requests/103" target="_blank" rel="noreferrer">103</a></td>
+              <td data-sort='000000000000' data-filter='000000000000'><a href="https://bitbucket.org/demo-workspace/orbit-worker/commits/0000000000000000000000000000000000000067" target="_blank" rel="noreferrer">000000000000</a></td>
+              <td data-sort='Refine synthetic implementation' data-filter='Refine synthetic implementation'>Refine synthetic implementation</td>
+              <td data-sort='2' data-filter='2'>2</td>
+              <td data-sort='1791831600' data-filter='2026-10-12 19:00'>2026-10-12 19:00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+  </section>
+</section>
+
+  </div>
+
+  <script>
+    (() => {
+      const panels = Array.from(document.querySelectorAll('[data-table-panel]'));
+
+      function parseComparable(value, type) {
+        const raw = String(value ?? '').trim();
+        if (type !== 'number') {
+          return raw.toLowerCase();
+        }
+
+        if (!raw) {
+          return null;
+        }
+
+        const parsed = Number(raw);
+        return Number.isNaN(parsed) ? null : parsed;
+      }
+
+      function compareValues(left, right, type, direction) {
+        const leftValue = parseComparable(left, type);
+        const rightValue = parseComparable(right, type);
+
+        if (leftValue === null && rightValue === null) {
+          return 0;
+        }
+
+        if (leftValue === null) {
+          return 1;
+        }
+
+        if (rightValue === null) {
+          return -1;
+        }
+
+        if (type === 'number') {
+          return direction === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+        }
+
+        return direction === 'asc'
+          ? leftValue.localeCompare(rightValue)
+          : rightValue.localeCompare(leftValue);
+      }
+
+      for (const panel of panels) {
+        const table = panel.querySelector('table');
+        const tbody = table.querySelector('tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr')).filter(row => !row.classList.contains('empty'));
+        const search = panel.querySelector('[data-table-search]');
+        const reset = panel.querySelector('[data-table-reset]');
+        const sortButtons = Array.from(panel.querySelectorAll('[data-sort-column]'));
+        const filters = Array.from(panel.querySelectorAll('.filter-input'));
+        const sortState = {
+          column: table.dataset.defaultSortColumn === '' ? null : Number(table.dataset.defaultSortColumn),
+          direction: table.dataset.defaultSortDirection || 'asc'
+        };
+
+        filters.forEach((filter, index) => {
+          filter.dataset.filterColumn = String(index);
+        });
+
+        function applyFilters() {
+          const globalTerm = (search?.value || '').trim().toLowerCase();
+          const columnTerms = new Map(filters.map(filter => [Number(filter.dataset.filterColumn), filter.value.trim().toLowerCase()]));
+
+          for (const row of rows) {
+            const cells = Array.from(row.children);
+            const globalMatch = !globalTerm || cells.some(cell => (cell.dataset.filter || cell.textContent || '').toLowerCase().includes(globalTerm));
+            const columnsMatch = cells.every((cell, index) => {
+              const term = columnTerms.get(index);
+              return !term || (cell.dataset.filter || cell.textContent || '').toLowerCase().includes(term);
+            });
+
+            row.hidden = !(globalMatch && columnsMatch);
+          }
+        }
+
+        function applySort() {
+          if (sortState.column === null) {
+            return;
+          }
+
+          const button = sortButtons.find(item => Number(item.dataset.sortColumn) === sortState.column);
+          const type = button?.dataset.sortType || 'text';
+          const sortedRows = [...rows].sort((leftRow, rightRow) => {
+            const leftCell = leftRow.children[sortState.column];
+            const rightCell = rightRow.children[sortState.column];
+            return compareValues(leftCell?.dataset.sort, rightCell?.dataset.sort, type, sortState.direction);
+          });
+
+          for (const row of sortedRows) {
+            tbody.appendChild(row);
+          }
+        }
+
+        function updateSortIndicators() {
+          for (const button of sortButtons) {
+            const indicator = button.querySelector('.sort-indicator');
+            const column = Number(button.dataset.sortColumn);
+            indicator.textContent = sortState.column === column ? (sortState.direction === 'asc' ? '^' : 'v') : '';
+          }
+        }
+
+        search?.addEventListener('input', applyFilters);
+        reset?.addEventListener('click', () => {
+          if (search) {
+            search.value = '';
+          }
+
+          for (const filter of filters) {
+            filter.value = '';
+          }
+
+          applyFilters();
+        });
+
+        filters.forEach(filter => filter.addEventListener('input', applyFilters));
+
+        for (const button of sortButtons) {
+          button.addEventListener('click', () => {
+            const column = Number(button.dataset.sortColumn);
+            sortState.direction = sortState.column === column && sortState.direction === 'asc' ? 'desc' : 'asc';
+            sortState.column = column;
+            applySort();
+            updateSortIndicators();
+            applyFilters();
+          });
+        }
+
+        applySort();
+        updateSortIndicators();
+        applyFilters();
+      }
+    })();
+  </script>
+</body>
+</html>

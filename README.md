@@ -105,6 +105,14 @@ To find UUIDs, set `ShowDeveloperUuidInStats` to `true` and run a report without
 
 Team filtering and metadata enrichment match by UUID, even if the names differ. Console, HTML, and PDF reports show the Bitbucket name, CSV name, and UUID for each observed discrepancy so the reader can assess whether it is a spelling difference or a mapping error. Name comparison is case-sensitive. Departments form team choices, grouped ignoring case. Developers without a CSV match retain `N/A` metadata. Without departments, there is no team picker.
 
+#### Example: a typo in the CSV name
+
+Suppose Bitbucket reports `Avery Stone` with UUID `demo:Avery Stone`, while the CSV contains `Avery Stonne;Senior;Platform;demo:Avery Stone`. The UUIDs match, so choosing **Platform** still includes Avery and applies the CSV grade and department. The report warns that the names differ; check the UUID before deciding whether this is a typo or an incorrect mapping. Differences in capitalization also produce a warning.
+
+![Diagram of UUID matching and the name discrepancy warning](screenshots/name-mismatch-diagram.svg)
+
+The diagram is illustrative. Open the [synthetic HTML report with the name mismatch](examples/demo-name-mismatch.html) locally to see the actual warning and the filtered report. Its UUIDs and activity are synthetic.
+
 ### Analysis cache and telemetry
 
 In live mode, BBDevPulse caches PR activity, correction commits, and diffstat snapshots in `AppContext.BaseDirectory/cache/pull-request-analysis`. An unchanged PR can reuse its snapshot on a later run. The cache has no automatic eviction. When telemetry is enabled, the console shows actual HTTP requests, cache hits/misses/stores, estimated avoided requests, and a request breakdown by API endpoint.
