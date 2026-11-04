@@ -41,6 +41,8 @@ public sealed class ReportData
     public IReadOnlyList<(string Name, IReadOnlyList<string> Uuids)> GetIdentityCollisions() => _state.GetIdentityCollisions();
     /// <summary>Returns notices for name collisions.</summary>
     public IReadOnlyList<IdentityCollisionNotice> GetIdentityCollisionNotices() => _state.GetIdentityCollisionNotices();
+    /// <summary>Returns observed name discrepancies for matching UUIDs.</summary>
+    public IReadOnlyList<(string Uuid, string BitbucketName, string CsvName)> GetNameMismatches() => _state.GetNameMismatches();
     /// <summary>Checks whether an identity belongs to the selected team.</summary>
     public bool IsDeveloperIncluded(DeveloperIdentity identity) => _state.IsDeveloperIncluded(identity);
     /// <summary>Looks up CSV metadata by name.</summary>

@@ -58,6 +58,12 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             _ = warning.Append(HtmlPresentationHelpers.Encode(ReportData.MissingUserUuidWarning));
             _ = warning.AppendLine("</strong></div>");
         }
+        foreach (var mismatch in reportData.GetNameMismatches())
+        {
+            _ = warning.Append("<div role=\"alert\" style=\"padding:12px 16px;border:2px solid #d97706;background:#fffbeb;color:#92400e;margin-bottom:16px\">");
+            _ = warning.Append(HtmlPresentationHelpers.Encode($"CSV name mismatch (UUID: {mismatch.Uuid}): Bitbucket: {mismatch.BitbucketName}; CSV: {mismatch.CsvName}"));
+            _ = warning.AppendLine("</div>");
+        }
         foreach (var collision in reportData.GetIdentityCollisionNotices())
         {
             var border = collision.IsError ? "#b91c1c" : "#d97706";

@@ -172,7 +172,7 @@ public sealed class PullRequestAnalyzerTests
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
-            new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new("Senior", "Core") });
+            new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core", "a") { AdditionalRows = [new PersonCsvRow("Senior", "Core", "b")] } });
         var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
         var firstPr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, first, null);
@@ -1262,10 +1262,10 @@ public sealed class PullRequestAnalyzerTests
             parameters,
             new Dictionary<DisplayName, PersonCsvRow>
             {
-                [new DisplayName("Alice")] = new("Senior", "Core"),
-                [new DisplayName("Reviewer")] = new("Senior", "Core"),
-                [new DisplayName("Outsider")] = new("Senior", "Other"),
-                [new DisplayName("External Reviewer")] = new("Senior", "Other")
+                [new DisplayName("Alice")] = new("Senior", "Core", "alice-1"),
+                [new DisplayName("Reviewer")] = new("Senior", "Core", "reviewer-1"),
+                [new DisplayName("Outsider")] = new("Senior", "Other", "outsider-1"),
+                [new DisplayName("External Reviewer")] = new("Senior", "Other", "external-reviewer-1")
             });
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var outsiderAuthor = new User(new DisplayName("Outsider"), new UserUuid("{outsider-1}"));

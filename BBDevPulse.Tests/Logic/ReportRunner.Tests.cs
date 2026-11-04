@@ -599,7 +599,7 @@ public sealed class ReportRunnerTests
         peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>
             {
-                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core Platform")
+                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core Platform", "{alice-1}")
             });
 
         var telemetryService = new Mock<IBitbucketTelemetryService>(MockBehavior.Strict);
@@ -719,7 +719,7 @@ public sealed class ReportRunnerTests
         peopleCsvProvider.Setup(x => x.GetPeopleByDisplayNameAsync(It.Is<CancellationToken>(token => token == cancellationToken)))
             .ReturnsAsync(new Dictionary<DisplayName, PersonCsvRow>
             {
-                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core"),
+                [new DisplayName("Alice")] = new PersonCsvRow("Senior", "Core", "alice"),
                 [new DisplayName("Bob")] = new PersonCsvRow("Senior", "core"),
                 [new DisplayName("Carol")] = new PersonCsvRow("Senior", "Other")
             });

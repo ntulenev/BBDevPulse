@@ -201,15 +201,7 @@ internal sealed class ReportBuildState
             return true;
         }
 
-        if (!_peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var entries))
-        {
-            return false;
-        }
-
-        var exact = entries.Rows.Where(row => row.MatchesUuid(identity.Uuid)).ToArray();
-        return exact.Length > 0
-            ? exact.Any(row => row.IsInTeam(Parameters.TeamFilter!))
-            : entries.Rows.Any(row => string.IsNullOrWhiteSpace(row.Uuid) && row.IsInTeam(Parameters.TeamFilter!));
+        return TryGetPerson(identity, out var person) && person.IsInTeam(Parameters.TeamFilter!);
     }
 
     /// <summary>Looks up CSV enrichment by display name.</summary>
@@ -227,26 +219,34 @@ internal sealed class ReportBuildState
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         person = default;
-        if (identity.Uuid is null || !_peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var rows))
+        if (identity.Uuid is null) return false;
+        foreach (var rows in _peopleByDisplayName.Values)
         {
-            return false;
-        }
-
-        foreach (var row in rows.Rows)
-        {
-            if (row.MatchesUuid(identity.Uuid))
+            foreach (var row in rows.Rows)
             {
-                person = row;
-                return true;
+                if (row.MatchesUuid(identity.Uuid))
+                {
+                    person = row;
+                    return true;
+                }
             }
         }
-        var fallbackRows = rows.Rows.Where(row => string.IsNullOrWhiteSpace(row.Uuid)).ToArray();
-        if (fallbackRows.Length == 1)
-        {
-            person = fallbackRows[0];
-            return true;
-        }
         return false;
+    }
+
+    /// <summary>Returns observed Bitbucket names that differ from the CSV name for the same UUID.</summary>
+    public IReadOnlyList<(string Uuid, string BitbucketName, string CsvName)> GetNameMismatches()
+    {
+        lock (_identityLock)
+        {
+            return (from observed in _observedIdentities
+                    from uuid in observed.Value
+                    from entry in _peopleByDisplayName
+                    from row in entry.Value.Rows
+                    where row.MatchesUuid(new UserUuid(uuid)) && !string.Equals(observed.Key, entry.Key, StringComparison.Ordinal)
+                    orderby observed.Key, uuid
+                    select (uuid, observed.Key, entry.Key)).ToArray();
+        }
     }
 
     /// <summary>Classifies duplicate-name warnings for the selected team.</summary>
@@ -261,7 +261,7 @@ internal sealed class ReportBuildState
                 : [];
             var unresolved = selected.Any(row => string.IsNullOrWhiteSpace(row.Uuid));
             var message = !Parameters.HasTeamFilter
-                ? "No team filter is selected. CSV enrichment may still be ambiguous when UUID is missing."
+                ? "No team filter is selected. CSV matching uses UUIDs."
                 : selected.Length == 0
                     ? "This name is not in the selected team in the CSV, so it does not affect team selection."
                     : unresolved

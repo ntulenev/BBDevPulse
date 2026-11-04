@@ -105,6 +105,11 @@ public sealed class SpectreReportPresenter : IReportPresenter
             AnsiConsole.MarkupLine("[bold red]" + Markup.Escape(ReportData.MissingUserUuidWarning) + "[/]");
         }
 
+        foreach (var mismatch in reportData.GetNameMismatches())
+        {
+            AnsiConsole.MarkupLine("[yellow]" + Markup.Escape($"CSV name mismatch (UUID: {mismatch.Uuid}): Bitbucket: {mismatch.BitbucketName}; CSV: {mismatch.CsvName}") + "[/]");
+        }
+
         foreach (var collision in reportData.GetIdentityCollisionNotices())
         {
             var color = collision.IsError ? "red" : "yellow";

@@ -111,6 +111,12 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         _ = column.Item().Border(1).BorderColor(Colors.Red.Medium).Padding(6)
                             .Text(ReportData.MissingUserUuidWarning).Bold().FontColor(Colors.Red.Darken3);
                     }
+                    foreach (var mismatch in reportData.GetNameMismatches())
+                    {
+                        _ = column.Item().Border(1).BorderColor(Colors.Orange.Darken3).Padding(6)
+                            .Text($"CSV name mismatch (UUID: {mismatch.Uuid}): Bitbucket: {mismatch.BitbucketName}; CSV: {mismatch.CsvName}")
+                            .FontColor(Colors.Orange.Darken3);
+                    }
                     foreach (var collision in reportData.GetIdentityCollisionNotices())
                     {
                         var color = collision.IsError ? Colors.Red.Darken3 : Colors.Orange.Darken3;
