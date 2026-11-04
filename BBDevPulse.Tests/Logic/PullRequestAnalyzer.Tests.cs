@@ -335,6 +335,71 @@ public sealed class PullRequestAnalyzerTests
     }
 
     [Fact]
+    public async Task ColdAndWarmCachePreserveMetricsWarningsAndUnavailableMeasurements()
+    {
+        var cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+            var parameters = CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true);
+            var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+            var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+            var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
+            var prs = new[]
+            {
+                new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, first, null),
+                new PullRequest(new PullRequestId(2), PullRequestState.Open, null, date, null, null, second, null)
+            };
+            var reviewer = second.ToDeveloperIdentity();
+            var missing = new DeveloperIdentity(null, new DisplayName("Unknown reviewer"));
+            var activities = new[]
+            {
+                new PullRequestActivity(date.AddHours(1), null, reviewer,
+                    new ActivityComment(reviewer, date.AddHours(1)), null),
+                new PullRequestActivity(date.AddHours(2), null, missing,
+                    new ActivityComment(missing, date.AddHours(2)), null)
+            };
+            var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+            client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable(prs));
+            client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(id => id.Value == 1), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable(activities));
+            client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(id => id.Value == 2), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+            client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+            client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("unavailable"));
+            var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(),
+                new Mock<IBitbucketTelemetryService>().Object, cacheDirectory);
+            var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer(), analysisCache: cache);
+            var cold = new ReportData(parameters);
+            var warm = new ReportData(parameters);
+            await analyzer.AnalyzeAsync(repository, cold, CancellationToken.None);
+            await analyzer.AnalyzeAsync(repository, warm, CancellationToken.None);
+
+            cold.HasMissingUserUuid.Should().BeTrue();
+            warm.HasMissingUserUuid.Should().BeTrue();
+            cold.GetIdentityCollisions().Single().Uuids.Should().Equal("{a}", "{b}");
+            warm.GetIdentityCollisions().Single().Uuids.Should().Equal("{a}", "{b}");
+            cold.Reports.Select(report => (report.Id.Value, report.Comments, report.FirstReactionOn, report.SizeAvailability))
+                .Should().BeEquivalentTo(warm.Reports.Select(report => (report.Id.Value, report.Comments, report.FirstReactionOn, report.SizeAvailability)));
+            cold.Reports.Should().OnlyContain(report => report.SizeAvailability == DataAvailability.Unavailable);
+            warm.DeveloperStats[new DeveloperKey(new UserUuid("{b}"))].PeerCommentsAfter.Should().Be(1);
+            cold.DeveloperStats[new DeveloperKey(new UserUuid("{b}"))].PeerCommentsAfter.Should().Be(1);
+            client.Verify(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDirectory))
+                Directory.Delete(cacheDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task AnalyzeAsyncRetriesMissingSizeThenUsesUpdatedDiskSnapshot()
     {
         var cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
