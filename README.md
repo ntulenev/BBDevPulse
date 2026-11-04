@@ -124,6 +124,8 @@ Cached supplemental data distinguishes a successful empty or zero measurement fr
 
 If a diffstat entry omits either line count, its file count remains usable but the line-based size is incomplete: the report shows it as unavailable and excludes it from line-based aggregates. The application retries incomplete diffstat data on later runs. A successful empty diff remains a measured zero.
 
+For supplemental commit and diffstat requests, the current policy treats any non-cancellation exception as unavailable data and continues the report. This also means an unexpected implementation error in those requests can appear as unavailable data; cancellation still stops the run.
+
 Bitbucket pull requests must have a positive ID and a creation timestamp; a response missing either cannot be analyzed. Unknown PR states are retained as `Unknown`, and optional timestamps and destination fields may be absent. A missing user UUID follows the warning and exclusion policy described below. A missing display name falls back to the UUID when possible. These rules describe the application boundary; they do not imply that Bitbucket guarantees every optional field.
 
 The application collects PR results concurrently, then applies them in creation-time, repository-slug, and PR-ID order before publishing a read-only report. A duplicate PR result for the same workspace and repository is rejected. If one UUID has appeared under multiple names, the first contributing identity in that order supplies the report name used for CSV enrichment; this is not a guarantee that the name is the user's current Bitbucket display name. Within one PR, the first matching activity identity is retained.

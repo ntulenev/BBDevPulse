@@ -706,6 +706,15 @@ public sealed class PullRequestAnalyzerTests
         act.Should().Throw<ArgumentNullException>();
     }
 
+    [Fact]
+    public void ConstructorRejectsMissingCacheKeyFactory()
+    {
+        Action create = () => _ = new PullRequestAnalyzer(
+            new Mock<IBitbucketClient>().Object, new Mock<IActivityAnalyzer>().Object,
+            new Mock<IPullRequestAnalysisCache>().Object, null!, CreateBitbucketOptions());
+        create.Should().Throw<ArgumentNullException>().WithParameterName("cacheKeys");
+    }
+
     [Fact(DisplayName = "Constructor throws when options are null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenOptionsAreNullThrowsArgumentNullException()
