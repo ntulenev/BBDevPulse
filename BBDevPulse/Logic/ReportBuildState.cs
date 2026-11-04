@@ -20,6 +20,7 @@ internal sealed class ReportBuildState
     public bool HasMissingUserUuid { get; private set; }
 
     private readonly Dictionary<string, HashSet<string>> _observedIdentities = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<(string Name, string Uuid), string> _observedNames = [];
 
     /// <summary>Records a Bitbucket identity before developer statistics can merge it with another identity.</summary>
     internal void ObserveDeveloperIdentity(DeveloperIdentity identity)
@@ -38,6 +39,8 @@ internal sealed class ReportBuildState
             {
                 return;
             }
+            var uuidKey = identity.Uuid.Value.Trim().Trim('{', '}').ToUpperInvariant();
+            _observedNames.TryAdd((identity.DisplayName.Value, uuidKey), identity.Uuid.Value);
             if (!_observedIdentities.TryGetValue(identity.DisplayName.Value, out var uuids))
             {
                 uuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -239,13 +242,13 @@ internal sealed class ReportBuildState
     {
         lock (_identityLock)
         {
-            return (from observed in _observedIdentities
-                    from uuid in observed.Value
+            return (from observed in _observedNames
+                    let uuid = observed.Value
                     from entry in _peopleByDisplayName
                     from row in entry.Value.Rows
-                    where row.MatchesUuid(new UserUuid(uuid)) && !string.Equals(observed.Key, entry.Key, StringComparison.Ordinal)
-                    orderby observed.Key, uuid
-                    select (uuid, observed.Key, entry.Key)).ToArray();
+                    where row.MatchesUuid(new UserUuid(uuid)) && !string.Equals(observed.Key.Name, entry.Key, StringComparison.Ordinal)
+                    orderby observed.Key.Name, uuid
+                    select (uuid, observed.Key.Name, entry.Key)).ToArray();
         }
     }
 
@@ -538,6 +541,10 @@ internal sealed class ReportBuildState
             foreach (var entry in _observedIdentities)
             {
                 snapshot._observedIdentities.Add(entry.Key, new HashSet<string>(entry.Value, StringComparer.OrdinalIgnoreCase));
+            }
+            foreach (var entry in _observedNames)
+            {
+                snapshot._observedNames.Add(entry.Key, entry.Value);
             }
             snapshot.Freeze();
             Freeze();

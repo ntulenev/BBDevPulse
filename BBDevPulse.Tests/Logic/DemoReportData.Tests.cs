@@ -26,6 +26,25 @@ public sealed class DemoReportDataTests
         report.DeveloperStats.Values.Sum(item => item.CommitActivities.Count).Should().BeGreaterThan(0);
     }
 
+    [Fact]
+    public async Task TeamFilterKeepsAuthorAndReviewActivityWhenCsvNameHasTypo()
+    {
+        var people = await DemoPeopleCsv.LoadAsync(CancellationToken.None);
+        var original = people.Single(pair => pair.Key.Value == "Avery Stone");
+        people.Remove(original.Key);
+        people.Add(new DisplayName("Avery Stonne"), original.Value);
+
+        var report = DemoReportData.Create(people, "Platform");
+
+        var avery = report.DeveloperStats.Values.Should().ContainSingle(stat => stat.DisplayName.Value == "Avery Stone").Subject;
+        avery.Department.Should().Be("Platform");
+        avery.Grade.Should().Be("Senior");
+        avery.PrsOpenedSince.Should().BeGreaterThan(0);
+        avery.CommentsAfter.Should().BeGreaterThan(0);
+        report.Reports.Should().Contain(pr => pr.Author == "Avery Stone" && pr.IncludeInMetrics);
+        report.GetNameMismatches().Should().ContainSingle().Which.Should().Be(("demo:Avery Stone", "Avery Stone", "Avery Stonne"));
+    }
+
     [Fact(DisplayName = "Demo team filter uses synthetic CSV people and keeps reviewer-only activity")]
     public async Task CreateFiltersSyntheticPeopleAndPullRequests()
     {

@@ -20,6 +20,20 @@ public sealed class HtmlContentComposerTests
         html.IndexOf(ReportData.IdentityCollisionWarning, StringComparison.Ordinal).Should().BeLessThan(html.IndexOf("<h2>Pull Requests</h2>", StringComparison.Ordinal));
     }
     [Fact]
+    public void ComposeEscapesBothNamesInMismatchWarning()
+    {
+        var people = new Dictionary<DisplayName, PersonCsvRow>
+        {
+            [new DisplayName("CSV <name>")] = new("Senior", "Core", "a")
+        };
+        var data = new ReportData(CreateParameters(), people);
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("BB & name")));
+        var html = new HtmlContentComposer(new DateDiffFormatter(), new StatisticsCalculator()).Compose(data);
+        html.Should().Contain("Bitbucket: BB &amp; name; CSV: CSV &lt;name&gt;");
+        html.IndexOf("CSV name mismatch", StringComparison.Ordinal).Should().BeLessThan(html.IndexOf("<h2>Pull Requests</h2>", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ComposeShowsMissingUuidWarning()
     {
         var data = new ReportData(CreateParameters());

@@ -46,6 +46,51 @@ public sealed class CsvUuidDisambiguationTests
         Render(data).Should().Contain("Bitbucket: Alex Kim; CSV: Alex CSV");
     }
 
+    [Theory]
+    [InlineData("Alex Kim", false)]
+    [InlineData("alex Kim", true)]
+    [InlineData("Alex Kimm", true)]
+    public async Task NameComparisonDoesNotAffectUuidFiltering(string bitbucketName, bool mismatch)
+    {
+        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Platform;{a}\n");
+        var parameters = new ReportParameters(DateTimeOffset.UnixEpoch, new Workspace("ws"), new RepoNameFilter(""), [],
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, [], teamFilter: "Platform");
+        var accumulator = new ReportAccumulator(parameters, people);
+        var identity = new DeveloperIdentity(new UserUuid("A"), new DisplayName(bitbucketName));
+        accumulator.IsDeveloperIncluded(identity).Should().BeTrue();
+        accumulator.RegisterDeveloper(identity);
+        accumulator.EnrichDevelopers();
+        var report = accumulator.Build();
+        report.DeveloperStats.Values.Should().ContainSingle().Which.Grade.Should().Be("Senior");
+        report.GetNameMismatches().Count.Should().Be(mismatch ? 1 : 0);
+    }
+
+    [Fact]
+    public async Task AllDistinctObservedNamesSurvivePublicationWithoutDuplicateUuidVariants()
+    {
+        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Platform;a\n");
+        var parameters = new ReportParameters(DateTimeOffset.UnixEpoch, new Workspace("ws"), new RepoNameFilter(""), [],
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, []);
+        var accumulator = new ReportAccumulator(parameters, people);
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("a"), new DisplayName("Alex Kim")));
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("{A}"), new DisplayName("alex Kim")));
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("a"), new DisplayName("alex Kim")));
+        accumulator.RegisterDeveloper(new DeveloperIdentity(new UserUuid("a"), new DisplayName("Alex Kimm")));
+        var report = accumulator.Build();
+        report.GetNameMismatches().Select(x => x.BitbucketName).Should().BeEquivalentTo("alex Kim", "Alex Kimm");
+    }
+
+    [Fact]
+    public async Task UnmatchedUuidAndMissingUuidDoNotCreateNameMismatch()
+    {
+        var people = await ReadCsv("Name;Grade;Department;UUID\nAlex Kim;Senior;Platform;a\n");
+        var data = CreateReport(people, "Platform");
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Wrong name")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("unmatched"), new DisplayName("Wrong name")));
+        data.GetNameMismatches().Should().BeEmpty();
+        data.IsDeveloperIncluded(new DeveloperIdentity(new UserUuid("unmatched"), new DisplayName("Alex Kim"))).Should().BeFalse();
+    }
+
     [Fact]
     public async Task UuidDoesNotMatchAnUnrelatedUserWithTheSameName()
     {
@@ -89,6 +134,8 @@ public sealed class CsvUuidDisambiguationTests
     [Theory]
     [InlineData("Name;Grade;Department\nAlex;Senior;Core\n")]
     [InlineData("Name;Grade;Department;UUID\nAlex;Senior;Core;\n")]
+    [InlineData("Name;Grade;Department;UUID\nAlex;Senior;Core;{}\n")]
+    [InlineData("Name;Grade;Department;UUID\nAlex;Senior;Core;   \n")]
     public async Task MissingUuidIsRejected(string csv)
     {
         Func<Task> read = async () => { _ = await ReadCsv(csv); };
