@@ -10,7 +10,13 @@ namespace BBDevPulse.Models;
 public sealed class ReportData
 {
     /// <summary>Warning displayed when distinct Bitbucket users share a display name.</summary>
-    public const string IdentityCollisionWarning = "Different Bitbucket users share the same display name. This report may not be fully accurate; please verify it manually.";
+    public const string IdentityCollisionWarning = "Different Bitbucket users share the same display name. Team filtering matches names from the CSV, so a matching name can incorrectly include or exclude users and make the filtered report inaccurate.";
+
+    /// <summary>Warning shown when Bitbucket omits a user UUID.</summary>
+    public const string MissingUserUuidWarning = "Bitbucket API did not provide a UUID for some users. Those users and their activity are excluded from the report.";
+
+    /// <summary>Whether a user without a UUID was observed.</summary>
+    public bool HasMissingUserUuid { get; private set; }
 
     private readonly Dictionary<string, HashSet<string>> _observedIdentities = new(StringComparer.OrdinalIgnoreCase);
 
@@ -19,13 +25,18 @@ public sealed class ReportData
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         EnsureMutable();
-        if (identity.Uuid is null || string.IsNullOrWhiteSpace(identity.DisplayName.Value))
-        {
-            return;
-        }
-
         lock (_identityLock)
         {
+            if (identity.Uuid is null)
+            {
+                HasMissingUserUuid = true;
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(identity.DisplayName.Value))
+            {
+                return;
+            }
             if (!_observedIdentities.TryGetValue(identity.DisplayName.Value, out var uuids))
             {
                 uuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -151,6 +162,11 @@ public sealed class ReportData
     public bool IsDeveloperIncluded(DeveloperIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
+        if (identity.Uuid is null)
+        {
+            return false;
+        }
+
         if (!Parameters.HasTeamFilter)
         {
             return true;
@@ -181,24 +197,6 @@ public sealed class ReportData
         if (DeveloperStats.TryGetValue(key, out var existing))
         {
             return existing;
-        }
-
-        foreach (var entry in DeveloperStats)
-        {
-            if (string.Equals(
-                entry.Value.DisplayName.Value,
-                identity.DisplayName.Value,
-                StringComparison.OrdinalIgnoreCase))
-            {
-                if (entry.Value.BitbucketUuid is null && identity.Uuid is not null)
-                {
-                    entry.Value.AttachUuid(identity.Uuid);
-                    _developers.Remove(entry.Key);
-                    _developers.Add(key, entry.Value);
-                }
-
-                return entry.Value;
-            }
         }
 
         var created = new DeveloperStats(identity.DisplayName, identity.Uuid);

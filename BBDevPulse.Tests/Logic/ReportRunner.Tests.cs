@@ -668,7 +668,7 @@ public sealed class ReportRunnerTests
             .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
             {
                 peopleLoadedBeforeAnalyze = reportData.IsDeveloperIncluded(
-                    new DeveloperIdentity(null, new DisplayName("Alice")));
+                    new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));
             })
             .Returns(Task.CompletedTask);
 

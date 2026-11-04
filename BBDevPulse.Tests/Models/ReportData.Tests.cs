@@ -70,7 +70,7 @@ public sealed class ReportDataTests
     public void ParallelAnalysisUpdatesArePreservedOnPublication()
     {
         var data = new ReportData(CreateReportParameters());
-        var identity = new DeveloperIdentity(null, new DisplayName("Alice"));
+        var identity = new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice"));
         Parallel.For(0, 200, _ => data.ApplyAnalysis(() => data.GetOrAddDeveloper(identity).CommentsAfter++));
         data.Freeze();
         data.DeveloperStats.Values.Single().CommentsAfter.Should().Be(200);
@@ -81,7 +81,7 @@ public sealed class ReportDataTests
     {
         var data = new ReportData(CreateReportParameters());
         var list = data.Reports;
-        var stats = data.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var stats = data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));
         var details = stats.AuthoredPullRequests;
         var report = CreatePullRequestReport(1, DateTimeOffset.UnixEpoch);
         list.Add(report);
@@ -96,20 +96,22 @@ public sealed class ReportDataTests
         Assert.Throws<InvalidOperationException>(() => stats.CommentsAfter++);
     }
 
-    [Fact]
-    public void CollisionsUseObservedIdentitiesEvenAfterStatisticsAreMerged()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SameNameWithDistinctUuidsDoesNotMergeDevelopers(bool reverse)
     {
         var data = new ReportData(CreateReportParameters());
-        data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{B}"), new DisplayName("Alice")));
-        data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("ALICE")));
-        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{A}"), new DisplayName("alice")));
-        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Alice")));
-        data.DeveloperStats.Should().HaveCount(1);
-        var entry = Assert.Single(data.DeveloperStats);
-        Assert.Equal(new DeveloperKey(entry.Value.BitbucketUuid!), entry.Key);
-        var collision = data.GetIdentityCollisions().Should().ContainSingle().Subject;
-        collision.Name.Should().Be("Alice");
-        collision.Uuids.Should().Equal("{a}", "{B}");
+        var first = new DeveloperIdentity(new UserUuid("{B}"), new DisplayName("Alice"));
+        var second = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("ALICE"));
+        var identities = reverse ? new[] { second, first } : new[] { first, second };
+        foreach (var identity in identities)
+        {
+            data.GetOrAddDeveloper(identity).CommentsAfter++;
+        }
+        data.DeveloperStats.Should().HaveCount(2);
+        data.DeveloperStats.Values.Should().OnlyContain(stats => stats.CommentsAfter == 1);
+        data.GetIdentityCollisions().Should().ContainSingle();
     }
 
     [Fact]
@@ -215,7 +217,7 @@ public sealed class ReportDataTests
             {
                 [new DisplayName("Alice")] = new("Senior", "Core")
             });
-        var identity = new DeveloperIdentity(null, new DisplayName("Alice"));
+        var identity = new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice"));
 
         // Act
         var result = reportData.IsDeveloperIncluded(identity);
@@ -238,8 +240,8 @@ public sealed class ReportDataTests
             });
 
         // Act
-        var missingResult = reportData.IsDeveloperIncluded(new DeveloperIdentity(null, new DisplayName("Alice")));
-        var mismatchedResult = reportData.IsDeveloperIncluded(new DeveloperIdentity(null, new DisplayName("Bob")));
+        var missingResult = reportData.IsDeveloperIncluded(new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));
+        var mismatchedResult = reportData.IsDeveloperIncluded(new DeveloperIdentity(new UserUuid("bob"), new DisplayName("Bob")));
 
         // Assert
         missingResult.Should().BeFalse();
@@ -277,7 +279,7 @@ public sealed class ReportDataTests
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
         var identity = new DeveloperIdentity(
-            uuid: null,
+            uuid: new UserUuid("bob"),
             displayName: new DisplayName("Bob"));
 
         // Act
@@ -285,26 +287,19 @@ public sealed class ReportDataTests
 
         // Assert
         stats.DisplayName.Value.Should().Be("Bob");
-        stats.BitbucketUuid.Should().BeNull();
+        stats.BitbucketUuid!.Value.Should().Be("bob");
         reportData.DeveloperStats.Should().HaveCount(1);
     }
 
-    [Fact(DisplayName = "GetOrAddDeveloper updates missing UUID when same developer is seen later with UUID")]
-    [Trait("Category", "Unit")]
-    public void GetOrAddDeveloperWhenUuidArrivesLaterStoresItOnExistingStats()
+    [Fact]
+    public void MissingUuidIsReportedAndCannotCreateStats()
     {
-        // Arrange
         var reportData = new ReportData(CreateReportParameters());
-        var withoutUuid = new DeveloperIdentity(null, new DisplayName("Alice"));
-        var withUuid = new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice"));
-
-        // Act
-        var firstStats = reportData.GetOrAddDeveloper(withoutUuid);
-        var secondStats = reportData.GetOrAddDeveloper(withUuid);
-
-        // Assert
-        secondStats.Should().BeSameAs(firstStats);
-        secondStats.BitbucketUuid!.Value.Should().Be("{alice-1}");
+        var identity = new DeveloperIdentity(null, new DisplayName("Alice"));
+        reportData.ObserveDeveloperIdentity(identity);
+        Assert.True(reportData.HasMissingUserUuid);
+        Assert.Throws<ArgumentException>(() => reportData.GetOrAddDeveloper(identity));
+        Assert.Empty(reportData.DeveloperStats);
     }
 
     [Fact(DisplayName = "SortReportsByCreatedOn sorts reports in ascending creation order")]
@@ -408,11 +403,11 @@ public sealed class ReportDataTests
     {
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
-        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));
         alice.PrsOpenedSince = 3;
-        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("bob"), new DisplayName("Bob")));
         bob.PrsOpenedSince = 0;
-        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Carol")));
+        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("carol"), new DisplayName("Carol")));
         carol.PrsOpenedSince = 1;
 
         // Act
@@ -428,7 +423,7 @@ public sealed class ReportDataTests
         var data = new ReportData(CreateReportParameters());
         foreach (var (name, count) in new[] { ("Alice", 3), ("Bob", 0), ("Carol", 0) })
         {
-            data.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName(name))).PrsOpenedSince = count;
+            data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid(name), new DisplayName(name))).PrsOpenedSince = count;
         }
 
         var counts = data.GetOpenedPullRequestCountsPerDeveloper();
@@ -440,7 +435,7 @@ public sealed class ReportDataTests
     public void OpenedPullRequestDistributionIncludesReviewersWhenNoPrsWereOpened()
     {
         var data = new ReportData(CreateReportParameters());
-        data.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Reviewer"))).CommentsAfter = 1;
+        data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("reviewer"), new DisplayName("Reviewer"))).CommentsAfter = 1;
 
         var counts = data.GetOpenedPullRequestCountsPerDeveloper();
         counts.Should().Equal(0d);
@@ -453,11 +448,11 @@ public sealed class ReportDataTests
     {
         // Arrange
         var reportData = new ReportData(CreateReportParameters());
-        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var alice = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));
         alice.PeerCommentsAfter = 3;
-        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Bob")));
+        var bob = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("bob"), new DisplayName("Bob")));
         bob.PeerCommentsAfter = 0;
-        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(null, new DisplayName("Carol")));
+        var carol = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("carol"), new DisplayName("Carol")));
         carol.PeerCommentsAfter = 1;
 
         // Act

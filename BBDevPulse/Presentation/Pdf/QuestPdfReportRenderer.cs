@@ -106,6 +106,11 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                 page.Content().PaddingTop(8).Column(column =>
                 {
                     column.Spacing(8);
+                    if (reportData.HasMissingUserUuid)
+                    {
+                        _ = column.Item().Border(1).BorderColor(Colors.Red.Medium).Padding(6)
+                            .Text(ReportData.MissingUserUuidWarning).Bold().FontColor(Colors.Red.Darken3);
+                    }
                     var collisions = reportData.GetIdentityCollisions();
                     if (collisions.Count > 0)
                     {

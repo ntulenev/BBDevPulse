@@ -10,10 +10,9 @@ public sealed class User
     /// </summary>
     /// <param name="displayName">Display name.</param>
     /// <param name="uuid">User UUID.</param>
-    public User(DisplayName displayName, UserUuid uuid)
+    public User(DisplayName displayName, UserUuid? uuid)
     {
         ArgumentNullException.ThrowIfNull(displayName);
-        ArgumentNullException.ThrowIfNull(uuid);
 
         DisplayName = displayName;
         Uuid = uuid;
@@ -27,7 +26,7 @@ public sealed class User
     /// <summary>
     /// User UUID.
     /// </summary>
-    public UserUuid Uuid { get; }
+    public UserUuid? Uuid { get; }
 
     /// <summary>
     /// Builds developer identity for this user.

@@ -467,7 +467,7 @@ public sealed class PullRequestActivityMapperTests
         result.Actor!.Value.DisplayName.Value.Should().Be("Commenter");
     }
 
-    [Fact(DisplayName = "Map ignores user nodes without identity fields")]
+    [Fact(DisplayName = "Map preserves a user node without identity fields")]
     [Trait("Category", "Unit")]
     public void MapWhenUserNodeHasNoIdentityFieldsReturnsNullActor()
     {
@@ -485,7 +485,8 @@ public sealed class PullRequestActivityMapperTests
 
         // Assert
         result.ActivityDate.Should().Be(new DateTimeOffset(2026, 2, 21, 3, 0, 0, TimeSpan.Zero));
-        result.Actor.Should().BeNull();
+        result.Actor.Should().NotBeNull();
+        result.Actor!.Value.Uuid.Should().BeNull();
     }
 
     [Fact(DisplayName = "Map resolves approval using root date fallback when approval specific dates are missing")]

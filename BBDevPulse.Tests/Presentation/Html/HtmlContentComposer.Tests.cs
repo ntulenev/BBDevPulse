@@ -19,6 +19,15 @@ public sealed class HtmlContentComposerTests
         html.Should().Contain(ReportData.IdentityCollisionWarning).And.Contain("A &lt; B: {1}, {2}");
         html.IndexOf(ReportData.IdentityCollisionWarning, StringComparison.Ordinal).Should().BeLessThan(html.IndexOf("<h2>Pull Requests</h2>", StringComparison.Ordinal));
     }
+    [Fact]
+    public void ComposeShowsMissingUuidWarning()
+    {
+        var data = new ReportData(CreateParameters());
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var html = new HtmlContentComposer(new DateDiffFormatter(), new StatisticsCalculator()).Compose(data);
+        html.Should().Contain(ReportData.MissingUserUuidWarning);
+    }
+
     [Fact(DisplayName = "Compose renders interactive report sections for populated data")]
     [Trait("Category", "Unit")]
     public void ComposeWhenDataExistsRendersExpectedSectionsAndTableControls()

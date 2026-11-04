@@ -50,7 +50,7 @@ internal static class DemoReportData
         var reportData = new ReportData(parameters, peopleByName);
         var stats = Developers.Select(name =>
         {
-            var identity = new DeveloperIdentity(null, new DisplayName(name));
+            var identity = new DeveloperIdentity(new UserUuid("demo:" + name), new DisplayName(name));
             if (!reportData.IsDeveloperIncluded(identity))
             {
                 return null;

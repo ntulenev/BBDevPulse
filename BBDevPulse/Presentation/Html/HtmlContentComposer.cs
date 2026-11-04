@@ -52,6 +52,12 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
 
         var content = new StringBuilder(32 * 1024);
         var warning = new StringBuilder();
+        if (reportData.HasMissingUserUuid)
+        {
+            _ = warning.Append("<div role=\"alert\" style=\"padding:12px 16px;border:2px solid #b91c1c;background:#fef2f2;color:#991b1b;margin-bottom:16px\"><strong>");
+            _ = warning.Append(HtmlPresentationHelpers.Encode(ReportData.MissingUserUuidWarning));
+            _ = warning.AppendLine("</strong></div>");
+        }
         var collisions = reportData.GetIdentityCollisions();
         if (collisions.Count > 0)
         {

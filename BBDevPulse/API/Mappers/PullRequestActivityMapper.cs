@@ -248,7 +248,7 @@ public sealed class PullRequestActivityMapper : IPullRequestActivityMapper
                 GetString(userElement, "username");
             var uuid = GetString(userElement, "uuid");
 
-            if (!string.IsNullOrWhiteSpace(displayName) || !string.IsNullOrWhiteSpace(uuid))
+            if (userElement.ValueKind == JsonValueKind.Object)
             {
                 var resolvedName = !string.IsNullOrWhiteSpace(displayName)
                     ? displayName

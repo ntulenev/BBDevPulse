@@ -35,7 +35,7 @@ public sealed class DeveloperIdentityTests
         result.Should().BeTrue();
     }
 
-    [Fact(DisplayName = "IsSameIdentity falls back to display names when UUID is missing")]
+    [Fact(DisplayName = "IsSameIdentity does not match identities without UUIDs")]
     [Trait("Category", "Unit")]
     public void IsSameIdentityWhenUuidIsMissingComparesDisplayNameIgnoringCase()
     {
@@ -47,7 +47,7 @@ public sealed class DeveloperIdentityTests
         var result = left.IsSameIdentity(right);
 
         // Assert
-        result.Should().BeTrue();
+        result.Should().BeFalse();
     }
 
     [Fact(DisplayName = "ToKey returns UUID when UUID exists")]
@@ -64,7 +64,7 @@ public sealed class DeveloperIdentityTests
         key.Should().Be("{uuid}");
     }
 
-    [Fact(DisplayName = "ToKey returns display name when UUID is missing")]
+    [Fact(DisplayName = "ToKey rejects an identity without UUID")]
     [Trait("Category", "Unit")]
     public void ToKeyWhenUuidIsMissingReturnsDisplayName()
     {
@@ -72,9 +72,9 @@ public sealed class DeveloperIdentityTests
         var identity = new DeveloperIdentity(uuid: null, displayName: new DisplayName("Alice"));
 
         // Act
-        var key = identity.ToKey();
+        Action act = () => identity.ToKey();
 
         // Assert
-        key.Should().Be("Alice");
+        act.Should().Throw<InvalidOperationException>();
     }
 }

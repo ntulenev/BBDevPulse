@@ -14,29 +14,10 @@ public readonly struct DeveloperKey : IEquatable<DeveloperKey>
     {
         ArgumentNullException.ThrowIfNull(uuid);
         Uuid = uuid;
-        DisplayName = null;
     }
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DeveloperKey"/> struct using a display name.
-    /// </summary>
-    /// <param name="displayName">Developer display name.</param>
-    public DeveloperKey(DisplayName displayName)
-    {
-        ArgumentNullException.ThrowIfNull(displayName);
-        Uuid = null;
-        DisplayName = displayName;
-    }
-
-    /// <summary>
-    /// UUID identity, if available.
-    /// </summary>
+    /// <summary>UUID identity, if this is not the default key.</summary>
     public UserUuid? Uuid { get; }
-
-    /// <summary>
-    /// Display name identity, if UUID is not available.
-    /// </summary>
-    public DisplayName? DisplayName { get; }
 
     /// <summary>
     /// Creates a <see cref="DeveloperKey"/> from the provided identity.
@@ -46,25 +27,13 @@ public readonly struct DeveloperKey : IEquatable<DeveloperKey>
     public static DeveloperKey FromIdentity(DeveloperIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
-        return identity.Uuid is not null
-            ? new DeveloperKey(identity.Uuid)
-            : new DeveloperKey(identity.DisplayName);
+        return new DeveloperKey(identity.Uuid ?? throw new ArgumentException("A user UUID is required.", nameof(identity)));
     }
 
     /// <inheritdoc />
     public bool Equals(DeveloperKey other)
     {
-        if (Uuid is not null && other.Uuid is not null)
-        {
-            return StringComparer.OrdinalIgnoreCase.Equals(Uuid.Value, other.Uuid.Value);
-        }
-
-        if (Uuid is null && other.Uuid is null)
-        {
-            return StringComparer.OrdinalIgnoreCase.Equals(DisplayName?.Value, other.DisplayName?.Value);
-        }
-
-        return false;
+        return StringComparer.OrdinalIgnoreCase.Equals(Uuid?.Value, other.Uuid?.Value);
     }
 
     /// <inheritdoc />
@@ -83,16 +52,9 @@ public readonly struct DeveloperKey : IEquatable<DeveloperKey>
     /// <inheritdoc />
     public override int GetHashCode()
     {
-        if (Uuid is not null)
-        {
-            return StringComparer.OrdinalIgnoreCase.GetHashCode(Uuid.Value);
-        }
-
-        return DisplayName is null
-            ? 0
-            : StringComparer.OrdinalIgnoreCase.GetHashCode(DisplayName.Value);
+        return Uuid is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Uuid.Value);
     }
 
     /// <inheritdoc />
-    public override string ToString() => Uuid?.Value ?? DisplayName?.Value ?? string.Empty;
+    public override string ToString() => Uuid?.Value ?? string.Empty;
 }
