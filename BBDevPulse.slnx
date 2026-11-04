@@ -2,6 +2,7 @@
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
   </Folder>
+  <Project Path="BBDevPulse.CsvUuidLookup/BBDevPulse.CsvUuidLookup.csproj" />
   <Project Path="BBDevPulse.Tests/BBDevPulse.Tests.csproj" />
   <Project Path="BBDevPulse/BBDevPulse.csproj" />
 </Solution>
