@@ -10,7 +10,7 @@ namespace BBDevPulse.Models;
 public sealed class ReportData
 {
     /// <summary>Warning displayed when distinct Bitbucket users share a display name.</summary>
-    public const string IdentityCollisionWarning = "Different Bitbucket users share the same display name. Team filtering matches names from the CSV, so a matching name can incorrectly include or exclude users and make the filtered report inaccurate.";
+    public const string IdentityCollisionWarning = "Different Bitbucket users share the same display name.";
 
     /// <summary>Warning shown when Bitbucket omits a user UUID.</summary>
     public const string MissingUserUuidWarning = "Bitbucket API did not provide a UUID for some users. Those users and their activity are excluded from the report.";
@@ -172,8 +172,15 @@ public sealed class ReportData
             return true;
         }
 
-        return _peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var person) &&
-            person.IsInTeam(Parameters.TeamFilter!);
+        if (!_peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var entries))
+        {
+            return false;
+        }
+
+        var exact = entries.Rows.Where(row => row.MatchesUuid(identity.Uuid)).ToArray();
+        return exact.Length > 0
+            ? exact.Any(row => row.IsInTeam(Parameters.TeamFilter!))
+            : entries.Rows.Any(row => string.IsNullOrWhiteSpace(row.Uuid) && row.IsInTeam(Parameters.TeamFilter!));
     }
 
     /// <summary>Looks up CSV enrichment by display name.</summary>
@@ -185,6 +192,54 @@ public sealed class ReportData
         ArgumentNullException.ThrowIfNull(displayName);
         return _peopleByDisplayName.TryGetValue(displayName.Value, out person);
     }
+
+    /// <summary>Resolves CSV metadata by name and, when provided, UUID.</summary>
+    public bool TryGetPerson(DeveloperIdentity identity, out PersonCsvRow person)
+    {
+        ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
+        person = default;
+        if (identity.Uuid is null || !_peopleByDisplayName.TryGetValue(identity.DisplayName.Value, out var rows))
+        {
+            return false;
+        }
+
+        foreach (var row in rows.Rows)
+        {
+            if (row.MatchesUuid(identity.Uuid))
+            {
+                person = row;
+                return true;
+            }
+        }
+        var fallbackRows = rows.Rows.Where(row => string.IsNullOrWhiteSpace(row.Uuid)).ToArray();
+        if (fallbackRows.Length == 1)
+        {
+            person = fallbackRows[0];
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Classifies duplicate-name warnings for the selected team.</summary>
+    public IReadOnlyList<IdentityCollisionNotice> GetIdentityCollisionNotices() =>
+        GetIdentityCollisions().Select(collision =>
+        {
+            var rows = _peopleByDisplayName
+                .Where(entry => string.Equals(entry.Key, collision.Name, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(entry => entry.Value.Rows).ToArray();
+            var selected = Parameters.HasTeamFilter
+                ? rows.Where(row => row.IsInTeam(Parameters.TeamFilter!)).ToArray()
+                : [];
+            var unresolved = selected.Any(row => string.IsNullOrWhiteSpace(row.Uuid));
+            var message = !Parameters.HasTeamFilter
+                ? "No team filter is selected. CSV enrichment may still be ambiguous when UUID is missing."
+                : selected.Length == 0
+                    ? "This name is not in the selected team in the CSV, so it does not affect team selection."
+                    : unresolved
+                        ? "This name is in the selected team in the CSV without a UUID. Team filtering can include the wrong user and make the report inaccurate."
+                        : "This name is in the selected team in the CSV with UUIDs. The UUIDs resolve team selection for these entries.";
+            return new IdentityCollisionNotice(collision.Name, collision.Uuids, unresolved, message);
+        }).ToArray();
 
     /// <summary>Gets or creates the mutable statistics entry for a developer.</summary>
     /// <param name="identity">Developer identity with a display name.</param>

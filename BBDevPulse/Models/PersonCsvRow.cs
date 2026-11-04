@@ -5,8 +5,19 @@ namespace BBDevPulse.Models;
 /// </summary>
 /// <param name="Grade">Developer grade.</param>
 /// <param name="Department">Developer department.</param>
-public readonly record struct PersonCsvRow(string Grade, string Department)
+/// <param name="Uuid">Optional Bitbucket UUID.</param>
+public readonly record struct PersonCsvRow(string Grade, string Department, string? Uuid = null)
 {
+    /// <summary>Additional CSV rows with the same name.</summary>
+    public IReadOnlyList<PersonCsvRow>? AdditionalRows { get; init; }
+
+    /// <summary>Enumerates all CSV rows for this name.</summary>
+    public IEnumerable<PersonCsvRow> Rows => new[] { this }.Concat(AdditionalRows ?? []);
+
+    /// <summary>Compares Bitbucket and CSV UUIDs, allowing optional braces.</summary>
+    public bool MatchesUuid(UserUuid? uuid) => uuid is not null && !string.IsNullOrWhiteSpace(Uuid) &&
+        string.Equals(Uuid.Trim().Trim('{', '}'), uuid.Value.Trim().Trim('{', '}'), StringComparison.OrdinalIgnoreCase);
+
     /// <summary>
     /// Determines whether the row belongs to the provided team.
     /// </summary>

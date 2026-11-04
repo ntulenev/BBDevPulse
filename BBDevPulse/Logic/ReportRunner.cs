@@ -52,7 +52,7 @@ internal sealed class ReportRunner : IReportRunner
     {
         var peopleByName = await _peopleCsvProvider.GetPeopleByDisplayNameAsync(cancellationToken).ConfigureAwait(false);
         var teams = TeamFilterCatalog.Create(peopleByName);
-        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams, peopleByName.Count);
+        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams, peopleByName.Values.Sum(static row => row.Rows.Count()));
         var parameters = _options.CreateReportParameters(teamFilter);
         var htmlOptions = _options.Html ?? new HtmlOptions();
         var pdfOptions = _options.Pdf ?? new PdfOptions();
@@ -122,12 +122,9 @@ internal sealed class ReportRunner : IReportRunner
             return;
         }
 
-        var peopleByNameValue = peopleByName
-            .ToDictionary(entry => entry.Key.Value, entry => entry.Value, StringComparer.Ordinal);
-
         foreach (var stat in reportData.DeveloperStats.Values)
         {
-            if (peopleByNameValue.TryGetValue(stat.DisplayName.Value, out var person))
+            if (reportData.TryGetPerson(new DeveloperIdentity(stat.BitbucketUuid, stat.DisplayName), out var person))
             {
                 stat.Grade = person.Grade;
                 stat.Department = person.Department;

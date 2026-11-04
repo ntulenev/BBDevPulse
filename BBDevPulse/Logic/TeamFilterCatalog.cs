@@ -6,6 +6,7 @@ internal static class TeamFilterCatalog
 {
     public static List<TeamFilterOption> Create(IReadOnlyDictionary<DisplayName, PersonCsvRow> peopleByName) =>
         peopleByName
+            .SelectMany(static entry => entry.Value.Rows.Select(row => (entry.Key, Value: row)))
             .Where(static entry => !string.IsNullOrWhiteSpace(entry.Value.Department) &&
                 !string.Equals(entry.Value.Department.Trim(), DeveloperStats.NOT_AVAILABLE, StringComparison.OrdinalIgnoreCase))
             .GroupBy(static entry => entry.Value.Department.Trim(), StringComparer.OrdinalIgnoreCase)

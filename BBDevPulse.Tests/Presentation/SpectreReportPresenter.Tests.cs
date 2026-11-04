@@ -30,6 +30,28 @@ public sealed class SpectreReportPresenterTests
         normalized.Should().Contain(ReportData.IdentityCollisionWarning);
     }
 
+    [Theory]
+    [InlineData("Other", null, "not in the selected team")]
+    [InlineData("Core", null, "without a UUID")]
+    [InlineData("Core", "{a}", "with UUIDs")]
+    public void RenderReportExplainsCollisionForSelectedTeam(string department, string? uuid, string explanation)
+    {
+        var parameters = new ReportParameters(DateTimeOffset.UnixEpoch, new Workspace("workspace"),
+            new RepoNameFilter(""), [], RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, [], teamFilter: "Core");
+        var people = new Dictionary<DisplayName, PersonCsvRow>
+        {
+            [new DisplayName("Alice")] = new("Senior", department, uuid)
+        };
+        var data = new ReportData(parameters, people);
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Alice")));
+        var presenter = CreateSut(pullRequestReportPresenter: new Mock<IPullRequestReportPresenter>().Object,
+            statisticsPresenter: new Mock<IStatisticsPresenter>().Object);
+        var output = string.Join(" ", TestConsoleRunner.Run(_ => presenter.RenderReport(data))
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        output.Should().Contain(explanation).And.Contain("Alice: {a}, {b}");
+    }
+
     [Fact]
     public void RenderReportShowsMissingUuidWarning()
     {

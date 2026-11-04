@@ -99,7 +99,22 @@ Alice Doe;Senior;Core
 Bob Smith;Middle;Import
 ```
 
-Names must match Bitbucket display names exactly to enrich developer statistics. Departments form the team choices, with duplicate department names grouped without regard to case. A developer without a CSV match retains `N/A` metadata. Without departments, there is no team picker.
+An optional fourth `UUID` column distinguishes people with the same display name:
+
+```text
+Name;Grade;Department;UUID
+Alex Kim;Senior;Platform;{11111111-1111-1111-1111-111111111111}
+Alex Kim;Middle;Core;{22222222-2222-2222-2222-222222222222}
+Alice Doe;Senior;Core;
+```
+
+The original three-column format remains supported. If the same name occurs more than once in one department, every such row must have a UUID. A UUID must be unique across the whole CSV, including across departments; comparison ignores case and accepts values with or without braces. Validation compares names and departments without regard to case. Invalid CSV stops the run before Bitbucket requests and prints an error with the affected lines.
+
+**Planned breaking change:** A future version will likely require both the name and UUID for every CSV entry, allowing the application to check both fields and reduce matching errors.
+
+To find the UUIDs for the CSV, set `ShowDeveloperUuidInStats` to `true` and run a report without a team filter. If the CSV is not yet valid, temporarily clear `PeopleCsvPath` so the report can start without reading it. Copy the UUIDs shown in the developer statistics into the corresponding CSV rows, restore `PeopleCsvPath` if needed, then run the report again and select the desired team. The report shows developers observed in the selected repositories and date range, so adjust that scope if a person is missing.
+
+Names must match Bitbucket display names exactly. When a UUID is present, both the name and UUID must match. For a name with both UUID-specific and blank-UUID rows, an exact UUID match takes precedence and the blank-UUID row is the fallback. A UUID-specific row is not assigned to a different UUID. Names without UUIDs may occur in different departments: each department remains selectable, but the application cannot determine which person belongs to which department from the name alone. If more than one blank-UUID row matches a name, ambiguous grade and department enrichment is omitted. Departments form the team choices, with duplicate department names grouped without regard to case. A developer without a CSV match retains `N/A` metadata. Without departments, there is no team picker.
 
 ### Analysis cache and telemetry
 
@@ -153,20 +168,22 @@ If diffstat is unavailable, that PR has no size value and is omitted from size a
 
 Developer statistics and identity comparisons use Bitbucket UUIDs, ignoring case. Different UUIDs remain separate even when their display names match. If Bitbucket does not provide a UUID for a user, console, HTML, and PDF reports show a warning: that user's activity is excluded, and a PR whose author has no UUID is excluded entirely. Missing authors are treated the same way. The warning covers users encountered in the data fetched for the run.
 
-CSV enrichment and team selection still match display names. When different Bitbucket UUIDs share a name, a warning lists the name and UUIDs. For example, if the CSV assigns Alex Kim to Platform, both Bitbucket users named Alex Kim pass the Platform filter, even if only one belongs to the team. Their statistics remain separate, but the team report can include the wrong person. CSV name matching is case-sensitive; collision detection is case-insensitive. Detection covers identities observed during the run, not every account in the workspace. The screenshots below show a synthetic collision added to a demo report; no team filter is applied in the screenshots.
-
-In the current version, such collisions are assumed to be unlikely in a small organization. A future enhancement will add an optional UUID field to the CSV to resolve these cases.
+When different Bitbucket UUIDs share a name, a warning lists the name and UUIDs. With a team filter selected, the warning is yellow if the name is outside that team, red if a matching team entry has no UUID, and yellow if the selected team's matching entries have UUIDs. In the red case, both users may pass the filter, even if only one belongs to the team. With no team filter, the warning is yellow and notes that CSV enrichment may still be ambiguous. CSV name matching is case-sensitive; collision detection is case-insensitive and covers only identities observed during the run. UUID matching relies on the CSV being accurate and does not verify team membership. The screenshots below show a synthetic collision added to a demo report with the Platform filter selected.
 
 <details>
 <summary>Show example warning screenshots</summary>
 
-HTML report:
+Name outside the selected team (yellow):
 
 ![Synthetic duplicate-name warning in HTML](screenshots/identity-collision-html.png)
 
-PDF report:
+Name in the selected team without a UUID (red):
 
-![Synthetic duplicate-name warning in PDF](screenshots/identity-collision-pdf.png)
+![Unresolved duplicate-name warning in HTML](screenshots/identity-collision-ambiguous.png)
+
+Name in the selected team with a UUID (yellow):
+
+![UUID-resolved duplicate-name warning in HTML](screenshots/identity-collision-resolved.png)
 
 </details>
 

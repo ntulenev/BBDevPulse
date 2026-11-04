@@ -23,7 +23,7 @@ internal sealed class DemoReportRunner : IReportRunner
         cancellationToken.ThrowIfCancellationRequested();
         var peopleByName = await DemoPeopleCsv.LoadAsync(cancellationToken).ConfigureAwait(false);
         var teams = TeamFilterCatalog.Create(peopleByName);
-        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams, peopleByName.Count);
+        var teamFilter = teams.Count == 0 ? null : _presenter.SelectTeamFilter(teams, peopleByName.Values.Sum(static row => row.Rows.Count()));
         var reportData = DemoReportData.Create(peopleByName, teamFilter);
         var htmlName = Path.GetFileName(DemoReportOptions.Html.ResolveOutputPath(teamFilter));
         var pdfName = Path.GetFileName(DemoReportOptions.Pdf.ResolveOutputPath(teamFilter));

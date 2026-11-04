@@ -85,6 +85,49 @@ public sealed class PullRequestAnalyzerTests
         collision.Uuids.Should().Equal("{a}", "{b}");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TeamFilterUsesCsvUuidToSelectOnlyMatchingSameNamedUser(bool reverse)
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var data = new ReportData(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
+            new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new("Senior", "Core", "a") });
+        var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+        var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
+        var firstPr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, first, null);
+        var secondPr = new PullRequest(new PullRequestId(2), PullRequestState.Open, null, date, null, null, second, null);
+        var reviewer = second.ToDeveloperIdentity();
+        var comment = new PullRequestActivity(date.AddHours(1), null, reviewer,
+            new ActivityComment(reviewer, date.AddHours(1)), null);
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable<PullRequest>(reverse ? [secondPr, firstPr] : [firstPr, secondPr]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.Is<PullRequestId>(id => id.Value == 1), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable([comment]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.Is<PullRequestId>(id => id.Value == 2), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
+
+        await CreateAnalyzer(client.Object, new ActivityAnalyzer()).AnalyzeAsync(repository, data, CancellationToken.None);
+
+        data.Reports.Should().ContainSingle().Which.Id.Value.Should().Be(1);
+        data.DeveloperStats.Should().ContainSingle();
+        data.DeveloperStats[new DeveloperKey(new UserUuid("{a}"))].PrsOpenedSince.Should().Be(1);
+        data.DeveloperStats.Should().NotContainKey(new DeveloperKey(new UserUuid("{b}")));
+        data.GetIdentityCollisionNotices().Single().IsError.Should().BeFalse();
+        var collision = data.GetIdentityCollisions().Should().ContainSingle().Subject;
+        collision.Name.Should().Be("Alice");
+        collision.Uuids.Should().Equal("{a}", "{b}");
+    }
+
     [Fact]
     public async Task MissingAuthorUuidExcludesPullRequestAndRaisesWarning()
     {

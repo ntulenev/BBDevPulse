@@ -78,8 +78,8 @@ public sealed class PeopleCsvProviderTests
             // Assert
             result.Should().HaveCount(2);
             result.TryGetValue(new DisplayName("Alice"), out var alice).Should().BeTrue();
-            alice.Grade.Should().Be("Lead");
-            alice.Department.Should().Be("Core");
+            alice.Rows.Select(row => (row.Grade, row.Department)).Should().BeEquivalentTo(
+                new[] { ("Senior", "Platform"), ("Lead", "Core") });
             result.TryGetValue(new DisplayName("Bob"), out var bob).Should().BeTrue();
             bob.Grade.Should().Be(DeveloperStats.NOT_AVAILABLE);
             bob.Department.Should().Be(DeveloperStats.NOT_AVAILABLE);
@@ -115,7 +115,7 @@ public sealed class PeopleCsvProviderTests
 
             // Assert
             (await act.Should().ThrowAsync<FormatException>())
-                .WithMessage("Invalid people CSV format at line 2. Expected 'Name;Grade;Department'.");
+                .WithMessage("Invalid people CSV format at line 2. Expected 'Name;Grade;Department[;UUID]'.");
         }
         finally
         {
