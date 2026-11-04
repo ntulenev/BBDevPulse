@@ -66,9 +66,16 @@ public sealed class ReportData
     public ReportData(
         ReportParameters parameters,
         IReadOnlyDictionary<DisplayName, PersonCsvRow>? peopleByDisplayName = null)
+        : this(parameters, peopleByDisplayName, deferResults: false)
+    {
+    }
+
+    internal ReportData(ReportParameters parameters,
+        IReadOnlyDictionary<DisplayName, PersonCsvRow>? peopleByDisplayName, bool deferResults)
     {
         ArgumentNullException.ThrowIfNull(parameters);
         Parameters = parameters;
+        _deferResults = deferResults;
         Reports = new System.Collections.ObjectModel.ReadOnlyCollection<PullRequestReport>(_reports);
         DeveloperStats = new System.Collections.ObjectModel.ReadOnlyDictionary<DeveloperKey, DeveloperStats>(_developers);
         _peopleByDisplayName = peopleByDisplayName is null
@@ -284,6 +291,10 @@ public sealed class ReportData
     private readonly Dictionary<DeveloperKey, DeveloperStats> _developers = [];
     private readonly Dictionary<string, PersonCsvRow> _peopleByDisplayName;
     private readonly HashSet<(string Workspace, string Repository, int Id)> _appliedPullRequests = [];
+    private readonly HashSet<(string Workspace, string Repository, int Id)> _queuedPullRequests = [];
+    private readonly List<PullRequestAnalysisResult> _pendingResults = [];
+    private bool _deferResults;
+    private bool _analysisFailed;
 
     internal void ApplyResult(PullRequestAnalysisResult result)
     {
@@ -296,9 +307,15 @@ public sealed class ReportData
                 throw new ArgumentException("The pull request belongs to a different workspace.", nameof(result));
             }
             var key = (result.Workspace.Value.ToUpperInvariant(), result.Repository.Value.ToUpperInvariant(), result.Id.Value);
-            if (_appliedPullRequests.Contains(key))
+            if (_appliedPullRequests.Contains(key) || _queuedPullRequests.Contains(key))
             {
                 throw new InvalidOperationException("The pull request result has already been applied.");
+            }
+            if (_deferResults)
+            {
+                _queuedPullRequests.Add(key);
+                _pendingResults.Add(result);
+                return;
             }
             ValidateResult(result);
             _appliedPullRequests.Add(key);
@@ -468,6 +485,36 @@ public sealed class ReportData
         public int Approvals { get; set; }
     }
 
+    internal void CompleteAnalysis()
+    {
+        lock (_identityLock)
+        {
+            EnsureMutable();
+            if (!_deferResults)
+            {
+                return;
+            }
+            _deferResults = false;
+            var ordered = _pendingResults.OrderBy(static result => result.CreatedOn)
+                .ThenBy(static result => result.Repository.Value, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static result => result.Id.Value).ToArray();
+            _pendingResults.Clear();
+            _queuedPullRequests.Clear();
+            try
+            {
+                foreach (var result in ordered)
+                {
+                    ApplyResult(result);
+                }
+            }
+            catch
+            {
+                _analysisFailed = true;
+                throw;
+            }
+        }
+    }
+
     internal ReportData CreatePublishedSnapshot()
     {
         lock (_identityLock)
@@ -515,6 +562,10 @@ public sealed class ReportData
 
     private void EnsureMutable()
     {
+        if (_analysisFailed)
+        {
+            throw new InvalidOperationException("A failed report analysis cannot be published or modified.");
+        }
         if (_frozen)
         {
             throw new InvalidOperationException("Published reports cannot be modified.");

@@ -10,7 +10,7 @@ internal sealed class ReportAccumulator
     public ReportAccumulator(ReportParameters parameters,
         IReadOnlyDictionary<DisplayName, PersonCsvRow>? peopleByDisplayName = null)
     {
-        _workingData = new ReportData(parameters, peopleByDisplayName);
+        _workingData = new ReportData(parameters, peopleByDisplayName, deferResults: true);
     }
 
     public ReportData WorkingData => _workingData ??
@@ -18,8 +18,11 @@ internal sealed class ReportAccumulator
 
     public ReportData Build()
     {
+        CompleteAnalysis();
         var report = WorkingData.CreatePublishedSnapshot();
         _workingData = null;
         return report;
     }
+
+    public void CompleteAnalysis() => WorkingData.CompleteAnalysis();
 }

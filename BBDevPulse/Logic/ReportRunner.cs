@@ -102,6 +102,7 @@ internal sealed class ReportRunner : IReportRunner
                 (repo, itemToken) => _analyzer.AnalyzeAsync(repo, reportData, itemToken),
                 progress, token), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
+        accumulator.CompleteAnalysis();
         if (reportData.DeveloperStats.Count > 0)
         {
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);

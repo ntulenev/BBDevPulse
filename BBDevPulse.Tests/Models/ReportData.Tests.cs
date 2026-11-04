@@ -53,6 +53,38 @@ public sealed class ReportDataTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AccumulatorAppliesContributionsInStableOrderRegardlessOfCompletion(bool reverse)
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        var date = accumulator.WorkingData.Parameters.FilterDate;
+        var first = CreateContribution(1, date, "Alice Old", "repo-a");
+        var second = CreateContribution(2, date.AddDays(1), "Alice New", "repo-b");
+        foreach (var result in reverse ? new[] { second, first } : new[] { first, second })
+        {
+            accumulator.WorkingData.ApplyResult(result);
+        }
+        accumulator.WorkingData.DeveloperStats.Should().BeEmpty();
+        var report = accumulator.Build();
+        report.DeveloperStats.Should().ContainSingle();
+        report.DeveloperStats.Values.Single().DisplayName.Value.Should().Be("Alice Old");
+        report.DeveloperStats.Values.Single().PrsOpenedSince.Should().Be(2);
+        report.Reports.Select(item => item.Id.Value).Should().Equal(1, 2);
+
+        PullRequestAnalysisResult CreateContribution(int id, DateTimeOffset created, string name, string slug)
+        {
+            var identity = new DeveloperIdentity(new UserUuid("{same}"), new DisplayName(name));
+            var repo = new Repository(new RepoName(slug), new RepoSlug(slug));
+            var pr = new PullRequest(new PullRequestId(id), PullRequestState.Open, null, created, null, null,
+                new User(identity.DisplayName, identity.Uuid), null);
+            return new PullRequestAnalysisResult(accumulator.WorkingData.Parameters.Workspace, repo, pr,
+                [identity], identity, true, CreatePullRequestReport(id, created), null, 0, true,
+                new ActivityAnalysisState(created, identity, true), [], null, null);
+        }
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("Core")]
     public void DefaultIdentityIsRejectedAtEachBoundary(string? teamFilter)
@@ -207,6 +239,30 @@ public sealed class ReportDataTests
         stats.PrsOpenedSince.Should().Be(1);
         data.HasMissingUserUuid.Should().BeTrue();
         data.Reports.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void FailedDeferredAnalysisCannotPublishPartialReport()
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        var data = accumulator.WorkingData;
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        data.GetOrAddDeveloper(identity).PrsOpenedSince = int.MaxValue - 1;
+        var created = data.Parameters.FilterDate;
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        for (var id = 1; id <= 2; id++)
+        {
+            var pr = new PullRequest(new PullRequestId(id), PullRequestState.Open, null, created, null, null,
+                new User(identity.DisplayName, identity.Uuid), null);
+            data.ApplyResult(new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr, [identity],
+                identity, true, CreatePullRequestReport(id, created), null, 0, true,
+                new ActivityAnalysisState(created, identity, true), [], null, null));
+        }
+
+        Action first = () => accumulator.Build();
+        first.Should().Throw<OverflowException>();
+        Action retry = () => accumulator.Build();
+        retry.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
