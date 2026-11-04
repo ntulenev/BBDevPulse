@@ -13,6 +13,16 @@ namespace BBDevPulse.Tests.API;
 
 public sealed class BitbucketMapperTests
 {
+    [Theory]
+    [InlineData("{\"id\":1,\"state\":\"OPEN\"}")]
+    [InlineData("{\"id\":1,\"state\":\"OPEN\",\"created_on\":null}")]
+    public void MissingCreationTimestampDoesNotBecomeAValidDate(string json)
+    {
+        var dto = JsonSerializer.Deserialize<PullRequestDto>(json)!;
+        Action map = () => CreateMapper().Map(dto);
+        map.Should().Throw<InvalidDataException>().WithMessage("*creation timestamp*");
+    }
+
     [Fact(DisplayName = "Constructor throws when activity mapper is null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenActivityMapperIsNullThrowsArgumentNullException()

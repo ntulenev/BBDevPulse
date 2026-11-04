@@ -29,7 +29,7 @@ internal sealed class PullRequestDto
     /// Creation timestamp.
     /// </summary>
     [JsonPropertyName("created_on")]
-    public DateTimeOffset CreatedOn { get; init; }
+    public DateTimeOffset? CreatedOn { get; init; }
 
     /// <summary>
     /// Last updated timestamp.

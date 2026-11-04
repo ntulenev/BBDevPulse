@@ -122,6 +122,8 @@ In live mode, BBDevPulse caches PR activity, correction commits, and diffstat sn
 
 Cached supplemental data distinguishes a successful empty or zero measurement from a failed request and from data not requested. Older version 2 entries without explicit availability are still readable; when a field was not available, its original reason remains unknown and the application may retry the request. Contradictory or malformed cache entries are treated as misses. Cache validity does not establish that the Bitbucket activity response is historically complete.
 
+Bitbucket pull requests must have a positive ID and a creation timestamp; a response missing either cannot be analyzed. Unknown PR states are retained as `Unknown`, and optional timestamps and destination fields may be absent. A missing user UUID follows the warning and exclusion policy described below. A missing display name falls back to the UUID when possible. These rules describe the application boundary; they do not imply that Bitbucket guarantees every optional field.
+
 ## Scope and team filtering
 
 ### Repository and branch selection
