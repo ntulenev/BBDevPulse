@@ -59,6 +59,26 @@ public sealed class RepositoryAnalysisCoordinatorTests
     }
 
     [Fact]
+    public async Task ExternalCancellationIsPreservedWhenLastHandlerCompletesNormally()
+    {
+        var coordinator = new RepositoryAnalysisCoordinator(1);
+        using var cancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var repository = new Repository(new RepoName("A"), new RepoSlug("a"));
+        var run = coordinator.RunAsync([repository], async (_, _) =>
+        {
+            started.SetResult();
+            await release.Task;
+        }, _ => { }, cancellation.Token);
+
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        cancellation.Cancel();
+        release.SetResult();
+        await FluentActions.Invoking(async () => await run).Should().ThrowAsync<OperationCanceledException>();
+    }
+
+    [Fact]
     public async Task LimitsConcurrentRepositoriesWithoutPresentation()
     {
         var coordinator = new RepositoryAnalysisCoordinator(2);

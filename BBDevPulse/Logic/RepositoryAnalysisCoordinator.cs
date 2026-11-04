@@ -114,5 +114,6 @@ internal sealed class RepositoryAnalysisCoordinator(int concurrency)
         {
             ExceptionDispatchInfo.Capture(sourceError).Throw();
         }
+        cancellationToken.ThrowIfCancellationRequested();
     }
 }
