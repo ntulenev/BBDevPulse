@@ -120,6 +120,8 @@ Names must match Bitbucket display names exactly. When a UUID is present, both t
 
 In live mode, BBDevPulse caches PR activity, correction commits, and diffstat snapshots in `AppContext.BaseDirectory/cache/pull-request-analysis`. An unchanged PR can reuse its snapshot on a later run. The cache has no automatic eviction. When telemetry is enabled, the console shows actual HTTP requests, cache hits/misses/stores, estimated avoided requests, and a request breakdown by API endpoint.
 
+Cached supplemental data distinguishes a successful empty or zero measurement from a failed request and from data not requested. Older version 2 entries without explicit availability are still readable; when a field was not available, its original reason remains unknown and the application may retry the request. Contradictory or malformed cache entries are treated as misses. Cache validity does not establish that the Bitbucket activity response is historically complete.
+
 ## Scope and team filtering
 
 ### Repository and branch selection

@@ -422,7 +422,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             correctionCommits: [],
             sizeSummary: PullRequestSizeSummary.Empty,
             commitActivities: [],
-            hasEnrichment: false);
+            hasEnrichment: false,
+            commitsAvailability: DataAvailability.NotRequested,
+            sizeAvailability: DataAvailability.NotRequested);
     }
 
     private async Task<PullRequestAnalysisSnapshot> EnrichAnalysisSnapshotAsync(
@@ -466,7 +468,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             hasEnrichment: loadedCommits is not null && loadedSize is not null &&
                 commitActivities.All(static activity => activity.HasSizeData),
             hasCommits: loadedCommits is not null,
-            hasSize: loadedSize is not null);
+            hasSize: loadedSize is not null,
+            commitsAvailability: loadedCommits is null ? DataAvailability.Unavailable : DataAvailability.Available,
+            sizeAvailability: loadedSize is null ? DataAvailability.Unavailable : DataAvailability.Available);
     }
 
     private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(

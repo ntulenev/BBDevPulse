@@ -20,12 +20,15 @@ public sealed class FilePullRequestAnalysisCacheTests : IDisposable
         var repo = new RepoSlug("repo");
         var id = new PullRequestId(42);
         var snapshot = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
-            hasEnrichment: false, hasCommits: true, hasSize: false);
+            hasEnrichment: false, hasCommits: true, hasSize: false,
+            commitsAvailability: DataAvailability.Available, sizeAvailability: DataAvailability.Unavailable);
 
         cache.Store(workspace, repo, id, "pr", "parameters", snapshot);
         cache.TryGet(workspace, repo, id, "pr", "parameters", out var loaded).Should().BeTrue();
         loaded.HasCommits.Should().BeTrue();
         loaded.HasSize.Should().BeFalse();
+        loaded.CommitsAvailability.Should().Be(DataAvailability.Available);
+        loaded.SizeAvailability.Should().Be(DataAvailability.Unavailable);
 
         var path = Directory.EnumerateFiles(_cacheDirectory, "*.json", SearchOption.AllDirectories).Single();
         var json = File.ReadAllText(path);

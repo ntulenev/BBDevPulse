@@ -7,6 +7,35 @@ namespace BBDevPulse.Tests.Models;
 public sealed class PullRequestAnalysisSnapshotTests
 {
     [Fact]
+    public void AvailabilityDistinguishesNotRequestedFailureAndMeasuredZero()
+    {
+        var pending = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            commitsAvailability: DataAvailability.NotRequested, sizeAvailability: DataAvailability.NotRequested);
+        var failed = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            commitsAvailability: DataAvailability.Unavailable, sizeAvailability: DataAvailability.Unavailable);
+        var measured = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            hasCommits: true, hasSize: true, commitsAvailability: DataAvailability.Available,
+            sizeAvailability: DataAvailability.Available);
+        pending.SizeAvailability.Should().Be(DataAvailability.NotRequested);
+        failed.SizeAvailability.Should().Be(DataAvailability.Unavailable);
+        measured.SizeAvailability.Should().Be(DataAvailability.Available);
+        measured.SizeSummary.LineChurn.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContradictoryAvailabilityIsRejected()
+    {
+        Action create = () => _ = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            hasSize: false, sizeAvailability: DataAvailability.Available);
+        create.Should().Throw<ArgumentException>();
+        Action completeWithoutSize = () => _ = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            hasEnrichment: true, hasSize: false);
+        completeWithoutSize.Should().Throw<ArgumentException>();
+        Action nullItem = () => _ = new PullRequestAnalysisSnapshot([null!], [], PullRequestSizeSummary.Empty, []);
+        nullItem.Should().Throw<ArgumentException>().WithParameterName("activities");
+    }
+
+    [Fact]
     public void SnapshotOwnsItsCollections()
     {
         var activity = new PullRequestActivity(null, null, null, null, null);

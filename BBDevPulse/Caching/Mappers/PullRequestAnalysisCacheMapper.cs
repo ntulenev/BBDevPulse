@@ -22,7 +22,9 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             CommitActivities = [.. snapshot.CommitActivities.Select(MapCommitActivity)],
             HasEnrichment = snapshot.HasEnrichment,
             HasCommits = snapshot.HasCommits,
-            HasSize = snapshot.HasSize
+            HasSize = snapshot.HasSize,
+            CommitsAvailability = snapshot.CommitsAvailability,
+            SizeAvailability = snapshot.SizeAvailability
         };
     }
 
@@ -41,6 +43,25 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             return false;
         }
 
+        if (snapshot.Activities.Any(static activity => activity is null) ||
+            snapshot.CorrectionCommits.Any(static commit => commit is null) ||
+            snapshot.CommitActivities.Any(static activity => activity is null))
+        {
+            return false;
+        }
+
+        if ((snapshot.CommitsAvailability.HasValue &&
+             (!Enum.IsDefined(snapshot.CommitsAvailability.Value) ||
+              (snapshot.CommitsAvailability == DataAvailability.Available) != snapshot.HasCommits)) ||
+            (snapshot.SizeAvailability.HasValue &&
+             (!Enum.IsDefined(snapshot.SizeAvailability.Value) ||
+              (snapshot.SizeAvailability == DataAvailability.Available) != snapshot.HasSize)) ||
+            (snapshot.HasEnrichment && (!snapshot.HasCommits || !snapshot.HasSize ||
+                snapshot.CommitActivities.Any(static activity => activity is null || !activity.HasSizeData))))
+        {
+            return false;
+        }
+
         var activities = snapshot.Activities.Select(MapActivity).ToArray();
         var correctionCommits = snapshot.CorrectionCommits.Select(MapCommit).ToArray();
         var commitActivities = snapshot.CommitActivities.Select(MapCommitActivity).ToArray();
@@ -52,7 +73,9 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             commitActivities,
             snapshot.HasEnrichment,
             snapshot.HasCommits,
-            snapshot.HasSize);
+            snapshot.HasSize,
+            snapshot.CommitsAvailability,
+            snapshot.SizeAvailability);
 
         return mappedSnapshot.Activities.All(static activity => activity is not null) &&
                mappedSnapshot.CorrectionCommits.All(static commit => commit is not null) &&
