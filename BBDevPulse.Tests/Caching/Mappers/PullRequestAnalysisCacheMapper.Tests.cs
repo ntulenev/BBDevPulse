@@ -8,6 +8,31 @@ namespace BBDevPulse.Tests.Caching.Mappers;
 
 public sealed class PullRequestAnalysisCacheMapperTests
 {
+    [Fact]
+    public void InvalidAvailabilityAndNullItemsAreCacheMisses()
+    {
+        var mapper = new PullRequestAnalysisCacheMapper();
+        var incomplete = new CachedPullRequestAnalysisSnapshot
+        {
+            Activities = [null!],
+            CorrectionCommits = [],
+            SizeSummary = new CachedPullRequestSizeSummary(),
+            CommitActivities = []
+        };
+        mapper.TryMap(incomplete, out _).Should().BeFalse();
+
+        var contradiction = new CachedPullRequestAnalysisSnapshot
+        {
+            Activities = [],
+            CorrectionCommits = [],
+            SizeSummary = new CachedPullRequestSizeSummary(),
+            CommitActivities = [],
+            HasSize = false,
+            SizeAvailability = DataAvailability.Available
+        };
+        mapper.TryMap(contradiction, out _).Should().BeFalse();
+    }
+
     [Fact(DisplayName = "Map throws when snapshot is null")]
     [Trait("Category", "Unit")]
     public void MapWhenSnapshotIsNullThrowsArgumentNullException()
@@ -130,7 +155,8 @@ public sealed class PullRequestAnalysisCacheMapperTests
             {
                 FilesChanged = 3,
                 LinesAdded = 25,
-                LinesRemoved = 5
+                LinesRemoved = 5,
+                HasLineData = true
             },
             CommitActivities =
             [
@@ -146,11 +172,14 @@ public sealed class PullRequestAnalysisCacheMapperTests
                     {
                         FilesChanged = 1,
                         LinesAdded = 5,
-                        LinesRemoved = 2
+                        LinesRemoved = 2,
+                        HasLineData = true
                     }
                 }
             ],
-            HasEnrichment = true
+            HasEnrichment = true,
+            HasCommits = true,
+            HasSize = true
         };
 
         // Act

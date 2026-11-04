@@ -22,7 +22,9 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             CommitActivities = [.. snapshot.CommitActivities.Select(MapCommitActivity)],
             HasEnrichment = snapshot.HasEnrichment,
             HasCommits = snapshot.HasCommits,
-            HasSize = snapshot.HasSize
+            HasSize = snapshot.HasSize,
+            CommitsAvailability = snapshot.CommitsAvailability,
+            SizeAvailability = snapshot.SizeAvailability
         };
     }
 
@@ -41,6 +43,36 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             return false;
         }
 
+        if (snapshot.Activities.Any(static activity => activity is null) ||
+            snapshot.CorrectionCommits.Any(static commit => commit is null) ||
+            snapshot.CommitActivities.Any(static activity => activity is null))
+        {
+            return false;
+        }
+
+        if (!IsValidSize(snapshot.SizeSummary) ||
+            (snapshot.HasSize && snapshot.SizeSummary.HasLineData is null) ||
+            snapshot.CommitActivities.Any(static activity => !IsValidSize(activity.SizeSummary) ||
+                (activity.HasSizeData && activity.SizeSummary.HasLineData is null)))
+        {
+            return false;
+        }
+
+        if ((snapshot.CommitsAvailability.HasValue &&
+             (!Enum.IsDefined(snapshot.CommitsAvailability.Value) ||
+              (snapshot.CommitsAvailability == DataAvailability.Available) != snapshot.HasCommits)) ||
+            (snapshot.SizeAvailability.HasValue &&
+             (!Enum.IsDefined(snapshot.SizeAvailability.Value) ||
+              (snapshot.SizeAvailability is DataAvailability.Available or DataAvailability.Incomplete) != snapshot.HasSize ||
+              (snapshot.HasSize && (snapshot.SizeAvailability == DataAvailability.Incomplete) == snapshot.SizeSummary.HasLineData))) ||
+            (snapshot.HasEnrichment && (!snapshot.HasCommits || !snapshot.HasSize ||
+                snapshot.SizeSummary.HasLineData != true ||
+                snapshot.CommitActivities.Any(static activity => activity is null || !activity.HasSizeData ||
+                    activity.SizeSummary.HasLineData != true))))
+        {
+            return false;
+        }
+
         var activities = snapshot.Activities.Select(MapActivity).ToArray();
         var correctionCommits = snapshot.CorrectionCommits.Select(MapCommit).ToArray();
         var commitActivities = snapshot.CommitActivities.Select(MapCommitActivity).ToArray();
@@ -52,7 +84,9 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
             commitActivities,
             snapshot.HasEnrichment,
             snapshot.HasCommits,
-            snapshot.HasSize);
+            snapshot.HasSize,
+            snapshot.CommitsAvailability,
+            snapshot.SizeAvailability);
 
         return mappedSnapshot.Activities.All(static activity => activity is not null) &&
                mappedSnapshot.CorrectionCommits.All(static commit => commit is not null) &&
@@ -154,13 +188,19 @@ internal sealed class PullRequestAnalysisCacheMapper : IPullRequestAnalysisCache
         {
             FilesChanged = summary.FilesChanged,
             LinesAdded = summary.LinesAdded,
-            LinesRemoved = summary.LinesRemoved
+            LinesRemoved = summary.LinesRemoved,
+            HasLineData = summary.HasLineData
         };
     }
 
     private static PullRequestSizeSummary MapSizeSummary(CachedPullRequestSizeSummary summary)
     {
         ArgumentNullException.ThrowIfNull(summary);
-        return new PullRequestSizeSummary(summary.FilesChanged, summary.LinesAdded, summary.LinesRemoved);
+        return new PullRequestSizeSummary(summary.FilesChanged!.Value, summary.LinesAdded!.Value,
+            summary.LinesRemoved!.Value, summary.HasLineData ?? false);
     }
+
+    private static bool IsValidSize(CachedPullRequestSizeSummary? summary) =>
+        summary is not null && summary.FilesChanged is >= 0 && summary.LinesAdded is >= 0 &&
+        summary.LinesRemoved is >= 0 && summary.LinesAdded <= int.MaxValue - summary.LinesRemoved;
 }

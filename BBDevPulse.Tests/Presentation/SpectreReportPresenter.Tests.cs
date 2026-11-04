@@ -303,27 +303,16 @@ public sealed class SpectreReportPresenterTests
         fetchCalls.Should().Be(1);
     }
 
-    [Fact(DisplayName = "AnalyzeRepositoriesAsync delegates to repository analysis presenter")]
-    [Trait("Category", "Unit")]
-    public async Task AnalyzeRepositoriesAsyncWhenCalledDelegatesToRepositoryAnalysisPresenter()
+    [Fact]
+    public async Task RepositoryProgressDelegatesToPresenter()
     {
-        // Arrange
-        var repositories = (IReadOnlyList<Repository>)new List<Repository> { CreateRepository("RepoA", "repoa") };
-        var repositoryAnalysisPresenter = new Mock<IRepositoryAnalysisPresenter>(MockBehavior.Strict);
-        var analyzeCalls = 0;
-        repositoryAnalysisPresenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                repositories,
-                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
-                It.Is<CancellationToken>(token => token == cancellationToken)))
-            .Callback(() => analyzeCalls++)
-            .Returns(Task.CompletedTask);
-        var sut = CreateSut(repositoryAnalysisPresenter: repositoryAnalysisPresenter.Object);
-
-        // Act
-        await sut.AnalyzeRepositoriesAsync(repositories, (_, _) => Task.CompletedTask, cancellationToken);
-
-        // Assert
-        analyzeCalls.Should().Be(1);
+        var repositoryPresenter = new Mock<IRepositoryAnalysisPresenter>(MockBehavior.Strict);
+        repositoryPresenter.Setup(x => x.RunWithRepositoryProgressAsync(1,
+                It.IsAny<Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task>>(), cancellationToken))
+            .Returns(Task.CompletedTask).Verifiable();
+        var sut = CreateSut(repositoryAnalysisPresenter: repositoryPresenter.Object);
+        await sut.RunWithRepositoryProgressAsync(1, (_, _) => Task.CompletedTask, cancellationToken);
+        repositoryPresenter.Verify();
     }
 
     [Fact(DisplayName = "RenderRepositoryTable throws when parameters are null")]
@@ -421,8 +410,8 @@ public sealed class SpectreReportPresenterTests
         // Arrange
         var parameters = CreateReportParameters();
         var reportData = new ReportData(parameters);
-        reportData.Reports.Add(CreateReport(2, new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero)));
-        reportData.Reports.Add(CreateReport(1, new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero)));
+        reportData.MutableReports.Add(CreateReport(2, new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero)));
+        reportData.MutableReports.Add(CreateReport(1, new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero)));
 
         var pullRequestReportPresenter = new Mock<IPullRequestReportPresenter>(MockBehavior.Strict);
         var renderPullRequestCalls = 0;

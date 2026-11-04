@@ -47,38 +47,32 @@ internal static class DemoReportData
             showAllDetailsForDevelopers: true,
             toDateExclusive: end,
             isDemo: true);
-        var reportData = new ReportData(parameters, peopleByName);
-        var stats = Developers.Select(name =>
+        var accumulator = new ReportAccumulator(parameters, peopleByName);
+        var identities = Developers.Select(name =>
+            new DeveloperIdentity(new UserUuid("demo:" + name), new DisplayName(name))).ToArray();
+        foreach (var identity in identities.Where(accumulator.IsDeveloperIncluded))
         {
-            var identity = new DeveloperIdentity(new UserUuid("demo:" + name), new DisplayName(name));
-            if (!reportData.IsDeveloperIncluded(identity))
-            {
-                return null;
-            }
-
-            var developer = reportData.GetOrAddDeveloper(identity);
-            if (reportData.TryGetPerson(identity, out var person))
-            {
-                developer.Grade = person.Grade;
-                developer.Department = person.Department;
-            }
-            return developer;
-        }).ToArray();
+            accumulator.RegisterDeveloper(identity);
+        }
 
         for (var index = 0; index < PullRequests.Length; index++)
         {
-            AddPullRequest(reportData, stats, PullRequests[index], index, start);
+            AddPullRequest(accumulator, identities, PullRequests[index], index, start);
         }
 
-        return reportData;
+        accumulator.CompleteAnalysis();
+        accumulator.EnrichDevelopers();
+        return accumulator.Build();
     }
 
     private static void AddPullRequest(
-        ReportData reportData, DeveloperStats?[] stats, DemoPullRequest item, int index, DateTimeOffset start)
+        ReportAccumulator accumulator, DeveloperIdentity[] identities, DemoPullRequest item, int index, DateTimeOffset start)
     {
-        var authorStats = stats[item.Author];
-        var reviewer = stats[(item.Author + 1) % stats.Length];
-        if (authorStats is null && reviewer is null)
+        var authorIdentity = identities[item.Author];
+        var reviewerIdentity = identities[(item.Author + 1) % identities.Length];
+        var includeAuthor = accumulator.IsDeveloperIncluded(authorIdentity);
+        var includeReviewer = accumulator.IsDeveloperIncluded(reviewerIdentity);
+        if (!includeAuthor && !includeReviewer)
         {
             return;
         }
@@ -89,53 +83,40 @@ internal static class DemoReportData
         var slug = RepositorySlugs[item.Repository];
         var author = Developers[item.Author];
         var id = new PullRequestId(101 + index);
+        var merged = item.State == PullRequestState.Merged ? closed : (DateTimeOffset?)null;
+        var rejected = item.State is PullRequestState.Declined or PullRequestState.Superseded ? closed : (DateTimeOffset?)null;
         var report = new PullRequestReport(
-            repo, slug, author, "main", created, closed,
-            item.State == PullRequestState.Merged ? closed : null,
-            item.State is PullRequestState.Declined or PullRequestState.Superseded ? closed : null,
+            repo, slug, author, "main", created, closed, merged, rejected,
             item.State, id, item.Comments, item.Corrections,
             firstReactionOn: created.AddHours(2 + (index % 5)),
-            filesChanged: item.Files,
-            linesAdded: item.Added,
-            linesRemoved: item.Removed,
-            isActivityOnlyMatch: authorStats is null);
-        reportData.Reports.Add(report);
-
-        if (authorStats is not null)
+            filesChanged: item.Files, linesAdded: item.Added, linesRemoved: item.Removed,
+            isActivityOnlyMatch: !includeAuthor);
+        var state = new ActivityAnalysisState(created, authorIdentity, shouldCalculateTtfr: true);
+        var comments = new List<(DeveloperIdentity User, DateTimeOffset Date)>();
+        var approvals = new List<(DeveloperIdentity User, DateTimeOffset Date)>();
+        if (includeReviewer)
         {
-            authorStats.PrsOpenedSince++;
-            if (item.State == PullRequestState.Merged)
-            {
-                authorStats.PrsMergedAfter++;
-            }
-
-            authorStats.Corrections += item.Corrections;
-            authorStats.AuthoredPullRequests.Add(report);
-            if (item.Corrections > 0)
-            {
-                authorStats.CommitActivities.Add(new DeveloperCommitActivity(
-                    repo, slug, id,
-                    (101 + index).ToString("x40", System.Globalization.CultureInfo.InvariantCulture),
-                    "Refine synthetic implementation",
-                    created.AddHours(8),
-                    new PullRequestSizeSummary(item.Files, item.Added, item.Removed)));
-            }
-        }
-
-        if (reviewer is not null)
-        {
-            reviewer.CommentsAfter += item.Comments;
-            reviewer.PeerCommentsAfter += item.Comments;
-            reviewer.ApprovalsAfter++;
+            state.AddParticipant(reviewerIdentity);
+            state.CommentCounts.Add(reviewerIdentity.ToKey(), item.Comments);
+            state.ApprovalCounts.Add(reviewerIdentity.ToKey(), 1);
             for (var comment = 0; comment < item.Comments; comment++)
             {
-                reviewer.CommentActivities.Add(new DeveloperCommentActivity(
-                    repo, slug, id, author, created.AddHours(3 + comment)));
+                comments.Add((reviewerIdentity, created.AddHours(3 + comment)));
             }
-
-            reviewer.ApprovalActivities.Add(new DeveloperApprovalActivity(
-                repo, slug, id, author, created.AddHours(5)));
+            approvals.Add((reviewerIdentity, created.AddHours(5)));
         }
+        IReadOnlyList<DeveloperCommitActivity> commits = includeAuthor && item.Corrections > 0
+            ? [new DeveloperCommitActivity(repo, slug, id,
+                (101 + index).ToString("x40", System.Globalization.CultureInfo.InvariantCulture),
+                "Refine synthetic implementation", created.AddHours(8),
+                new PullRequestSizeSummary(item.Files, item.Added, item.Removed))]
+            : [];
+        var repository = new Repository(new RepoName(repo), new RepoSlug(slug));
+        var pr = new PullRequest(id, item.State, null, created, null, merged,
+            new User(authorIdentity.DisplayName, authorIdentity.Uuid), null);
+        accumulator.ApplyResult(new PullRequestAnalysisResult(
+            accumulator.Parameters.Workspace, repository, pr, [authorIdentity], authorIdentity,
+            includeAuthor, report, merged, item.Corrections, true, state, commits, comments, approvals));
     }
 
     private readonly record struct DemoPullRequest(

@@ -5,9 +5,11 @@ namespace BBDevPulse.Caching.Internal.Models;
 /// </summary>
 internal sealed class CachedPullRequestSizeSummary
 {
-    public int FilesChanged { get; init; }
+    public int? FilesChanged { get; init; }
 
-    public int LinesAdded { get; init; }
+    public int? LinesAdded { get; init; }
 
-    public int LinesRemoved { get; init; }
+    public int? LinesRemoved { get; init; }
+
+    public bool? HasLineData { get; init; }
 }

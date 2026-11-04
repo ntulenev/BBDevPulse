@@ -94,42 +94,19 @@ internal sealed class ReportRunner : IReportRunner
     private async Task BuildReportsAsync(List<Repository> filteredRepos, ReportParameters parameters,
         Dictionary<DisplayName, PersonCsvRow> peopleByName, CancellationToken cancellationToken)
     {
-        var reportData = new ReportData(parameters, peopleByName);
-        await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
-        {
-            await _analyzer.AnalyzeAsync(
-                repo,
-                reportData,
-                token).ConfigureAwait(false);
-        }, cancellationToken).ConfigureAwait(false);
+        var accumulator = new ReportAccumulator(parameters, peopleByName);
+        var coordinator = new RepositoryAnalysisCoordinator(_options.RepositoryConcurrency);
+        await _presenter.RunWithRepositoryProgressAsync(filteredRepos.Count,
+            (progress, token) => coordinator.RunAsync(filteredRepos,
+                (repo, itemToken) => _analyzer.AnalyzeAsync(repo, accumulator, itemToken),
+                progress, token), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        if (reportData.DeveloperStats.Count > 0)
-        {
-            EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
-        }
-        reportData.Freeze();
-        _presenter.RenderReport(reportData);
+        accumulator.CompleteAnalysis(cancellationToken);
+        accumulator.EnrichDevelopers();
+        var report = accumulator.Build(cancellationToken);
+        _presenter.RenderReport(report);
         _presenter.RenderTelemetrySummary(_telemetryService.GetSnapshot());
-        await _publisher.PublishAsync(reportData, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static void EnrichDeveloperStatsFromPeopleCsv(
-        ReportData reportData,
-        Dictionary<DisplayName, PersonCsvRow> peopleByName)
-    {
-        if (reportData.DeveloperStats.Count == 0 || peopleByName.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var stat in reportData.DeveloperStats.Values)
-        {
-            if (reportData.TryGetPerson(new DeveloperIdentity(stat.BitbucketUuid, stat.DisplayName), out var person))
-            {
-                stat.Grade = person.Grade;
-                stat.Department = person.Department;
-            }
-        }
+        await _publisher.PublishAsync(report, cancellationToken).ConfigureAwait(false);
     }
 
     private readonly IBitbucketClient _client;

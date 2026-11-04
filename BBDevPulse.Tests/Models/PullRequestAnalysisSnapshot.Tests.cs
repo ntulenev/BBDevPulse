@@ -6,6 +6,58 @@ namespace BBDevPulse.Tests.Models;
 
 public sealed class PullRequestAnalysisSnapshotTests
 {
+    [Fact]
+    public void AvailabilityDistinguishesNotRequestedFailureAndMeasuredZero()
+    {
+        var pending = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            commitsAvailability: DataAvailability.NotRequested, sizeAvailability: DataAvailability.NotRequested);
+        var failed = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            commitsAvailability: DataAvailability.Unavailable, sizeAvailability: DataAvailability.Unavailable);
+        var measured = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            hasCommits: true, hasSize: true, commitsAvailability: DataAvailability.Available,
+            sizeAvailability: DataAvailability.Available);
+        pending.SizeAvailability.Should().Be(DataAvailability.NotRequested);
+        failed.SizeAvailability.Should().Be(DataAvailability.Unavailable);
+        measured.SizeAvailability.Should().Be(DataAvailability.Available);
+        measured.SizeSummary.LineChurn.Should().Be(0);
+    }
+
+    [Fact]
+    public void ContradictoryAvailabilityIsRejected()
+    {
+        Action create = () => _ = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            hasSize: false, sizeAvailability: DataAvailability.Available);
+        create.Should().Throw<ArgumentException>();
+        Action completeWithoutSize = () => _ = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [],
+            hasEnrichment: true, hasSize: false);
+        completeWithoutSize.Should().Throw<ArgumentException>();
+        Action nullItem = () => _ = new PullRequestAnalysisSnapshot([null!], [], PullRequestSizeSummary.Empty, []);
+        nullItem.Should().Throw<ArgumentException>().WithParameterName("activities");
+    }
+
+    [Fact]
+    public void SnapshotOwnsItsCollections()
+    {
+        var activity = new PullRequestActivity(null, null, null, null, null);
+        var commit = new PullRequestCommitInfo("hash", DateTimeOffset.UnixEpoch, "message");
+        var detail = new DeveloperCommitActivity("Repo", "repo", new PullRequestId(1), "hash",
+            "message", DateTimeOffset.UnixEpoch, PullRequestSizeSummary.Empty);
+        var activities = new List<PullRequestActivity> { activity };
+        var commits = new List<PullRequestCommitInfo> { commit };
+        var details = new List<DeveloperCommitActivity> { detail };
+        var snapshot = new PullRequestAnalysisSnapshot(activities, commits, PullRequestSizeSummary.Empty, details);
+
+        activities.Clear();
+        commits.Clear();
+        details.Clear();
+
+        snapshot.Activities.Should().ContainSingle().Which.Should().BeSameAs(activity);
+        snapshot.CorrectionCommits.Should().ContainSingle().Which.Should().BeSameAs(commit);
+        snapshot.CommitActivities.Should().ContainSingle().Which.Should().BeSameAs(detail);
+        ((IList<PullRequestActivity>)snapshot.Activities).Invoking(items => items.Clear())
+            .Should().Throw<NotSupportedException>();
+    }
+
     [Fact(DisplayName = "Constructor throws when activities are null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenActivitiesAreNullThrowsArgumentNullException()

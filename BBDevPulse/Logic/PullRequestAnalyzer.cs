@@ -1,7 +1,4 @@
-using System.Globalization;
 using System.Runtime.ExceptionServices;
-using System.Security.Cryptography;
-using System.Text;
 
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
@@ -22,29 +19,33 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
     /// <param name="client">Bitbucket API client.</param>
     /// <param name="activityAnalyzer">Activity analyzer.</param>
     /// <param name="analysisCache">Pull request analysis cache.</param>
+    /// <param name="cacheKeys">Creates cache fingerprints.</param>
     /// <param name="options">Bitbucket options.</param>
     public PullRequestAnalyzer(
         IBitbucketClient client,
         IActivityAnalyzer activityAnalyzer,
         IPullRequestAnalysisCache analysisCache,
+        IPullRequestAnalysisCacheKeyFactory cacheKeys,
         IOptions<BitbucketOptions> options)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(activityAnalyzer);
         ArgumentNullException.ThrowIfNull(analysisCache);
+        ArgumentNullException.ThrowIfNull(cacheKeys);
         ArgumentNullException.ThrowIfNull(options);
 
         var maxConcurrentPullRequests = options.Value.PullRequestConcurrency;
         _client = client;
         _activityAnalyzer = activityAnalyzer;
         _analysisCache = analysisCache;
+        _cacheKeys = cacheKeys;
         _maxConcurrentPullRequests = maxConcurrentPullRequests;
     }
 
     /// <inheritdoc />
     public async Task AnalyzeAsync(
         Repository repo,
-        ReportData reportData,
+        ReportAccumulator reportData,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(repo);
@@ -121,7 +122,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
     private async Task AnalyzePullRequestWithSemaphoreAsync(
         Repository repo,
-        ReportData reportData,
+        ReportAccumulator reportData,
         PullRequest pr,
         SemaphoreSlim semaphore,
         Action<Exception> onError,
@@ -144,7 +145,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
     private async Task AnalyzePullRequestAsync(
         Repository repo,
-        ReportData reportData,
+        ReportAccumulator reportData,
         PullRequest pr,
         CancellationToken cancellationToken)
     {
@@ -152,25 +153,17 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var filterDate = parameters.FilterDate;
         var workspace = parameters.Workspace;
         var collectDeveloperDetails = parameters.ShowAllDetailsForDevelopers;
-        var parametersFingerprint = BuildParametersFingerprint(parameters);
-        var pullRequestFingerprint = BuildPullRequestFingerprint(pr);
+        var parametersFingerprint = _cacheKeys.BuildParametersFingerprint(parameters);
+        var pullRequestFingerprint = _cacheKeys.BuildPullRequestFingerprint(pr);
 
+        var observedIdentities = new List<DeveloperIdentity>();
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
-        if (!authorIdentity.HasValue)
+        observedIdentities.Add(authorIdentity ?? new DeveloperIdentity(null, new DisplayName("unknown")));
+        if (!authorIdentity.HasValue || authorIdentity.Value.Uuid is null)
         {
-            reportData.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("unknown")));
+            reportData.ApplyResult(PullRequestAnalysisResult.Skipped(workspace, repo.Slug, pr.Id, observedIdentities));
             return;
         }
-        if (authorIdentity.HasValue)
-        {
-            reportData.ObserveDeveloperIdentity(authorIdentity.Value);
-            if (authorIdentity.Value.Uuid is null)
-            {
-                return;
-            }
-        }
-        var includeAuthoredPullRequest = !parameters.HasTeamFilter ||
-            (authorIdentity.HasValue && reportData.IsDeveloperIncluded(authorIdentity.Value));
         var cacheHit = TryReadAnalysisSnapshot(
             workspace,
             repo.Slug,
@@ -188,87 +181,21 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 cancellationToken).ConfigureAwait(false);
         }
 
-        var analysis = new ActivityAnalysisState(
-            pr.CreatedOn,
-            authorIdentity,
-            pr.IsCreatedInRange(parameters));
-        var detailedComments = collectDeveloperDetails
-            ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
-            : null;
-        var detailedApprovals = collectDeveloperDetails
-            ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
-            : null;
-
-        foreach (var activity in snapshot.Activities)
+        var evaluation = PullRequestResultBuilder.Evaluate(
+            pr, parameters, snapshot, reportData.IsDeveloperIncluded, _activityAnalyzer);
+        if (evaluation.Selection != PullRequestResultBuilder.Selection.Included)
         {
-            if (activity.Actor.HasValue)
+            if (evaluation.Selection == PullRequestResultBuilder.Selection.OutsideTeam && !cacheHit)
             {
-                reportData.ObserveDeveloperIdentity(activity.Actor.Value);
+                _analysisCache.Store(workspace, repo.Slug, pr.Id,
+                    pullRequestFingerprint, parametersFingerprint, snapshot);
             }
-            if (activity.Comment is not null)
-            {
-                reportData.ObserveDeveloperIdentity(activity.Comment.User);
-            }
-            if (activity.Approval is not null)
-            {
-                reportData.ObserveDeveloperIdentity(activity.Approval.User);
-            }
-            if ((activity.Comment is not null && activity.Comment.User.Uuid is null) ||
-                (activity.Approval is not null && activity.Approval.User.Uuid is null) ||
-                (activity.Actor.HasValue && activity.Actor.Value.Uuid is null &&
-                 activity.Comment is null && activity.Approval is null))
-            {
-                continue;
-            }
-            if (parameters.HasTeamFilter &&
-                parameters.IsInRange(activity.ActivityDate) &&
-                HasIncludedTeamActivity(activity, reportData))
-            {
-                analysis.HasIncludedTeamActivity = true;
-            }
-
-            _activityAnalyzer.Analyze(analysis, activity, parameters);
-
-            if (collectDeveloperDetails)
-            {
-                if (activity.Comment is not null && activity.Comment.User.Uuid is not null && parameters.IsInRange(activity.Comment.Date))
-                {
-                    detailedComments!.Add((activity.Comment.User, activity.Comment.Date));
-                }
-
-                if (activity.Approval is not null && activity.Approval.User.Uuid is not null && parameters.IsInRange(activity.Approval.Date))
-                {
-                    detailedApprovals!.Add((activity.Approval.User, activity.Approval.Date));
-                }
-            }
-        }
-
-        var matchesFilter = parameters.IsInRange(pr.CreatedOn) || analysis.HasActivityInRange;
-        if (!matchesFilter)
-        {
+            reportData.ApplyResult(PullRequestResultBuilder.Complete(repo, pr, parameters, snapshot, evaluation));
             return;
         }
 
-        var hasTeamActivity = parameters.HasTeamFilter && analysis.HasIncludedTeamActivity;
-        var shouldDisplayPullRequest = includeAuthoredPullRequest || hasTeamActivity;
-        if (!shouldDisplayPullRequest)
-        {
-            if (!cacheHit)
-            {
-                _analysisCache.Store(
-                    workspace,
-                    repo.Slug,
-                    pr.Id,
-                    pullRequestFingerprint,
-                    parametersFingerprint,
-                    snapshot);
-            }
-
-            return;
-        }
-
-        if (!snapshot.HasCommits || !snapshot.HasSize ||
-            (collectDeveloperDetails && snapshot.CommitActivities.Any(static activity => !activity.HasSizeData)))
+        if (!snapshot.HasCommits || !snapshot.HasSize || !snapshot.SizeSummary.HasLineData ||
+            (collectDeveloperDetails && snapshot.CommitActivities.Any(static activity => !activity.HasSizeData || !activity.SizeSummary.HasLineData)))
         {
             snapshot = await EnrichAnalysisSnapshotAsync(
                 snapshot,
@@ -288,150 +215,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 snapshot);
         }
 
-        if (authorIdentity.HasValue)
-        {
-            analysis.Participants[authorIdentity.Value.ToKey()] = authorIdentity.Value;
-        }
-
-        var mergedOnResolved = analysis.MergedOnFromActivity ?? pr.MergedOn;
-        if (!parameters.IsInRange(mergedOnResolved))
-        {
-            mergedOnResolved = null;
-        }
-
-        var rejectedOn = pr.ResolveRejectedOn();
-        if (!parameters.IsInRange(rejectedOn))
-        {
-            rejectedOn = null;
-        }
-
-        var correctionCommits = snapshot.CorrectionCommits;
-        IReadOnlyList<DeveloperCommitActivity> correctionCommitActivities = [];
-        var sizeSummary = snapshot.SizeSummary;
-        if (shouldDisplayPullRequest)
-        {
-            if (collectDeveloperDetails && authorIdentity.HasValue && includeAuthoredPullRequest && snapshot.CommitActivities.Count > 0)
-            {
-                correctionCommitActivities = snapshot.CommitActivities;
-            }
-        }
-
-        var corrections = correctionCommits.Count;
-        var repositoryName = string.IsNullOrWhiteSpace(repo.Name.Value) ? repo.Slug.Value : repo.Name.Value;
-        var pullRequestAuthor = pr.Author?.DisplayName.Value ?? "unknown";
-        var reportEntry = shouldDisplayPullRequest
-            ? new PullRequestReport(
-                repositoryName,
-                repo.Slug.Value,
-                pullRequestAuthor,
-                pr.Destination?.Branch?.Name ?? "-",
-                pr.CreatedOn,
-                analysis.LastActivity,
-                mergedOnResolved,
-                rejectedOn,
-                pr.State,
-                pr.Id,
-                analysis.TotalComments,
-                corrections,
-                analysis.FirstReactionOn,
-                sizeSummary.FilesChanged,
-                sizeSummary.LinesAdded,
-                sizeSummary.LinesRemoved,
-                isActivityOnlyMatch: !includeAuthoredPullRequest,
-                hasSizeData: snapshot.HasSize,
-                hasCorrectionsData: snapshot.HasCommits)
-            : null;
-
-        reportData.ApplyAnalysis(() =>
-        {
-            if (authorIdentity.HasValue && includeAuthoredPullRequest)
-            {
-                var authorStats = reportData.GetOrAddDeveloper(authorIdentity.Value);
-                if (parameters.IsInRange(pr.CreatedOn))
-                {
-                    authorStats.PrsOpenedSince++;
-                }
-
-                if (parameters.IsInRange(mergedOnResolved))
-                {
-                    authorStats.PrsMergedAfter++;
-                }
-
-                if (snapshot.HasCommits)
-                {
-                    authorStats.Corrections += corrections;
-                }
-                else
-                {
-                    authorStats.HasCompleteCorrectionsData = false;
-                }
-                if (collectDeveloperDetails && reportEntry is not null)
-                {
-                    authorStats.AuthoredPullRequests.Add(reportEntry);
-                    foreach (var commit in correctionCommitActivities)
-                    {
-                        authorStats.CommitActivities.Add(commit);
-                    }
-                }
-            }
-
-            foreach (var entry in analysis.CommentCounts)
-            {
-                if (analysis.Participants.TryGetValue(entry.Key, out var participant) &&
-                    reportData.IsDeveloperIncluded(participant))
-                {
-                    var participantStats = reportData.GetOrAddDeveloper(participant);
-                    participantStats.CommentsAfter += entry.Value;
-                    if (authorIdentity.HasValue && !participant.IsSameIdentity(authorIdentity.Value))
-                    {
-                        participantStats.PeerCommentsAfter += entry.Value;
-                    }
-                }
-            }
-
-            foreach (var entry in analysis.ApprovalCounts)
-            {
-                if (analysis.Participants.TryGetValue(entry.Key, out var participant) &&
-                    reportData.IsDeveloperIncluded(participant))
-                {
-                    reportData.GetOrAddDeveloper(participant).ApprovalsAfter += entry.Value;
-                }
-            }
-
-            if (collectDeveloperDetails)
-            {
-                foreach (var detail in detailedComments!)
-                {
-                    if (reportData.IsDeveloperIncluded(detail.User))
-                    {
-                        reportData.GetOrAddDeveloper(detail.User).CommentActivities.Add(new DeveloperCommentActivity(
-                            repositoryName,
-                            repo.Slug.Value,
-                            pr.Id,
-                            pullRequestAuthor,
-                            detail.Date));
-                    }
-                }
-
-                foreach (var detail in detailedApprovals!)
-                {
-                    if (reportData.IsDeveloperIncluded(detail.User))
-                    {
-                        reportData.GetOrAddDeveloper(detail.User).ApprovalActivities.Add(new DeveloperApprovalActivity(
-                            repositoryName,
-                            repo.Slug.Value,
-                            pr.Id,
-                            pullRequestAuthor,
-                            detail.Date));
-                    }
-                }
-            }
-
-            if (shouldDisplayPullRequest)
-            {
-                reportData.Reports.Add(reportEntry!);
-            }
-        });
+        cancellationToken.ThrowIfCancellationRequested();
+        reportData.ApplyResult(PullRequestResultBuilder.Complete(repo, pr, parameters, snapshot, evaluation));
     }
 
     private async Task<IReadOnlyList<PullRequestCommitInfo>?> GetCorrectionCommitsAsync(
@@ -511,7 +296,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             correctionCommits: [],
             sizeSummary: PullRequestSizeSummary.Empty,
             commitActivities: [],
-            hasEnrichment: false);
+            hasEnrichment: false,
+            commitsAvailability: DataAvailability.NotRequested,
+            sizeAvailability: DataAvailability.NotRequested);
     }
 
     private async Task<PullRequestAnalysisSnapshot> EnrichAnalysisSnapshotAsync(
@@ -529,10 +316,11 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             await GetCorrectionCommitsAsync(parameters.Workspace, repo.Slug, pr.Id,
                 pr.CreatedOn, parameters, cancellationToken).ConfigureAwait(false);
         var correctionCommits = loadedCommits ?? snapshot.CorrectionCommits;
-        var loadedSize = snapshot.HasSize ? snapshot.SizeSummary :
+        var loadedSize = snapshot.HasSize && snapshot.SizeSummary.HasLineData ? snapshot.SizeSummary :
             await GetPullRequestSizeSafeAsync(parameters.Workspace, repo.Slug, pr.Id,
                 cancellationToken).ConfigureAwait(false);
-        var sizeSummary = loadedSize ?? snapshot.SizeSummary;
+        var effectiveSize = loadedSize ?? (snapshot.HasSize ? snapshot.SizeSummary : (PullRequestSizeSummary?)null);
+        var sizeSummary = effectiveSize ?? snapshot.SizeSummary;
 
         IReadOnlyList<DeveloperCommitActivity> commitActivities = [];
         if (collectDeveloperDetails && hasAuthorIdentity && loadedCommits is not null && correctionCommits.Count > 0)
@@ -552,10 +340,13 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             correctionCommits,
             sizeSummary,
             commitActivities,
-            hasEnrichment: loadedCommits is not null && loadedSize is not null &&
-                commitActivities.All(static activity => activity.HasSizeData),
+            hasEnrichment: loadedCommits is not null && effectiveSize is not null && effectiveSize.Value.HasLineData &&
+                commitActivities.All(static activity => activity.HasSizeData && activity.SizeSummary.HasLineData),
             hasCommits: loadedCommits is not null,
-            hasSize: loadedSize is not null);
+            hasSize: effectiveSize is not null,
+            commitsAvailability: loadedCommits is null ? DataAvailability.Unavailable : DataAvailability.Available,
+            sizeAvailability: effectiveSize is null ? DataAvailability.Unavailable :
+                effectiveSize.Value.HasLineData ? DataAvailability.Available : DataAvailability.Incomplete);
     }
 
     private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(
@@ -580,14 +371,14 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         foreach (var commit in correctionCommits)
         {
             PullRequestSizeSummary? sizeSummary;
-            if (cachedSizes.TryGetValue(commit.Hash, out var cachedSize))
+            if (cachedSizes.TryGetValue(commit.Hash, out var cachedSize) && cachedSize.HasLineData)
             {
                 sizeSummary = cachedSize;
             }
             else
             {
                 sizeSummary = await GetCommitSizeSafeAsync(workspace, repoSlug, commit.Hash, cancellationToken)
-                    .ConfigureAwait(false);
+                    .ConfigureAwait(false) ?? (cachedSizes.ContainsKey(commit.Hash) ? cachedSize : null);
             }
             activities.Add(new DeveloperCommitActivity(
                 repositoryName,
@@ -601,21 +392,6 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
 
         return activities;
-    }
-
-    private static bool HasIncludedTeamActivity(PullRequestActivity activity, ReportData reportData)
-    {
-        if (activity.Actor.HasValue && reportData.IsDeveloperIncluded(activity.Actor.Value))
-        {
-            return true;
-        }
-
-        if (activity.Comment is not null && reportData.IsDeveloperIncluded(activity.Comment.User))
-        {
-            return true;
-        }
-
-        return activity.Approval is not null && reportData.IsDeveloperIncluded(activity.Approval.User);
     }
 
     private async Task<PullRequestSizeSummary?> GetPullRequestSizeSafeAsync(
@@ -660,46 +436,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
     }
 
-    private static string BuildParametersFingerprint(ReportParameters parameters)
-    {
-        ArgumentNullException.ThrowIfNull(parameters);
-
-        var rawFingerprint = string.Join(
-            '\n',
-            parameters.FilterDate.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
-            parameters.ToDateExclusive?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            parameters.ShowAllDetailsForDevelopers ? "1" : "0");
-
-        return ComputeFingerprint(rawFingerprint);
-    }
-
-    private static string BuildPullRequestFingerprint(PullRequest pullRequest)
-    {
-        ArgumentNullException.ThrowIfNull(pullRequest);
-
-        var rawFingerprint = string.Join(
-            '\n',
-            pullRequest.Id.Value.ToString(CultureInfo.InvariantCulture),
-            pullRequest.State.ToString(),
-            pullRequest.CreatedOn.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
-            pullRequest.UpdatedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            pullRequest.ClosedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            pullRequest.MergedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            pullRequest.Author?.DisplayName.Value ?? string.Empty,
-            pullRequest.Author?.Uuid?.Value ?? string.Empty,
-            pullRequest.Destination?.Branch?.Name ?? string.Empty);
-
-        return ComputeFingerprint(rawFingerprint);
-    }
-
-    private static string ComputeFingerprint(string value)
-    {
-        var fingerprintBytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
-        return Convert.ToHexString(fingerprintBytes);
-    }
-
     private readonly IBitbucketClient _client;
     private readonly IActivityAnalyzer _activityAnalyzer;
     private readonly IPullRequestAnalysisCache _analysisCache;
+    private readonly IPullRequestAnalysisCacheKeyFactory _cacheKeys;
     private readonly int _maxConcurrentPullRequests;
 }

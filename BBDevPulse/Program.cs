@@ -73,6 +73,7 @@ using var host = Host.CreateDefaultBuilder(args)
         _ = services.AddSingleton<IHtmlReportRenderer, HtmlReportRenderer>();
         _ = services.AddSingleton<IPdfReportFileStore, PdfReportFileStore>();
         _ = services.AddSingleton<IPdfReportRenderer, QuestPdfReportRenderer>();
+        _ = services.AddSingleton<IPullRequestAnalysisCacheKeyFactory, PullRequestAnalysisCacheKeyFactory>();
         _ = services.AddSingleton<IPullRequestAnalysisCacheMapper, PullRequestAnalysisCacheMapper>();
         _ = services.AddSingleton<IPullRequestAnalysisCache, FilePullRequestAnalysisCache>();
         _ = services.AddSingleton<IPeopleCsvProvider, PeopleCsvProvider>();

@@ -50,7 +50,7 @@ internal sealed class BitbucketMapper : IBitbucketMapper
             new PullRequestId(dto.Id),
             MapState(dto.State),
             dto.ClosedOn,
-            dto.CreatedOn,
+            dto.CreatedOn ?? throw new InvalidDataException("Bitbucket pull request is missing its creation timestamp."),
             dto.UpdatedOn,
             dto.MergedOn,
             Map(dto.Author),

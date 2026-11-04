@@ -18,6 +18,90 @@ namespace BBDevPulse.Tests.Presentation;
 
 public sealed partial class ReportFormatParityTests
 {
+    [Theory]
+    [InlineData(PullRequestSizeMode.Lines)]
+    [InlineData(PullRequestSizeMode.Files)]
+    public async Task ZeroSizeAndUnavailableDataRemainDistinctAcrossFormats(PullRequestSizeMode mode)
+    {
+        var start = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+        var parameters = new ReportParameters(start, new Workspace("team"), new RepoNameFilter(""), [],
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, [], pullRequestSizeMode: mode,
+            teamFilter: "Core");
+        var data = new ReportData(parameters, new Dictionary<DisplayName, PersonCsvRow>
+        {
+            [new DisplayName("Alex Kim")] = new("Senior", "Core")
+        });
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{one}"), new DisplayName("Alex Kim")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{two}"), new DisplayName("Alex Kim")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Unknown")));
+        data.MutableReports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, start,
+            null, null, PullRequestState.Open, new PullRequestId(1), 0, hasSizeData: true));
+        data.MutableReports.Add(new PullRequestReport("repo", "repo", "Bob", "main", start, start,
+            null, null, PullRequestState.Open, new PullRequestId(2), 0,
+            hasSizeData: false, hasCorrectionsData: false));
+        data.MutableReports.Add(new PullRequestReport("repo", "repo", "Carol", "main", start, start,
+            null, null, PullRequestState.Open, new PullRequestId(3), 0, filesChanged: 7, linesAdded: 1,
+            hasSizeData: true, hasLineSizeData: false));
+        data.Freeze();
+        var calculator = new StatisticsCalculator();
+        var formatter = new DateDiffFormatter();
+        var html = new HtmlContentComposer(formatter, calculator).Compose(data);
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var options = new BitbucketOptions
+            {
+                Workspace = "team",
+                PageLength = 10,
+                Username = "user",
+                AppPassword = "unused",
+                RepoNameFilter = "",
+                RepoNameList = [],
+                BranchNameList = [],
+                RepoSearchMode = parameters.RepoSearchMode,
+                PrTimeFilterMode = parameters.PrTimeFilterMode,
+                Pdf = new PdfOptions { OutputPath = Path.Combine(directory.FullName, "report.pdf") }
+            };
+            var presenter = new SpectreReportPresenter(
+                new SpectreAuthPresenter(), new SpectreRepositoryListPresenter(),
+                new SpectreRepositoryAnalysisPresenter(), new SpectreBranchFilterPresenter(),
+                new SpectrePullRequestReportPresenter(formatter), new SpectreStatisticsPresenter(calculator, formatter));
+            var console = TestConsoleRunner.Run(console =>
+            {
+                console.Profile.Width = 240;
+                presenter.RenderReport(data);
+            });
+            var renderer = new QuestPdfReportRenderer(Options.Create(options), formatter, calculator, new PdfReportFileStore());
+            await renderer.RenderReportAsync(data);
+            using var pdf = PdfDocument.Open(Assert.Single(directory.GetFiles("*.pdf")).FullName);
+            var pdfText = string.Concat(pdf.GetPages().Select(page => page.Text));
+
+            foreach (var text in new[] { console, WebUtility.HtmlDecode(HtmlTag().Replace(html, "")), pdfText })
+            {
+                var compact = Layout().Replace(text, "");
+                Assert.Contains("XS(0)", compact);
+                Assert.Contains("Unavailable", compact);
+                Assert.Contains(Layout().Replace(ReportData.IdentityCollisionWarning, ""), compact);
+                Assert.Contains(Layout().Replace(ReportData.MissingUserUuidWarning, ""), compact);
+                Assert.Contains("AlexKim", compact);
+                Assert.Contains("{one}", compact);
+                Assert.Contains("{two}", compact);
+                if (mode == PullRequestSizeMode.Lines)
+                {
+                    Assert.DoesNotContain("XS(1)", compact);
+                }
+                else
+                {
+                    Assert.Contains("M(7)", compact);
+                }
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public async Task PublishedReportShowsSameThroughputAndTtfrInAllFormats()
     {
@@ -52,7 +136,7 @@ public sealed partial class ReportFormatParityTests
             };
             var presenter = new SpectreReportPresenter(
                 new SpectreAuthPresenter(), new SpectreRepositoryListPresenter(),
-                new SpectreRepositoryAnalysisPresenter(Options.Create(options)), new SpectreBranchFilterPresenter(),
+                new SpectreRepositoryAnalysisPresenter(), new SpectreBranchFilterPresenter(),
                 new SpectrePullRequestReportPresenter(formatter), new SpectreStatisticsPresenter(calculator, formatter));
             var console = TestConsoleRunner.Run(_ => presenter.RenderReport(data));
 
@@ -71,7 +155,7 @@ public sealed partial class ReportFormatParityTests
         void AddReport(int id, PullRequestState state, int? reactionHours, bool activityOnly = false)
         {
             var end = start.AddHours(22);
-            data.Reports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, end,
+            data.MutableReports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, end,
                 state == PullRequestState.Merged ? end : null, state == PullRequestState.Declined ? end : null,
                 state, new PullRequestId(id), 0, firstReactionOn: reactionHours.HasValue ? start.AddHours(reactionHours.Value) : null,
                 isActivityOnlyMatch: activityOnly));

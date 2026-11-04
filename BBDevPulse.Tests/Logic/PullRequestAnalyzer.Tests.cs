@@ -19,11 +19,137 @@ namespace BBDevPulse.Tests.Logic;
 public sealed class PullRequestAnalyzerTests
 {
     [Fact]
+    public async Task RepositoryAndPullRequestLimitsComposeWithoutLosingResults()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repositories = new[]
+        {
+            new Repository(new RepoName("Repo A"), new RepoSlug("repo-a")),
+            new Repository(new RepoName("Repo B"), new RepoSlug("repo-b"))
+        };
+        var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+        var prs = Enumerable.Range(1, 3).Select(id => new PullRequest(new PullRequestId(id),
+            PullRequestState.Open, null, date, null, null, author, null)).ToArray();
+        var allStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var maximum = 0;
+        var sync = new object();
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable(prs));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => WaitForRelease());
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
+        var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer(), pullRequestConcurrency: 2);
+        var accumulator = new ReportAccumulator(CreateParameters(date.AddDays(-1)));
+        var coordinator = new RepositoryAnalysisCoordinator(2);
+        var run = coordinator.RunAsync(repositories,
+            (repo, token) => analyzer.AnalyzeAsync(repo, accumulator, token), _ => { }, CancellationToken.None);
+
+        await allStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        maximum.Should().Be(4);
+        release.SetResult();
+        await run;
+        var report = accumulator.Build();
+        report.Reports.Should().HaveCount(6);
+        report.DeveloperStats.Values.Single().PrsOpenedSince.Should().Be(6);
+        maximum.Should().Be(4);
+        active.Should().Be(0);
+
+        async IAsyncEnumerable<PullRequestActivity> WaitForRelease()
+        {
+            var current = Interlocked.Increment(ref active);
+            lock (sync)
+            {
+                maximum = System.Math.Max(maximum, current);
+            }
+            if (current == 4)
+            {
+                allStarted.TrySetResult();
+            }
+            try
+            {
+                await release.Task;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref active);
+            }
+            yield break;
+        }
+    }
+
+    [Fact]
+    public async Task PullRequestConcurrencyIsBoundedPerRepository()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+        var pullRequests = Enumerable.Range(1, 4)
+            .Select(id => new PullRequest(new PullRequestId(id), PullRequestState.Open, null, date,
+                null, null, author, null)).ToArray();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var maxActive = 0;
+        var sync = new object();
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable(pullRequests));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ReadActivities());
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
+        var run = CreateAnalyzer(client.Object, new ActivityAnalyzer(), pullRequestConcurrency: 2)
+            .AnalyzeAsync(repository, data, CancellationToken.None);
+
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        maxActive.Should().Be(2);
+        release.SetResult();
+        await run;
+        maxActive.Should().Be(2);
+        active.Should().Be(0);
+        data.Reports.Should().HaveCount(4);
+
+        async IAsyncEnumerable<PullRequestActivity> ReadActivities()
+        {
+            var current = Interlocked.Increment(ref active);
+            lock (sync)
+            {
+                maxActive = System.Math.Max(maxActive, current);
+            }
+            if (current == 2)
+            {
+                started.TrySetResult();
+            }
+            try
+            {
+                await release.Task;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref active);
+            }
+            yield break;
+        }
+    }
+
+    [Fact]
     public async Task AnalyzeAsyncObservesAuthorAndActivityIdentitiesBeforeTheyAreMerged()
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var reviewer = new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Alice"));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, author, null);
@@ -45,7 +171,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
             new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new("Senior", "Core") });
         var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
@@ -92,7 +218,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
             new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new("Senior", "Core", "a") });
         var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
@@ -133,7 +259,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null,
             new User(new DisplayName("Alice"), null), null);
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
@@ -152,7 +278,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true));
         var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var reviewer = new DeveloperIdentity(null, new DisplayName("Reviewer"));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, author, null);
@@ -191,7 +317,7 @@ public sealed class PullRequestAnalyzerTests
             .Throws(failure);
 
         var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
-        var report = new ReportData(CreateParameters(date.AddDays(-1)));
+        var report = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var thrown = await FluentActions.Invoking(() => analyzer.AnalyzeAsync(repository, report, CancellationToken.None))
             .Should().ThrowAsync<InvalidOperationException>();
 
@@ -205,7 +331,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
             closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
             author: new User(new DisplayName("Alice"), new UserUuid("{alice-1}")), destination: null);
@@ -267,11 +393,76 @@ public sealed class PullRequestAnalyzerTests
             });
 
         var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
-        var report = new ReportData(CreateParameters(date.AddDays(-1)));
+        var report = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
 
         await FluentActions.Invoking(() => analyzer.AnalyzeAsync(repository, report, cancellation.Token))
             .Should().ThrowAsync<OperationCanceledException>();
         report.Reports.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ColdAndWarmCachePreserveMetricsWarningsAndUnavailableMeasurements()
+    {
+        var cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+            var parameters = CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true);
+            var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+            var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+            var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
+            var prs = new[]
+            {
+                new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, first, null),
+                new PullRequest(new PullRequestId(2), PullRequestState.Open, null, date, null, null, second, null)
+            };
+            var reviewer = second.ToDeveloperIdentity();
+            var missing = new DeveloperIdentity(null, new DisplayName("Unknown reviewer"));
+            var activities = new[]
+            {
+                new PullRequestActivity(date.AddHours(1), null, reviewer,
+                    new ActivityComment(reviewer, date.AddHours(1)), null),
+                new PullRequestActivity(date.AddHours(2), null, missing,
+                    new ActivityComment(missing, date.AddHours(2)), null)
+            };
+            var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+            client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable(prs));
+            client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(id => id.Value == 1), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable(activities));
+            client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.Is<PullRequestId>(id => id.Value == 2), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+            client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+            client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ThrowsAsync(new InvalidOperationException("unavailable"));
+            var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(),
+                new Mock<IBitbucketTelemetryService>().Object, cacheDirectory);
+            var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer(), analysisCache: cache);
+            var cold = ReportAccumulator.CreateImmediate(parameters);
+            var warm = ReportAccumulator.CreateImmediate(parameters);
+            await analyzer.AnalyzeAsync(repository, cold, CancellationToken.None);
+            await analyzer.AnalyzeAsync(repository, warm, CancellationToken.None);
+
+            cold.HasMissingUserUuid.Should().BeTrue();
+            warm.HasMissingUserUuid.Should().BeTrue();
+            cold.GetIdentityCollisions().Single().Uuids.Should().Equal("{a}", "{b}");
+            warm.GetIdentityCollisions().Single().Uuids.Should().Equal("{a}", "{b}");
+            cold.Reports.Select(report => (report.Id.Value, report.Comments, report.FirstReactionOn, report.SizeAvailability))
+                .Should().BeEquivalentTo(warm.Reports.Select(report => (report.Id.Value, report.Comments, report.FirstReactionOn, report.SizeAvailability)));
+            cold.Reports.Should().OnlyContain(report => report.SizeAvailability == DataAvailability.Unavailable);
+            warm.DeveloperStats[new DeveloperKey(new UserUuid("{b}"))].PeerCommentsAfter.Should().Be(1);
+            cold.DeveloperStats[new DeveloperKey(new UserUuid("{b}"))].PeerCommentsAfter.Should().Be(1);
+            client.Verify(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDirectory))
+                Directory.Delete(cacheDirectory, recursive: true);
+        }
     }
 
     [Fact]
@@ -316,17 +507,17 @@ public sealed class PullRequestAnalyzerTests
             var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
                 analysisCache: cache);
 
-            var first = new ReportData(parameters);
+            var first = ReportAccumulator.CreateImmediate(parameters);
             await analyzer.AnalyzeAsync(repository, first, CancellationToken.None);
             first.Reports.Single().HasSizeData.Should().BeFalse();
             first.Reports.Single().HasCorrectionsData.Should().BeTrue();
 
-            var second = new ReportData(parameters);
+            var second = ReportAccumulator.CreateImmediate(parameters);
             await analyzer.AnalyzeAsync(repository, second, CancellationToken.None);
             second.Reports.Single().FilesChanged.Should().Be(2);
             second.Reports.Single().HasSizeData.Should().BeTrue();
 
-            var third = new ReportData(parameters);
+            var third = ReportAccumulator.CreateImmediate(parameters);
             await analyzer.AnalyzeAsync(repository, third, CancellationToken.None);
             third.Reports.Single().FilesChanged.Should().Be(2);
             second.DeveloperStats.Values.Single().CommitActivities.Should()
@@ -351,11 +542,58 @@ public sealed class PullRequestAnalyzerTests
     }
 
     [Fact]
+    public async Task IncompleteDiffstatIsRetriedWithoutLosingKnownFileCount()
+    {
+        var cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+            var parameters = CreateParameters(date.AddDays(-1));
+            var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+            var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null,
+                new User(new DisplayName("Alice"), new UserUuid("{a}")), null);
+            var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+            client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable([pr]));
+            client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+            client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+            client.SetupSequence(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PullRequestSizeSummary(2, 3, 0, hasLineData: false))
+                .ThrowsAsync(new InvalidOperationException("temporary error"))
+                .ReturnsAsync(new PullRequestSizeSummary(2, 3, 1));
+            var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(),
+                new Mock<IBitbucketTelemetryService>().Object, cacheDirectory);
+            var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer(), analysisCache: cache);
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var report = ReportAccumulator.CreateImmediate(parameters);
+                await analyzer.AnalyzeAsync(repository, report, CancellationToken.None);
+                var entry = report.Reports.Single();
+                entry.HasSizeDataForMode(PullRequestSizeMode.Files).Should().BeTrue();
+                entry.GetSizeMetricValue(PullRequestSizeMode.Files).Should().Be(2);
+                entry.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().Be(attempt == 2);
+            }
+            client.Verify(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDirectory))
+                Directory.Delete(cacheDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task AnalyzeAsyncWaitsForActiveHandlerAndPreservesPageFailure()
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var pullRequest = new PullRequest(new PullRequestId(1), PullRequestState.Open,
             closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
             author: new User(new DisplayName("Author"), new UserUuid("{author}")), destination: null);
@@ -421,6 +659,7 @@ public sealed class PullRequestAnalyzerTests
             client,
             new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
@@ -440,6 +679,7 @@ public sealed class PullRequestAnalyzerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             activityAnalyzer,
             new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
@@ -459,10 +699,20 @@ public sealed class PullRequestAnalyzerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
             analysisCache,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
         act.Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ConstructorRejectsMissingCacheKeyFactory()
+    {
+        Action create = () => _ = new PullRequestAnalyzer(
+            new Mock<IBitbucketClient>().Object, new Mock<IActivityAnalyzer>().Object,
+            new Mock<IPullRequestAnalysisCache>().Object, null!, CreateBitbucketOptions());
+        create.Should().Throw<ArgumentNullException>().WithParameterName("cacheKeys");
     }
 
     [Fact(DisplayName = "Constructor throws when options are null")]
@@ -479,6 +729,7 @@ public sealed class PullRequestAnalyzerTests
             client,
             activityAnalyzer,
             new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
@@ -492,7 +743,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var analyzer = CreateAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
         Repository repository = null!;
-        var reportData = new ReportData(CreateParameters(DateTimeOffset.UtcNow));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(DateTimeOffset.UtcNow));
 
         // Act
         Func<Task> act = async () => await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -508,7 +759,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var analyzer = CreateAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        ReportData reportData = null!;
+        ReportAccumulator reportData = null!;
 
         // Act
         Func<Task> act = async () => await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -523,7 +774,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, branchNameList: [new BranchName("main")]));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, branchNameList: [new BranchName("main")]));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(1),
@@ -570,7 +821,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(1),
@@ -623,7 +874,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
         var parameters = CreateParameters(filterDate, branchNameList: [new BranchName("develop")]);
-        var reportData = new ReportData(parameters);
+        var reportData = ReportAccumulator.CreateImmediate(parameters);
         var repository = new Repository(new RepoName("Repo Name"), new RepoSlug("repo-slug"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var pullRequest = new PullRequest(
@@ -771,7 +1022,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(3),
@@ -822,7 +1073,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(CreateRepoNameWithoutValidation(" "), new RepoSlug("repo-slug"));
         var pullRequest = new PullRequest(
             new PullRequestId(4),
@@ -872,7 +1123,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Author"), new UserUuid("{author-1}"));
         var pullRequest = new PullRequest(
@@ -950,7 +1201,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Author"), new UserUuid("{author-1}"));
         var pullRequest = new PullRequest(
@@ -1007,7 +1258,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
         var parameters = CreateParameters(filterDate, teamFilter: "Core");
-        var reportData = new ReportData(
+        var reportData = ReportAccumulator.CreateImmediate(
             parameters,
             new Dictionary<DisplayName, PersonCsvRow>
             {
@@ -1144,7 +1395,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
         var toDateExclusive = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var pullRequest = new PullRequest(
@@ -1215,7 +1466,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
         var toDateExclusive = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(78),
@@ -1251,7 +1502,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, showAllDetailsForDevelopers: true));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, showAllDetailsForDevelopers: true));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var reviewerIdentity = new DeveloperIdentity(new UserUuid("{reviewer-1}"), new DisplayName("Reviewer"));
@@ -1346,7 +1597,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
         var parameters = CreateParameters(filterDate, branchNameList: [new BranchName("develop")], showAllDetailsForDevelopers: true);
-        var reportData = new ReportData(parameters);
+        var reportData = ReportAccumulator.CreateImmediate(parameters);
         var repository = new Repository(new RepoName("Repo Name"), new RepoSlug("repo-slug"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var reviewerIdentity = new DeveloperIdentity(new UserUuid("{reviewer-1}"), new DisplayName("Reviewer"));
@@ -1540,6 +1791,7 @@ public sealed class PullRequestAnalyzerTests
             client,
             activityAnalyzer,
             resolvedAnalysisCache,
+            new PullRequestAnalysisCacheKeyFactory(),
             CreateBitbucketOptions(pullRequestConcurrency));
     }
 

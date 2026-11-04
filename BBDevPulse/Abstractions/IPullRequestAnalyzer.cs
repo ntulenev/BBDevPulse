@@ -1,11 +1,12 @@
 using BBDevPulse.Models;
+using BBDevPulse.Logic;
 
 namespace BBDevPulse.Abstractions;
 
 /// <summary>
 /// Analyzes pull requests and produces reporting data.
 /// </summary>
-public interface IPullRequestAnalyzer
+internal interface IPullRequestAnalyzer
 {
     /// <summary>
     /// Analyzes pull requests for a repository and updates report data.
@@ -15,6 +16,6 @@ public interface IPullRequestAnalyzer
     /// <param name="cancellationToken">Cancellation token.</param>
     Task AnalyzeAsync(
         Repository repo,
-        ReportData reportData,
+        ReportAccumulator reportData,
         CancellationToken cancellationToken);
 }

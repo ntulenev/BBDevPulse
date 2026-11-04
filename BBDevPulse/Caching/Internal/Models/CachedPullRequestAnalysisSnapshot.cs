@@ -1,3 +1,5 @@
+using BBDevPulse.Models;
+
 namespace BBDevPulse.Caching.Internal.Models;
 
 /// <summary>
@@ -18,4 +20,8 @@ internal sealed class CachedPullRequestAnalysisSnapshot
     public bool HasCommits { get; init; }
 
     public bool HasSize { get; init; }
+
+    public DataAvailability? CommitsAvailability { get; init; }
+
+    public DataAvailability? SizeAvailability { get; init; }
 }

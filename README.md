@@ -120,6 +120,16 @@ Names must match Bitbucket display names exactly. When a UUID is present, both t
 
 In live mode, BBDevPulse caches PR activity, correction commits, and diffstat snapshots in `AppContext.BaseDirectory/cache/pull-request-analysis`. An unchanged PR can reuse its snapshot on a later run. The cache has no automatic eviction. When telemetry is enabled, the console shows actual HTTP requests, cache hits/misses/stores, estimated avoided requests, and a request breakdown by API endpoint.
 
+Cached supplemental data distinguishes a successful empty or zero measurement from a failed request and from data not requested. Older version 2 entries without explicit availability remain readable when their data can be interpreted safely; when a field was not available, its original reason remains unknown and the application may retry the request. Cached sizes without recorded line-count completeness are treated as misses and fetched again. Contradictory or malformed cache entries are also treated as misses. Cache validity does not establish that the Bitbucket activity response is historically complete.
+
+If a diffstat entry omits either line count, its file count remains usable but the line-based size is incomplete: the report shows it as unavailable and excludes it from line-based aggregates. The application retries incomplete diffstat data on later runs. A successful empty diff remains a measured zero.
+
+For supplemental commit and diffstat requests, the current policy treats any non-cancellation exception as unavailable data and continues the report. This also means an unexpected implementation error in those requests can appear as unavailable data; cancellation still stops the run.
+
+Bitbucket pull requests must have a positive ID and a creation timestamp; a response missing either cannot be analyzed. Unknown PR states are retained as `Unknown`, and optional timestamps and destination fields may be absent. A missing user UUID follows the warning and exclusion policy described below. A missing display name falls back to the UUID when possible. These rules describe the application boundary; they do not imply that Bitbucket guarantees every optional field.
+
+The application collects PR results concurrently in an accumulator, then applies them in creation-time, repository-slug, and PR-ID order. The accumulator applies CSV enrichment and publishes a detached, read-only report once; it rejects further use after publication. A duplicate PR result for the same workspace and repository is rejected. If one UUID has appeared under multiple names, the first contributing identity in that order supplies the report name used for CSV enrichment; this is not a guarantee that the name is the user's current Bitbucket display name. Within one PR, activities are analyzed by timestamp, with identity and event fields as deterministic tie breakers; the first matching activity identity is retained. Changing the order of the same loaded events therefore does not change which name is used.
+
 ## Scope and team filtering
 
 ### Repository and branch selection

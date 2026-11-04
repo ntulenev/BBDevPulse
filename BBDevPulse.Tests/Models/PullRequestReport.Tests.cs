@@ -15,6 +15,39 @@ public sealed class PullRequestReportTests
 
         report.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().BeTrue();
         report.GetSizeMetricValue(PullRequestSizeMode.Lines).Should().Be(0);
+        report.SizeAvailability.Should().Be(DataAvailability.Available);
+        report.CorrectionsAvailability.Should().Be(DataAvailability.Available);
+    }
+
+    [Fact]
+    public void MissingAndUnspecifiedSizeAreNotReportedAsMeasuredZero()
+    {
+        var created = DateTimeOffset.UnixEpoch;
+        var missing = new PullRequestReport("Repo", "repo", "Alice", "main", created, created,
+            null, null, PullRequestState.Open, new PullRequestId(1), 0,
+            hasSizeData: false, hasCorrectionsData: false);
+        var unspecified = new PullRequestReport("Repo", "repo", "Alice", "main", created, created,
+            null, null, PullRequestState.Open, new PullRequestId(2), 0);
+        missing.SizeAvailability.Should().Be(DataAvailability.Unavailable);
+        missing.CorrectionsAvailability.Should().Be(DataAvailability.Unavailable);
+        unspecified.SizeAvailability.Should().Be(DataAvailability.Unknown);
+        missing.HasSizeData.Should().BeFalse();
+        unspecified.HasSizeData.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IncompleteLineCountsDoNotHideValidFileCount()
+    {
+        var created = DateTimeOffset.UnixEpoch;
+        var report = new PullRequestReport("Repo", "repo", "Alice", "main", created, created,
+            null, null, PullRequestState.Open, new PullRequestId(1), 0,
+            filesChanged: 7, linesAdded: 3, hasSizeData: true, hasLineSizeData: false);
+        report.SizeAvailability.Should().Be(DataAvailability.Incomplete);
+        report.HasSizeDataForMode(PullRequestSizeMode.Files).Should().BeTrue();
+        report.GetSizeMetricValue(PullRequestSizeMode.Files).Should().Be(7);
+        report.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().BeFalse();
+        Action getLines = () => report.GetSizeMetricValue(PullRequestSizeMode.Lines);
+        getLines.Should().Throw<InvalidOperationException>();
     }
 
     [Fact(DisplayName = "Constructor throws when repository is null")]

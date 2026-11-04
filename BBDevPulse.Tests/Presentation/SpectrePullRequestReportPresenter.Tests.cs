@@ -57,7 +57,7 @@ public sealed class SpectrePullRequestReportPresenterTests
         var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
         var createdOn = new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero);
         var reportData = new ReportData(CreateReportParameters(createdOn.AddDays(-1)));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -100,7 +100,7 @@ public sealed class SpectrePullRequestReportPresenterTests
         var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
         var filterDate = new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero);
         var reportData = new ReportData(CreateReportParameters(filterDate));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -113,7 +113,7 @@ public sealed class SpectrePullRequestReportPresenterTests
             id: new PullRequestId(21),
             comments: 1,
             firstReactionOn: null));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoB",
             repositorySlug: "repob",
             author: "Bob",
@@ -153,7 +153,7 @@ public sealed class SpectrePullRequestReportPresenterTests
         var createdOn = new DateTimeOffset(2026, 2, 20, 12, 0, 0, TimeSpan.Zero); // Friday
         var mondayNoon = new DateTimeOffset(2026, 2, 23, 12, 0, 0, TimeSpan.Zero); // Monday
         var reportData = new ReportData(CreateReportParameters(createdOn.AddDays(-1), excludeWeekend: true));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -194,7 +194,7 @@ public sealed class SpectrePullRequestReportPresenterTests
             monday.AddDays(-1),
             excludeWeekend: false,
             excludedDays: [new DateOnly(2026, 2, 3)]));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -232,7 +232,7 @@ public sealed class SpectrePullRequestReportPresenterTests
         var reportData = new ReportData(CreateReportParameters(
             createdOn.AddDays(-1),
             pullRequestSizeMode: PullRequestSizeMode.Files));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -272,7 +272,7 @@ public sealed class SpectrePullRequestReportPresenterTests
         var presenter = new SpectrePullRequestReportPresenter(formatter.Object);
         var createdOn = new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero);
         var reportData = new ReportData(CreateReportParameters(createdOn.AddDays(-1)));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "External",

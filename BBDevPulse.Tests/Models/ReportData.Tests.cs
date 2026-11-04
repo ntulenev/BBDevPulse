@@ -2,11 +2,88 @@ using FluentAssertions;
 
 using BBDevPulse.Models;
 using BBDevPulse.Math;
+using BBDevPulse.Logic;
 
 namespace BBDevPulse.Tests.Models;
 
 public sealed class ReportDataTests
 {
+    [Fact]
+    public void AccumulatorPublishesOnceAndDetachesCsvRows()
+    {
+        var additional = new List<PersonCsvRow> { new("Lead", "Core", "{a}") };
+        var people = new Dictionary<DisplayName, PersonCsvRow>
+        {
+            [new DisplayName("Alice")] = new("Junior", "Other") { AdditionalRows = additional }
+        };
+        var accumulator = new ReportAccumulator(CreateReportParameters(teamFilter: "Core"), people);
+        var working = accumulator.WorkingData;
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        additional.Clear();
+        people.Clear();
+
+        working.IsDeveloperIncluded(identity).Should().BeTrue();
+        var workingStats = working.GetOrAddDeveloper(identity);
+        workingStats.CommentsAfter = 2;
+        var report = accumulator.Build();
+        report.Should().NotBeSameAs(working);
+        report.DeveloperStats[DeveloperKey.FromIdentity(identity)].Should().NotBeSameAs(workingStats);
+        report.DeveloperStats[DeveloperKey.FromIdentity(identity)].CommentsAfter.Should().Be(2);
+        Action changeReports = () => ((IList<PullRequestReport>)report.Reports).Clear();
+        changeReports.Should().Throw<NotSupportedException>();
+        Action changeDetails = () => ((IList<PullRequestReport>)report.DeveloperStats[DeveloperKey.FromIdentity(identity)]
+            .AuthoredPullRequests).Clear();
+        changeDetails.Should().Throw<NotSupportedException>();
+        report.IsDeveloperIncluded(identity).Should().BeTrue();
+        Action rebuild = () => accumulator.Build();
+        rebuild.Should().Throw<InvalidOperationException>();
+        Action modify = () => working.GetOrAddDeveloper(identity);
+        modify.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void PublishedReportsHaveStableOrderForEqualCreationTimes()
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        var date = accumulator.WorkingData.Parameters.FilterDate;
+        accumulator.WorkingData.MutableReports.Add(CreatePullRequestReport(2, date));
+        accumulator.WorkingData.MutableReports.Add(CreatePullRequestReport(1, date));
+        var report = accumulator.Build();
+        report.Reports.Select(item => item.Id.Value).Should().Equal(1, 2);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AccumulatorAppliesContributionsInStableOrderRegardlessOfCompletion(bool reverse)
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        var date = accumulator.WorkingData.Parameters.FilterDate;
+        var first = CreateContribution(1, date, "Alice Old", "repo-a");
+        var second = CreateContribution(2, date.AddDays(1), "Alice New", "repo-b");
+        foreach (var result in reverse ? new[] { second, first } : new[] { first, second })
+        {
+            accumulator.WorkingData.ApplyResult(result);
+        }
+        accumulator.WorkingData.DeveloperStats.Should().BeEmpty();
+        var report = accumulator.Build();
+        report.DeveloperStats.Should().ContainSingle();
+        report.DeveloperStats.Values.Single().DisplayName.Value.Should().Be("Alice Old");
+        report.DeveloperStats.Values.Single().PrsOpenedSince.Should().Be(2);
+        report.Reports.Select(item => item.Id.Value).Should().Equal(1, 2);
+
+        PullRequestAnalysisResult CreateContribution(int id, DateTimeOffset created, string name, string slug)
+        {
+            var identity = new DeveloperIdentity(new UserUuid("{same}"), new DisplayName(name));
+            var repo = new Repository(new RepoName(slug), new RepoSlug(slug));
+            var pr = new PullRequest(new PullRequestId(id), PullRequestState.Open, null, created, null, null,
+                new User(identity.DisplayName, identity.Uuid), null);
+            return new PullRequestAnalysisResult(accumulator.WorkingData.Parameters.Workspace, repo, pr,
+                [identity], identity, true, CreatePullRequestReport(id, created), null, 0, true,
+                new ActivityAnalysisState(created, identity, true), [], null, null);
+        }
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("Core")]
@@ -28,8 +105,8 @@ public sealed class ReportDataTests
         var stats = data.GetOrAddDeveloper(identity);
         var created = data.Parameters.FilterDate;
         var report = CreatePullRequestReport(1, created, created.AddHours(6));
-        data.Reports.Add(report);
-        stats.AuthoredPullRequests.Add(report);
+        data.MutableReports.Add(report);
+        stats.MutableAuthoredPullRequests.Add(report);
         data.Freeze();
 
         Parallel.For(0, 128, _ =>
@@ -55,10 +132,10 @@ public sealed class ReportDataTests
     {
         var data = new ReportData(CreateReportParameters());
         var created = DateTimeOffset.UnixEpoch;
-        data.Reports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
-        data.Reports.Add(CreatePullRequestReport(2, created, created.AddDays(3)));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
+        data.MutableReports.Add(CreatePullRequestReport(2, created, created.AddDays(3)));
         data.GetTtfrStatistics(new StatisticsCalculator()).Count.Should().Be(2);
-        data.Reports.RemoveAt(1);
+        data.MutableReports.RemoveAt(1);
         var calculator = new Moq.Mock<BBDevPulse.Abstractions.IStatisticsCalculator>();
         calculator.Setup(x => x.Percentile(Moq.It.IsAny<IReadOnlyList<double>>(), 50)).Returns(0.5);
         var result = data.GetTtfrStatistics(calculator.Object);
@@ -71,18 +148,142 @@ public sealed class ReportDataTests
     {
         var data = new ReportData(CreateReportParameters());
         var identity = new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice"));
-        Parallel.For(0, 200, _ => data.ApplyAnalysis(() => data.GetOrAddDeveloper(identity).CommentsAfter++));
+        Parallel.For(0, 200, index =>
+        {
+            var id = new PullRequestId(index + 1);
+            var created = data.Parameters.FilterDate;
+            var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+            var pr = new PullRequest(id, PullRequestState.Open, null, created, null, null,
+                new User(identity.DisplayName, identity.Uuid), null);
+            var analysis = new ActivityAnalysisState(created, identity, true);
+            analysis.AddParticipant(identity);
+            analysis.CommentCounts.Add(identity.ToKey(), 1);
+            var result = new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr, [identity],
+                identity, true, CreatePullRequestReport(index + 1, created), null, 0, true,
+                analysis, [], null, null);
+            data.ApplyResult(result);
+        });
         data.Freeze();
         data.DeveloperStats.Values.Single().CommentsAfter.Should().Be(200);
+    }
+
+    [Fact]
+    public void PullRequestResultsAreAppliedOncePerWorkspaceAndRepository()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var id = new PullRequestId(1);
+        var first = PullRequestAnalysisResult.Skipped(data.Parameters.Workspace, new RepoSlug("repo"), id,
+            [new DeveloperIdentity(null, new DisplayName("unknown"))]);
+        data.ApplyResult(first);
+        data.HasMissingUserUuid.Should().BeTrue();
+        Action duplicate = () => data.ApplyResult(first);
+        duplicate.Should().Throw<InvalidOperationException>();
+
+        var anotherRepository = PullRequestAnalysisResult.Skipped(data.Parameters.Workspace,
+            new RepoSlug("other"), id, []);
+        Action separate = () => data.ApplyResult(anotherRepository);
+        separate.Should().NotThrow();
+        var anotherWorkspace = PullRequestAnalysisResult.Skipped(new Workspace("other"), new RepoSlug("repo"), id, []);
+        Action wrongWorkspace = () => data.ApplyResult(anotherWorkspace);
+        wrongWorkspace.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void PullRequestResultDoesNotShareMutableAnalysisState()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        var created = data.Parameters.FilterDate;
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, created, null, null,
+            new User(identity.DisplayName, identity.Uuid), null);
+        var analysis = new ActivityAnalysisState(created, identity, true);
+        analysis.AddParticipant(identity);
+        analysis.CommentCounts.Add(identity.ToKey(), 1);
+        var observed = new List<DeveloperIdentity> { identity };
+        var result = new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr,
+            observed, identity, true, CreatePullRequestReport(1, created), null, 0, true,
+            analysis, [], null, null);
+        observed.Clear();
+        analysis.CommentCounts[identity.ToKey()] = 100;
+        analysis.Participants.Clear();
+
+        data.ApplyResult(result);
+        data.DeveloperStats[DeveloperKey.FromIdentity(identity)].CommentsAfter.Should().Be(1);
+    }
+
+    [Fact]
+    public void FailedResultLeavesNoPartialUpdatesAndCanBeRetried()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        var stats = data.GetOrAddDeveloper(identity);
+        stats.PrsOpenedSince = int.MaxValue;
+        var created = data.Parameters.FilterDate;
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, created, null, null,
+            new User(identity.DisplayName, identity.Uuid), null);
+        var analysis = new ActivityAnalysisState(created, identity, true);
+        var result = new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr,
+            [new DeveloperIdentity(null, new DisplayName("unknown")), identity], identity, true,
+            CreatePullRequestReport(1, created), null, 0, true, analysis, [], null, null);
+
+        Action apply = () => data.ApplyResult(result);
+        apply.Should().Throw<OverflowException>();
+        data.HasMissingUserUuid.Should().BeFalse();
+        data.Reports.Should().BeEmpty();
+        stats.PrsOpenedSince.Should().Be(int.MaxValue);
+
+        stats.PrsOpenedSince = 0;
+        apply.Should().NotThrow();
+        stats.PrsOpenedSince.Should().Be(1);
+        data.HasMissingUserUuid.Should().BeTrue();
+        data.Reports.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void FailedDeferredAnalysisCannotPublishPartialReport()
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        var data = accumulator.WorkingData;
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        data.GetOrAddDeveloper(identity).PrsOpenedSince = int.MaxValue - 1;
+        var created = data.Parameters.FilterDate;
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        for (var id = 1; id <= 2; id++)
+        {
+            var pr = new PullRequest(new PullRequestId(id), PullRequestState.Open, null, created, null, null,
+                new User(identity.DisplayName, identity.Uuid), null);
+            data.ApplyResult(new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr, [identity],
+                identity, true, CreatePullRequestReport(id, created), null, 0, true,
+                new ActivityAnalysisState(created, identity, true), [], null, null));
+        }
+
+        Action first = () => accumulator.Build();
+        first.Should().Throw<OverflowException>();
+        Action retry = () => accumulator.Build();
+        retry.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void CancelledAccumulationCannotPublishAReport()
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action build = () => accumulator.Build(cancellation.Token);
+        build.Should().Throw<OperationCanceledException>();
+        Action retry = () => accumulator.Build();
+        retry.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
     public void PublishedReportIsIndependentOfCollectionReferencesHeldByProducer()
     {
         var data = new ReportData(CreateReportParameters());
-        var list = data.Reports;
+        var list = data.MutableReports;
         var stats = data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));
-        var details = stats.AuthoredPullRequests;
+        var details = stats.MutableAuthoredPullRequests;
         var report = CreatePullRequestReport(1, DateTimeOffset.UnixEpoch);
         list.Add(report);
         details.Add(report);
@@ -92,7 +293,7 @@ public sealed class ReportDataTests
         details.Clear();
         data.Reports.Should().ContainSingle();
         stats.AuthoredPullRequests.Should().ContainSingle();
-        Assert.Throws<NotSupportedException>(() => data.Reports.Clear());
+        Assert.Throws<NotSupportedException>(() => ((IList<PullRequestReport>)data.Reports).Clear());
         Assert.Throws<InvalidOperationException>(() => stats.CommentsAfter++);
     }
 
@@ -128,10 +329,10 @@ public sealed class ReportDataTests
     {
         var data = new ReportData(CreateReportParameters());
         var created = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
-        data.Reports.Add(CreatePullRequestReport(1, created, created));
-        data.Reports.Add(CreatePullRequestReport(2, created, created.AddHours(2)));
-        data.Reports.Add(CreatePullRequestReport(3, created, created.AddHours(4)));
-        data.Reports.Add(CreatePullRequestReport(4, created));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created));
+        data.MutableReports.Add(CreatePullRequestReport(2, created, created.AddHours(2)));
+        data.MutableReports.Add(CreatePullRequestReport(3, created, created.AddHours(4)));
+        data.MutableReports.Add(CreatePullRequestReport(4, created));
 
         var statistics = data.GetTtfrStatistics(new StatisticsCalculator());
 
@@ -158,7 +359,7 @@ public sealed class ReportDataTests
         var calculator = new StatisticsCalculator();
         data.GetTtfrStatistics(calculator).Count.Should().Be(0);
         var created = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
-        data.Reports.Add(CreatePullRequestReport(1, created, created.AddHours(2)));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created.AddHours(2)));
         data.GetTtfrStatistics(calculator).Count.Should().Be(1);
     }
 
@@ -169,7 +370,7 @@ public sealed class ReportDataTests
             excludeWeekend: true,
             forcedIncludeDates: [new DateOnly(2026, 11, 7)]));
         var created = new DateTimeOffset(2026, 11, 7, 9, 0, 0, TimeSpan.Zero);
-        data.Reports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
 
         var statistics = data.GetTtfrStatistics(new StatisticsCalculator());
 
@@ -311,8 +512,8 @@ public sealed class ReportDataTests
         var newerDate = new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero);
         var olderDate = newerDate.AddHours(-4);
 
-        reportData.Reports.Add(CreatePullRequestReport(id: 2, createdOn: newerDate));
-        reportData.Reports.Add(CreatePullRequestReport(id: 1, createdOn: olderDate));
+        reportData.MutableReports.Add(CreatePullRequestReport(id: 2, createdOn: newerDate));
+        reportData.MutableReports.Add(CreatePullRequestReport(id: 1, createdOn: olderDate));
 
         // Act
         reportData.SortReportsByCreatedOn();
@@ -336,7 +537,7 @@ public sealed class ReportDataTests
             branchNameList: [],
             toDateExclusive: new DateTimeOffset(2026, 2, 25, 0, 0, 0, TimeSpan.Zero)));
 
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -348,7 +549,7 @@ public sealed class ReportDataTests
             state: PullRequestState.Merged,
             id: new PullRequestId(1),
             comments: 0));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoB",
             repositorySlug: "repob",
             author: "Bob",
@@ -360,7 +561,7 @@ public sealed class ReportDataTests
             state: PullRequestState.Merged,
             id: new PullRequestId(2),
             comments: 0));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoC",
             repositorySlug: "repoc",
             author: "Carol",
@@ -372,7 +573,7 @@ public sealed class ReportDataTests
             state: PullRequestState.Merged,
             id: new PullRequestId(3),
             comments: 0));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoD",
             repositorySlug: "repod",
             author: "External",

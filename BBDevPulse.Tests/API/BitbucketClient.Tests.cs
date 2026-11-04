@@ -17,6 +17,44 @@ namespace BBDevPulse.Tests.API;
 
 public sealed class BitbucketClientTests
 {
+    [Fact]
+    public async Task DiffstatWithMissingLineCountKeepsFileCountButMarksLinesIncomplete()
+    {
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(
+                It.IsAny<Uri>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDiffStatDto>
+            {
+                Values = [new PullRequestDiffStatDto { LinesAdded = 3, LinesRemoved = null }]
+            });
+        var client = CreateClient(transport.Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+
+        var result = await client.GetCommitSizeAsync(new Workspace("ws"), new RepoSlug("repo"),
+            "commit", CancellationToken.None);
+
+        result.FilesChanged.Should().Be(1);
+        result.HasLineData.Should().BeFalse();
+        Action partialChurn = () => _ = result.LineChurn;
+        partialChurn.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task DiffstatWithNegativeEntryIsRejectedBeforeAggregation()
+    {
+        var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
+        transport.Setup(x => x.GetAsync<PaginatedResponse<PullRequestDiffStatDto>>(
+                It.IsAny<Uri>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaginatedResponse<PullRequestDiffStatDto>
+            {
+                Values = [new PullRequestDiffStatDto { LinesAdded = -1, LinesRemoved = 0 },
+                    new PullRequestDiffStatDto { LinesAdded = 3, LinesRemoved = 0 }]
+            });
+        var client = CreateClient(transport.Object, new Mock<IBitbucketMapper>(MockBehavior.Strict).Object);
+        Func<Task> read = async () => await client.GetCommitSizeAsync(new Workspace("ws"), new RepoSlug("repo"),
+            "commit", CancellationToken.None);
+        await read.Should().ThrowAsync<InvalidDataException>();
+    }
+
     private readonly CancellationToken cancellationToken = new CancellationTokenSource().Token;
 
     [Fact(DisplayName = "Constructor throws when options are null")]
@@ -515,7 +553,7 @@ public sealed class BitbucketClientTests
                 new PullRequestId(dto.Id),
                 PullRequestState.Open,
                 closedOn: null,
-                createdOn: dto.CreatedOn,
+                createdOn: dto.CreatedOn!.Value,
                 updatedOn: null,
                 mergedOn: null,
                 author: null,
@@ -564,7 +602,7 @@ public sealed class BitbucketClientTests
                 new PullRequestId(dto.Id),
                 PullRequestState.Open,
                 closedOn: null,
-                createdOn: dto.CreatedOn,
+                createdOn: dto.CreatedOn!.Value,
                 updatedOn: null,
                 mergedOn: null,
                 author: null,
@@ -647,7 +685,7 @@ public sealed class BitbucketClientTests
                 new PullRequestId(dto.Id),
                 PullRequestState.Open,
                 closedOn: null,
-                createdOn: dto.CreatedOn,
+                createdOn: dto.CreatedOn!.Value,
                 updatedOn: null,
                 mergedOn: null,
                 author: null,
@@ -1167,7 +1205,7 @@ public sealed class BitbucketClientTests
                 new PullRequestId(dto.Id),
                 PullRequestState.Open,
                 closedOn: null,
-                createdOn: dto.CreatedOn,
+                createdOn: dto.CreatedOn!.Value,
                 updatedOn: null,
                 mergedOn: null,
                 author: null,
