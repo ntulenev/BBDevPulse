@@ -27,7 +27,19 @@ internal static class PullRequestActivityAnalysis
             ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
             : null;
 
-        foreach (var activity in snapshot.Activities)
+        // A stable order also chooses a reproducible display name when one UUID has aliases.
+        var orderedActivities = snapshot.Activities
+            .OrderBy(static activity => activity.ActivityDate ?? DateTimeOffset.MaxValue)
+            .ThenBy(static activity => activity.MergeDate ?? DateTimeOffset.MaxValue)
+            .ThenBy(static activity => activity.Actor?.Uuid?.Value, StringComparer.Ordinal)
+            .ThenBy(static activity => activity.Actor?.DisplayName.Value, StringComparer.Ordinal)
+            .ThenBy(static activity => activity.Comment?.Date ?? DateTimeOffset.MaxValue)
+            .ThenBy(static activity => activity.Comment?.User.Uuid?.Value, StringComparer.Ordinal)
+            .ThenBy(static activity => activity.Comment?.User.DisplayName.Value, StringComparer.Ordinal)
+            .ThenBy(static activity => activity.Approval?.Date ?? DateTimeOffset.MaxValue)
+            .ThenBy(static activity => activity.Approval?.User.Uuid?.Value, StringComparer.Ordinal)
+            .ThenBy(static activity => activity.Approval?.User.DisplayName.Value, StringComparer.Ordinal);
+        foreach (var activity in orderedActivities)
         {
             if (activity.Actor.HasValue)
             {

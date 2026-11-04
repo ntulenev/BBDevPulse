@@ -54,5 +54,33 @@ public sealed class PullRequestActivityAnalysisTests
         result.CommentCounts[reviewer.ToKey()].Should().Be(1);
         result.HasCommits.Should().BeTrue();
     }
-}
+    [Fact]
+    public void ReorderingActivitiesWithAliasesKeepsCompleteResultStable()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var author = new User(new DisplayName("Author"), new UserUuid("{a}"));
+        var first = new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Alex"));
+        var second = new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Zoe"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, author, null);
+        var repo = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var activities = new[] {
+            new PullRequestActivity(date.AddHours(1), null, second, new ActivityComment(second, date.AddHours(1)), null),
+            new PullRequestActivity(date.AddHours(1), null, first, new ActivityComment(first, date.AddHours(1)), null)
+        };
+        var parameters = new ReportParameters(date.AddDays(-1), new Workspace("workspace"),
+            new RepoNameFilter(string.Empty), [], RepoSearchMode.FilterFromTheList,
+            PrTimeFilterMode.CreatedOnOnly, []);
+        PullRequestAnalysisResult Analyze(IEnumerable<PullRequestActivity> input) => PullRequestResultBuilder.Analyze(
+            repo, pr, parameters, new PullRequestAnalysisSnapshot(input.ToArray(), [], PullRequestSizeSummary.Empty, []),
+            _ => true, new ActivityAnalyzer());
 
+        var forward = Analyze(activities);
+        var reverse = Analyze(activities.Reverse());
+
+        forward.Participants[first.ToKey()].DisplayName.Value.Should().Be("Alex");
+        reverse.Participants.Should().BeEquivalentTo(forward.Participants);
+        reverse.ObservedIdentities.Should().Equal(forward.ObservedIdentities);
+        reverse.CommentCounts.Should().BeEquivalentTo(forward.CommentCounts);
+        reverse.Report!.Comments.Should().Be(forward.Report!.Comments);
+    }
+}
