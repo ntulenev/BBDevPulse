@@ -28,10 +28,10 @@ public sealed class PullRequestAnalysisSnapshot
         ArgumentNullException.ThrowIfNull(correctionCommits);
         ArgumentNullException.ThrowIfNull(commitActivities);
 
-        Activities = activities;
-        CorrectionCommits = correctionCommits;
+        Activities = Array.AsReadOnly(activities.ToArray());
+        CorrectionCommits = Array.AsReadOnly(correctionCommits.ToArray());
         SizeSummary = sizeSummary;
-        CommitActivities = commitActivities;
+        CommitActivities = Array.AsReadOnly(commitActivities.ToArray());
         HasEnrichment = hasEnrichment;
         HasCommits = hasCommits ?? hasEnrichment;
         HasSize = hasSize ?? hasEnrichment;

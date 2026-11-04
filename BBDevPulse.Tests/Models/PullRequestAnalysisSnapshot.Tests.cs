@@ -6,6 +6,29 @@ namespace BBDevPulse.Tests.Models;
 
 public sealed class PullRequestAnalysisSnapshotTests
 {
+    [Fact]
+    public void SnapshotOwnsItsCollections()
+    {
+        var activity = new PullRequestActivity(null, null, null, null, null);
+        var commit = new PullRequestCommitInfo("hash", DateTimeOffset.UnixEpoch, "message");
+        var detail = new DeveloperCommitActivity("Repo", "repo", new PullRequestId(1), "hash",
+            "message", DateTimeOffset.UnixEpoch, PullRequestSizeSummary.Empty);
+        var activities = new List<PullRequestActivity> { activity };
+        var commits = new List<PullRequestCommitInfo> { commit };
+        var details = new List<DeveloperCommitActivity> { detail };
+        var snapshot = new PullRequestAnalysisSnapshot(activities, commits, PullRequestSizeSummary.Empty, details);
+
+        activities.Clear();
+        commits.Clear();
+        details.Clear();
+
+        snapshot.Activities.Should().ContainSingle().Which.Should().BeSameAs(activity);
+        snapshot.CorrectionCommits.Should().ContainSingle().Which.Should().BeSameAs(commit);
+        snapshot.CommitActivities.Should().ContainSingle().Which.Should().BeSameAs(detail);
+        ((IList<PullRequestActivity>)snapshot.Activities).Invoking(items => items.Clear())
+            .Should().Throw<NotSupportedException>();
+    }
+
     [Fact(DisplayName = "Constructor throws when activities are null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenActivitiesAreNullThrowsArgumentNullException()
