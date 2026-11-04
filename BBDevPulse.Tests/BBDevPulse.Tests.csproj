@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\\BBDevPulse\\BBDevPulse.csproj" />
+    <ProjectReference Include="..\BBDevPulse.CsvUuidLookup\BBDevPulse.CsvUuidLookup.csproj" />
   </ItemGroup>
 
   <ItemGroup>

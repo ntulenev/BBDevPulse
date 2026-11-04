@@ -119,6 +119,31 @@ Avery remains in the selected Platform team, with the CSV grade and department:
 
 Open the [synthetic HTML report with the name mismatch](examples/demo-name-mismatch.html) locally to explore the complete filtered report. Its UUIDs and activity are synthetic.
 
+### Populate CSV UUIDs from Bitbucket
+
+The solution includes a separate console utility that looks up current workspace members by their Bitbucket display names and adds UUIDs to an existing people CSV. It accepts `Name;Grade;Department` and `Name;Grade;Department;UUID`; the header is optional. This is a convenience for preparing the CSV, not a substitute for checking that each person is correct.
+
+The tool calls the paginated [Bitbucket Cloud workspace members API](https://developer.atlassian.com/cloud/bitbucket/rest/api-group-workspaces/#api-workspaces-workspace-members-get). The authenticated user must be able to list workspace members; an Atlassian API token requires the `read:workspace:bitbucket` scope. It only sees members returned by that API, so a former member or an outside collaborator may not be found.
+
+Set credentials in environment variables, then run the tool from the repository root (PowerShell example):
+
+```powershell
+$env:BBDEVPULSE_WORKSPACE = "your-workspace"
+$env:BBDEVPULSE_USERNAME = "your-bitbucket-username-or-atlassian-email"
+$env:BBDEVPULSE_TOKEN = "your-api-token-or-app-password"
+dotnet run --project BBDevPulse.CsvUuidLookup -- people.csv
+```
+
+Alternatively, use existing Bitbucket settings without copying the token into the command line:
+
+```powershell
+dotnet run --project BBDevPulse.CsvUuidLookup -- people.csv --config BBDevPulse/appsettings.json
+```
+
+`--config` reads `Bitbucket:Workspace`, `Bitbucket:Username` and `Bitbucket:AppPassword`. Environment variables, when set, take precedence. Use `--output path/to/result.csv` to choose the destination. By default `people.csv` produces `people.with-uuids.csv` beside the input. The input is never overwritten, and an existing output file is not replaced.
+
+Names are trimmed and compared ignoring case. A UUID is filled only when exactly one distinct UUID matches and no matching member lacks a UUID. Existing nonempty UUID fields are preserved. If a name is missing or ambiguous, or a UUID would occur more than once in the CSV, the tool reports the line and leaves any affected unfilled UUID blank for manual resolution. It also reports existing duplicate UUIDs. Review the output and resolve every reported row before using it in BBDevPulse, which requires unique, nonempty UUIDs. Exit code `0` means all rows were resolved, `2` means an output was written with issues to review, and `1` means an error or cancellation. The tool cannot verify that an existing UUID or an automatically matched person is the intended employee.
+
 ### Analysis cache and telemetry
 
 In live mode, BBDevPulse caches PR activity, correction commits, and diffstat snapshots in `AppContext.BaseDirectory/cache/pull-request-analysis`. An unchanged PR can reuse its snapshot on a later run. The cache has no automatic eviction. When telemetry is enabled, the console shows actual HTTP requests, cache hits/misses/stores, estimated avoided requests, and a request breakdown by API endpoint.
