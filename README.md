@@ -91,7 +91,7 @@ Live output paths receive a local-date suffix (`dd_MM_yyyy`) before the extensio
 
 ### People CSV
 
-The optional people CSV requires a name and UUID for every row:
+The optional people CSV uses semicolon-separated fields and requires a name and UUID for every row. The header is optional; an empty grade or department is displayed as `N/A`:
 
 ```text
 Name;Grade;Department;UUID
@@ -103,15 +103,21 @@ This is a breaking change for three-column files and rows with an empty UUID. Ea
 
 To find UUIDs, set `ShowDeveloperUuidInStats` to `true` and run a report without a team filter. If the CSV is not yet valid, temporarily clear `PeopleCsvPath`. Copy UUIDs from developer statistics into the CSV, restore `PeopleCsvPath`, and select the desired team. The report only shows developers observed in the selected repositories and date range.
 
-Team filtering and metadata enrichment match by UUID, even if the names differ. Console, HTML, and PDF reports show the Bitbucket name, CSV name, and UUID for each observed discrepancy so the reader can assess whether it is a spelling difference or a mapping error. Name comparison is case-sensitive. Departments form team choices, grouped ignoring case. Developers without a CSV match retain `N/A` metadata. Without departments, there is no team picker.
+Team filtering and metadata enrichment match by UUID, even if the names differ. A name mismatch is a warning, not a validation error: the matching UUID still selects the CSV team, grade, and department. Console, HTML, and PDF reports show the Bitbucket name, CSV name, and UUID for each observed discrepancy so the reader can assess whether it is a spelling difference or a mapping error. Name comparison is case-sensitive. Departments form team choices, grouped ignoring case. Developers without a CSV match retain `N/A` metadata. Without departments, there is no team picker.
 
 #### Example: a typo in the CSV name
 
 Suppose Bitbucket reports `Avery Stone` with UUID `demo:Avery Stone`, while the CSV contains `Avery Stonne;Senior;Platform;demo:Avery Stone`. The UUIDs match, so choosing **Platform** still includes Avery and applies the CSV grade and department. The report warns that the names differ; check the UUID before deciding whether this is a typo or an incorrect mapping. Differences in capitalization also produce a warning.
 
-![Diagram of UUID matching and the name discrepancy warning](screenshots/name-mismatch-diagram.svg)
+The synthetic HTML report shows the warning with both names and the matching UUID:
 
-The diagram is illustrative. Open the [synthetic HTML report with the name mismatch](examples/demo-name-mismatch.html) locally to see the actual warning and the filtered report. Its UUIDs and activity are synthetic.
+![HTML warning about different Bitbucket and CSV names for the same UUID](screenshots/csv-name-mismatch-html.png)
+
+Avery remains in the selected Platform team, with the CSV grade and department:
+
+![HTML developer statistics showing UUID-matched team and grade](screenshots/csv-name-mismatch-team.png)
+
+Open the [synthetic HTML report with the name mismatch](examples/demo-name-mismatch.html) locally to explore the complete filtered report. Its UUIDs and activity are synthetic.
 
 ### Analysis cache and telemetry
 
@@ -125,7 +131,7 @@ For supplemental commit and diffstat requests, the current policy treats any non
 
 Bitbucket pull requests must have a positive ID and a creation timestamp; a response missing either cannot be analyzed. Unknown PR states are retained as `Unknown`, and optional timestamps and destination fields may be absent. A missing user UUID follows the warning and exclusion policy described below. A missing display name falls back to the UUID when possible. These rules describe the application boundary; they do not imply that Bitbucket guarantees every optional field.
 
-The application collects PR results concurrently in an accumulator, then applies them in creation-time, repository-slug, and PR-ID order. The accumulator applies CSV enrichment and publishes a detached, read-only report once; it rejects further use after publication. A duplicate PR result for the same workspace and repository is rejected. If one UUID has appeared under multiple names, the first contributing identity in that order supplies the report name used for CSV enrichment; this is not a guarantee that the name is the user's current Bitbucket display name. Within one PR, activities are analyzed by timestamp, with identity and event fields as deterministic tie breakers; the first matching activity identity is retained. Changing the order of the same loaded events therefore does not change which name is used.
+The application collects PR results concurrently in an accumulator, then applies them in creation-time, repository-slug, and PR-ID order. The accumulator applies CSV enrichment and publishes a detached, read-only report once; it rejects further use after publication. A duplicate PR result for the same workspace and repository is rejected. If one UUID has appeared under multiple names, the first contributing identity in that order supplies the displayed report name; this is not a guarantee that it is the user's current Bitbucket display name. CSV enrichment matches the UUID, regardless of the displayed name. Within one PR, activities are analyzed by timestamp, with identity and event fields as deterministic tie breakers; the first matching activity identity is retained. Changing the order of the same loaded events therefore does not change which name is used.
 
 ## Scope and team filtering
 
