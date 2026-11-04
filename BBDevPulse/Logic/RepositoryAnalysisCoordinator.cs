@@ -4,8 +4,6 @@ using BBDevPulse.Models;
 
 namespace BBDevPulse.Logic;
 
-internal sealed record RepositoryAnalysisProgress(string? RepositoryName, int Completed, int Active, int Total);
-
 // Owns repository scheduling and drains all started work before returning.
 internal sealed class RepositoryAnalysisCoordinator(int concurrency)
 {

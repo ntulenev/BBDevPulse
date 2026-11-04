@@ -52,7 +52,7 @@ public sealed partial class ReportFormatParityTests
             };
             var presenter = new SpectreReportPresenter(
                 new SpectreAuthPresenter(), new SpectreRepositoryListPresenter(),
-                new SpectreRepositoryAnalysisPresenter(Options.Create(options)), new SpectreBranchFilterPresenter(),
+                new SpectreRepositoryAnalysisPresenter(), new SpectreBranchFilterPresenter(),
                 new SpectrePullRequestReportPresenter(formatter), new SpectreStatisticsPresenter(calculator, formatter));
             var console = TestConsoleRunner.Run(_ => presenter.RenderReport(data));
 

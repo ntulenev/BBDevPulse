@@ -96,13 +96,11 @@ internal sealed class ReportRunner : IReportRunner
     {
         var accumulator = new ReportAccumulator(parameters, peopleByName);
         var reportData = accumulator.WorkingData;
-        await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
-        {
-            await _analyzer.AnalyzeAsync(
-                repo,
-                reportData,
-                token).ConfigureAwait(false);
-        }, cancellationToken).ConfigureAwait(false);
+        var coordinator = new RepositoryAnalysisCoordinator(_options.RepositoryConcurrency);
+        await _presenter.RunWithRepositoryProgressAsync(filteredRepos.Count,
+            (progress, token) => coordinator.RunAsync(filteredRepos,
+                (repo, itemToken) => _analyzer.AnalyzeAsync(repo, reportData, itemToken),
+                progress, token), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         if (reportData.DeveloperStats.Count > 0)
         {

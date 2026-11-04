@@ -8,6 +8,57 @@ namespace BBDevPulse.Tests.Logic;
 public sealed class RepositoryAnalysisCoordinatorTests
 {
     [Fact]
+    public async Task HandlerFailureStopsSchedulingAndPreservesOriginalException()
+    {
+        var coordinator = new RepositoryAnalysisCoordinator(1);
+        var failure = new InvalidOperationException("repository failed");
+        var processed = 0;
+        var repositories = new[]
+        {
+            new Repository(new RepoName("A"), new RepoSlug("a")),
+            new Repository(new RepoName("B"), new RepoSlug("b"))
+        };
+        Func<Task> run = () => coordinator.RunAsync(repositories, (_, _) =>
+        {
+            Interlocked.Increment(ref processed);
+            return Task.FromException(failure);
+        }, _ => { }, CancellationToken.None);
+
+        var thrown = await run.Should().ThrowAsync<InvalidOperationException>();
+        thrown.Which.Should().BeSameAs(failure);
+        processed.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CancellationWaitsForActiveHandlerAndDoesNotStartMore()
+    {
+        var coordinator = new RepositoryAnalysisCoordinator(1);
+        using var cancellation = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var processed = 0;
+        var repositories = new[]
+        {
+            new Repository(new RepoName("A"), new RepoSlug("a")),
+            new Repository(new RepoName("B"), new RepoSlug("b"))
+        };
+        var run = coordinator.RunAsync(repositories, async (_, token) =>
+        {
+            Interlocked.Increment(ref processed);
+            started.SetResult();
+            await release.Task;
+            token.ThrowIfCancellationRequested();
+        }, _ => { }, cancellation.Token);
+
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        cancellation.Cancel();
+        run.IsCompleted.Should().BeFalse();
+        release.SetResult();
+        await FluentActions.Invoking(async () => await run).Should().ThrowAsync<OperationCanceledException>();
+        processed.Should().Be(1);
+    }
+
+    [Fact]
     public async Task LimitsConcurrentRepositoriesWithoutPresentation()
     {
         var coordinator = new RepositoryAnalysisCoordinator(2);

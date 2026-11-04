@@ -1,9 +1,5 @@
 using BBDevPulse.Abstractions;
-using BBDevPulse.Configuration;
-using BBDevPulse.Logic;
 using BBDevPulse.Models;
-
-using Microsoft.Extensions.Options;
 
 using Spectre.Console;
 
@@ -14,24 +10,13 @@ namespace BBDevPulse.Presentation;
 /// </summary>
 public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPresenter
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="SpectreRepositoryAnalysisPresenter"/> class.
-    /// </summary>
-    /// <param name="options">Bitbucket options.</param>
-    public SpectreRepositoryAnalysisPresenter(IOptions<BitbucketOptions> options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        _maxConcurrentRepositories = options.Value.RepositoryConcurrency;
-    }
-
     /// <inheritdoc />
-    public async Task AnalyzeRepositoriesAsync(
-        IReadOnlyList<Repository> repositories,
-        Func<Repository, CancellationToken, Task> analyzeRepository,
+    public async Task RunWithRepositoryProgressAsync(int total,
+        Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task> run,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(repositories);
-        ArgumentNullException.ThrowIfNull(analyzeRepository);
+        ArgumentNullException.ThrowIfNull(run);
+        ArgumentOutOfRangeException.ThrowIfNegative(total);
         await AnsiConsole.Progress()
             .AutoClear(false)
             .Columns(
@@ -43,19 +28,16 @@ public sealed class SpectreRepositoryAnalysisPresenter : IRepositoryAnalysisPres
                 new TaskDescriptionColumn())
             .StartAsync(async context =>
             {
-                var task = context.AddTask("Analyzing repositories", maxValue: repositories.Count);
-                var coordinator = new RepositoryAnalysisCoordinator(_maxConcurrentRepositories);
-                await coordinator.RunAsync(repositories, analyzeRepository, update =>
+                var task = context.AddTask("Analyzing repositories", maxValue: total);
+                await run(update =>
                 {
                     task.Value = update.Completed;
                     task.Description = update.RepositoryName is not null
                         ? $"Analyzing {update.RepositoryName} ({update.Completed}/{update.Total} complete, {update.Active} active)"
                         : $"Analyzing repositories ({update.Completed}/{update.Total} complete, {update.Active} active)";
                 }, cancellationToken).ConfigureAwait(false);
-                task.Description = $"Analyzing repositories ({repositories.Count}/{repositories.Count} complete)";
-            })
-            .ConfigureAwait(false);
+                task.Description = $"Analyzing repositories ({total}/{total} complete)";
+            }).ConfigureAwait(false);
     }
 
-    private readonly int _maxConcurrentRepositories;
 }

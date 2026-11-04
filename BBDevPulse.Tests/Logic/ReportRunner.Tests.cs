@@ -261,7 +261,7 @@ public sealed class ReportRunnerTests
         analyzer.Setup(x => x.AnalyzeAsync(
                 repoA,
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
-                It.Is<CancellationToken>(token => token == cancellationToken)))
+                It.IsAny<CancellationToken>()))
             .Callback<Repository, ReportData, CancellationToken>((repository, reportData, _) =>
             {
                 analyzedRepositories.Add(repository);
@@ -322,20 +322,13 @@ public sealed class ReportRunnerTests
         presenter.Setup(x => x.RenderBranchFilterInfo(
                 It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")))
             .Callback(() => renderBranchFilterInfoCalls++);
-        presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                It.Is<IReadOnlyList<Repository>>(repositories =>
-                    repositories.Count == 1 &&
-                    repositories.Single().Slug.Value == "repo-a"),
-                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
+        presenter.Setup(x => x.RunWithRepositoryProgressAsync(
+                1,
+                It.IsAny<Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => analyzeRepositoriesCalls++)
-            .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
-            {
-                foreach (var repository in repositories)
-                {
-                    await analyze(repository, token);
-                }
-            });
+            .Returns((int _, Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task> run, CancellationToken token) =>
+                run(_ => { }, token));
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
@@ -430,7 +423,7 @@ public sealed class ReportRunnerTests
         analyzer.Setup(x => x.AnalyzeAsync(
                 It.Is<Repository>(value => value.Slug.Value == "repo-a"),
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
-                It.Is<CancellationToken>(token => token == cancellationToken)))
+                It.IsAny<CancellationToken>()))
             .Callback(() => analyzedAnyRepository = true)
             .Returns(Task.CompletedTask);
 
@@ -458,12 +451,13 @@ public sealed class ReportRunnerTests
         presenter.Setup(x => x.RenderBranchFilterInfo(
                 It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")))
             .Callback(() => renderBranchFilterInfoCalls++);
-        presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                It.Is<IReadOnlyList<Repository>>(repositories => repositories.Count == 0),
-                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
+        presenter.Setup(x => x.RunWithRepositoryProgressAsync(
+                0,
+                It.IsAny<Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
             .Callback(() => analyzeRepositoriesCalls++)
-            .Returns(Task.CompletedTask);
+            .Returns((int _, Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task> run, CancellationToken token) =>
+                run(_ => { }, token));
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback(() => renderReportCalls++);
@@ -543,7 +537,7 @@ public sealed class ReportRunnerTests
         analyzer.Setup(x => x.AnalyzeAsync(
                 repository,
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
-                It.Is<CancellationToken>(token => token == cancellationToken)))
+                It.IsAny<CancellationToken>()))
             .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
             {
                 _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")));
@@ -578,19 +572,12 @@ public sealed class ReportRunnerTests
             It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
         presenter.Setup(x => x.RenderBranchFilterInfo(
             It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
-        presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                It.Is<IReadOnlyList<Repository>>(repositories =>
-                    repositories.Count == 1 &&
-                    repositories.Single().Slug.Value == "repo-a"),
-                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
+        presenter.Setup(x => x.RunWithRepositoryProgressAsync(
+                1,
+                It.IsAny<Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
-            .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
-            {
-                foreach (var repo in repositories)
-                {
-                    await analyze(repo, token);
-                }
-            });
+            .Returns((int _, Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task> run, CancellationToken token) =>
+                run(_ => { }, token));
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace")))
             .Callback<ReportData>(reportData => capturedReportData = reportData);
@@ -664,7 +651,7 @@ public sealed class ReportRunnerTests
         analyzer.Setup(x => x.AnalyzeAsync(
                 repository,
                 It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core"),
-                It.Is<CancellationToken>(token => token == cancellationToken)))
+                It.IsAny<CancellationToken>()))
             .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
             {
                 peopleLoadedBeforeAnalyze = reportData.IsDeveloperIncluded(
@@ -706,19 +693,12 @@ public sealed class ReportRunnerTests
             It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
         presenter.Setup(x => x.RenderBranchFilterInfo(
             It.Is<ReportParameters>(parameters => parameters.Workspace.Value == "workspace")));
-        presenter.Setup(x => x.AnalyzeRepositoriesAsync(
-                It.Is<IReadOnlyList<Repository>>(repositories =>
-                    repositories.Count == 1 &&
-                    repositories.Single().Slug.Value == "repo-a"),
-                It.Is<Func<Repository, CancellationToken, Task>>(analyze => analyze != null),
+        presenter.Setup(x => x.RunWithRepositoryProgressAsync(
+                1,
+                It.IsAny<Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task>>(),
                 It.Is<CancellationToken>(token => token == cancellationToken)))
-            .Returns(async (IReadOnlyList<Repository> repositories, Func<Repository, CancellationToken, Task> analyze, CancellationToken token) =>
-            {
-                foreach (var repo in repositories)
-                {
-                    await analyze(repo, token);
-                }
-            });
+            .Returns((int _, Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task> run, CancellationToken token) =>
+                run(_ => { }, token));
         presenter.Setup(x => x.RenderReport(
                 It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core")));
         presenter.Setup(x => x.RenderTelemetrySummary(It.IsAny<BitbucketTelemetrySnapshot>()));

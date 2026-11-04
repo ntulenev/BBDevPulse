@@ -70,11 +70,10 @@ public sealed class SpectreReportPresenter : IReportPresenter
         _repositoryListPresenter.FetchRepositoriesAsync(fetchRepositories, cancellationToken);
 
     /// <inheritdoc />
-    public Task AnalyzeRepositoriesAsync(
-        IReadOnlyList<Repository> repositories,
-        Func<Repository, CancellationToken, Task> analyzeRepository,
+    public Task RunWithRepositoryProgressAsync(int total,
+        Func<Action<RepositoryAnalysisProgress>, CancellationToken, Task> run,
         CancellationToken cancellationToken) =>
-        _repositoryAnalysisPresenter.AnalyzeRepositoriesAsync(repositories, analyzeRepository, cancellationToken);
+        _repositoryAnalysisPresenter.RunWithRepositoryProgressAsync(total, run, cancellationToken);
 
     /// <inheritdoc />
     public void RenderRepositoryTable(
