@@ -49,7 +49,7 @@ public sealed class PullRequestAnalyzerTests
         var accumulator = new ReportAccumulator(CreateParameters(date.AddDays(-1)));
         var coordinator = new RepositoryAnalysisCoordinator(2);
         var run = coordinator.RunAsync(repositories,
-            (repo, token) => analyzer.AnalyzeAsync(repo, accumulator.WorkingData, token), _ => { }, CancellationToken.None);
+            (repo, token) => analyzer.AnalyzeAsync(repo, accumulator, token), _ => { }, CancellationToken.None);
 
         await allStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         maximum.Should().Be(4);
@@ -109,7 +109,7 @@ public sealed class PullRequestAnalyzerTests
             It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
         client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
             It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var run = CreateAnalyzer(client.Object, new ActivityAnalyzer(), pullRequestConcurrency: 2)
             .AnalyzeAsync(repository, data, CancellationToken.None);
 
@@ -149,7 +149,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var reviewer = new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Alice"));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, author, null);
@@ -171,7 +171,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
             new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new("Senior", "Core") });
         var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
@@ -218,7 +218,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
             new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new("Senior", "Core", "a") });
         var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
@@ -259,7 +259,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null,
             new User(new DisplayName("Alice"), null), null);
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
@@ -278,7 +278,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true));
         var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
         var reviewer = new DeveloperIdentity(null, new DisplayName("Reviewer"));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, author, null);
@@ -317,7 +317,7 @@ public sealed class PullRequestAnalyzerTests
             .Throws(failure);
 
         var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
-        var report = new ReportData(CreateParameters(date.AddDays(-1)));
+        var report = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var thrown = await FluentActions.Invoking(() => analyzer.AnalyzeAsync(repository, report, CancellationToken.None))
             .Should().ThrowAsync<InvalidOperationException>();
 
@@ -331,7 +331,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
             closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
             author: new User(new DisplayName("Alice"), new UserUuid("{alice-1}")), destination: null);
@@ -393,7 +393,7 @@ public sealed class PullRequestAnalyzerTests
             });
 
         var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
-        var report = new ReportData(CreateParameters(date.AddDays(-1)));
+        var report = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
 
         await FluentActions.Invoking(() => analyzer.AnalyzeAsync(repository, report, cancellation.Token))
             .Should().ThrowAsync<OperationCanceledException>();
@@ -441,8 +441,8 @@ public sealed class PullRequestAnalyzerTests
             var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(),
                 new Mock<IBitbucketTelemetryService>().Object, cacheDirectory);
             var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer(), analysisCache: cache);
-            var cold = new ReportData(parameters);
-            var warm = new ReportData(parameters);
+            var cold = ReportAccumulator.CreateImmediate(parameters);
+            var warm = ReportAccumulator.CreateImmediate(parameters);
             await analyzer.AnalyzeAsync(repository, cold, CancellationToken.None);
             await analyzer.AnalyzeAsync(repository, warm, CancellationToken.None);
 
@@ -507,17 +507,17 @@ public sealed class PullRequestAnalyzerTests
             var analyzer = CreateAnalyzer(client.Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
                 analysisCache: cache);
 
-            var first = new ReportData(parameters);
+            var first = ReportAccumulator.CreateImmediate(parameters);
             await analyzer.AnalyzeAsync(repository, first, CancellationToken.None);
             first.Reports.Single().HasSizeData.Should().BeFalse();
             first.Reports.Single().HasCorrectionsData.Should().BeTrue();
 
-            var second = new ReportData(parameters);
+            var second = ReportAccumulator.CreateImmediate(parameters);
             await analyzer.AnalyzeAsync(repository, second, CancellationToken.None);
             second.Reports.Single().FilesChanged.Should().Be(2);
             second.Reports.Single().HasSizeData.Should().BeTrue();
 
-            var third = new ReportData(parameters);
+            var third = ReportAccumulator.CreateImmediate(parameters);
             await analyzer.AnalyzeAsync(repository, third, CancellationToken.None);
             third.Reports.Single().FilesChanged.Should().Be(2);
             second.DeveloperStats.Values.Single().CommitActivities.Should()
@@ -571,7 +571,7 @@ public sealed class PullRequestAnalyzerTests
 
             for (var attempt = 0; attempt < 3; attempt++)
             {
-                var report = new ReportData(parameters);
+                var report = ReportAccumulator.CreateImmediate(parameters);
                 await analyzer.AnalyzeAsync(repository, report, CancellationToken.None);
                 var entry = report.Reports.Single();
                 entry.HasSizeDataForMode(PullRequestSizeMode.Files).Should().BeTrue();
@@ -593,7 +593,7 @@ public sealed class PullRequestAnalyzerTests
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var data = ReportAccumulator.CreateImmediate(CreateParameters(date.AddDays(-1)));
         var pullRequest = new PullRequest(new PullRequestId(1), PullRequestState.Open,
             closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
             author: new User(new DisplayName("Author"), new UserUuid("{author}")), destination: null);
@@ -743,7 +743,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var analyzer = CreateAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
         Repository repository = null!;
-        var reportData = new ReportData(CreateParameters(DateTimeOffset.UtcNow));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(DateTimeOffset.UtcNow));
 
         // Act
         Func<Task> act = async () => await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -759,7 +759,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var analyzer = CreateAnalyzer(new Mock<IBitbucketClient>(MockBehavior.Strict).Object, new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object);
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
-        ReportData reportData = null!;
+        ReportAccumulator reportData = null!;
 
         // Act
         Func<Task> act = async () => await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
@@ -774,7 +774,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, branchNameList: [new BranchName("main")]));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, branchNameList: [new BranchName("main")]));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(1),
@@ -821,7 +821,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(1),
@@ -874,7 +874,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
         var parameters = CreateParameters(filterDate, branchNameList: [new BranchName("develop")]);
-        var reportData = new ReportData(parameters);
+        var reportData = ReportAccumulator.CreateImmediate(parameters);
         var repository = new Repository(new RepoName("Repo Name"), new RepoSlug("repo-slug"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var pullRequest = new PullRequest(
@@ -1022,7 +1022,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(3),
@@ -1073,7 +1073,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(CreateRepoNameWithoutValidation(" "), new RepoSlug("repo-slug"));
         var pullRequest = new PullRequest(
             new PullRequestId(4),
@@ -1123,7 +1123,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Author"), new UserUuid("{author-1}"));
         var pullRequest = new PullRequest(
@@ -1201,7 +1201,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Author"), new UserUuid("{author-1}"));
         var pullRequest = new PullRequest(
@@ -1258,7 +1258,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
         var parameters = CreateParameters(filterDate, teamFilter: "Core");
-        var reportData = new ReportData(
+        var reportData = ReportAccumulator.CreateImmediate(
             parameters,
             new Dictionary<DisplayName, PersonCsvRow>
             {
@@ -1395,7 +1395,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
         var toDateExclusive = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var pullRequest = new PullRequest(
@@ -1466,7 +1466,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
         var toDateExclusive = new DateTimeOffset(2026, 3, 1, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, toDateExclusive: toDateExclusive));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequest = new PullRequest(
             new PullRequestId(78),
@@ -1502,7 +1502,7 @@ public sealed class PullRequestAnalyzerTests
     {
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
-        var reportData = new ReportData(CreateParameters(filterDate, showAllDetailsForDevelopers: true));
+        var reportData = ReportAccumulator.CreateImmediate(CreateParameters(filterDate, showAllDetailsForDevelopers: true));
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var reviewerIdentity = new DeveloperIdentity(new UserUuid("{reviewer-1}"), new DisplayName("Reviewer"));
@@ -1597,7 +1597,7 @@ public sealed class PullRequestAnalyzerTests
         // Arrange
         var filterDate = new DateTimeOffset(2026, 2, 15, 0, 0, 0, TimeSpan.Zero);
         var parameters = CreateParameters(filterDate, branchNameList: [new BranchName("develop")], showAllDetailsForDevelopers: true);
-        var reportData = new ReportData(parameters);
+        var reportData = ReportAccumulator.CreateImmediate(parameters);
         var repository = new Repository(new RepoName("Repo Name"), new RepoSlug("repo-slug"));
         var author = new User(new DisplayName("Alice"), new UserUuid("{alice-1}"));
         var reviewerIdentity = new DeveloperIdentity(new UserUuid("{reviewer-1}"), new DisplayName("Reviewer"));

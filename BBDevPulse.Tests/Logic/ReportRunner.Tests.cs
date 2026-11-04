@@ -260,12 +260,12 @@ public sealed class ReportRunnerTests
         var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
         analyzer.Setup(x => x.AnalyzeAsync(
                 repoA,
-                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<ReportAccumulator>(data => data.Parameters.Workspace.Value == "workspace"),
                 It.IsAny<CancellationToken>()))
-            .Callback<Repository, ReportData, CancellationToken>((repository, reportData, _) =>
+            .Callback<Repository, ReportAccumulator, CancellationToken>((repository, reportData, _) =>
             {
                 analyzedRepositories.Add(repository);
-                reportData.MutableReports.Add(new PullRequestReport(
+                reportData.WorkingData.MutableReports.Add(new PullRequestReport(
                     repository.DisplayName,
                     repository.Slug.Value,
                     "Alice",
@@ -422,7 +422,7 @@ public sealed class ReportRunnerTests
         var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
         analyzer.Setup(x => x.AnalyzeAsync(
                 It.Is<Repository>(value => value.Slug.Value == "repo-a"),
-                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<ReportAccumulator>(data => data.Parameters.Workspace.Value == "workspace"),
                 It.IsAny<CancellationToken>()))
             .Callback(() => analyzedAnyRepository = true)
             .Returns(Task.CompletedTask);
@@ -536,12 +536,12 @@ public sealed class ReportRunnerTests
         var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
         analyzer.Setup(x => x.AnalyzeAsync(
                 repository,
-                It.Is<ReportData>(data => data.Parameters.Workspace.Value == "workspace"),
+                It.Is<ReportAccumulator>(data => data.Parameters.Workspace.Value == "workspace"),
                 It.IsAny<CancellationToken>()))
-            .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
+            .Callback<Repository, ReportAccumulator, CancellationToken>((_, reportData, _) =>
             {
-                _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")));
-                _ = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{bob-1}"), new DisplayName("Bob")));
+                _ = reportData.WorkingData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{alice-1}"), new DisplayName("Alice")));
+                _ = reportData.WorkingData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("{bob-1}"), new DisplayName("Bob")));
             })
             .Returns(Task.CompletedTask);
 
@@ -650,9 +650,9 @@ public sealed class ReportRunnerTests
         var analyzer = new Mock<IPullRequestAnalyzer>(MockBehavior.Strict);
         analyzer.Setup(x => x.AnalyzeAsync(
                 repository,
-                It.Is<ReportData>(data => data.Parameters.TeamFilter == "Core"),
+                It.Is<ReportAccumulator>(data => data.Parameters.TeamFilter == "Core"),
                 It.IsAny<CancellationToken>()))
-            .Callback<Repository, ReportData, CancellationToken>((_, reportData, _) =>
+            .Callback<Repository, ReportAccumulator, CancellationToken>((_, reportData, _) =>
             {
                 peopleLoadedBeforeAnalyze = reportData.IsDeveloperIncluded(
                     new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));

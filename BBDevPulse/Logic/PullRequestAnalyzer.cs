@@ -45,7 +45,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
     /// <inheritdoc />
     public async Task AnalyzeAsync(
         Repository repo,
-        ReportData reportData,
+        ReportAccumulator reportData,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(repo);
@@ -122,7 +122,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
     private async Task AnalyzePullRequestWithSemaphoreAsync(
         Repository repo,
-        ReportData reportData,
+        ReportAccumulator reportData,
         PullRequest pr,
         SemaphoreSlim semaphore,
         Action<Exception> onError,
@@ -145,7 +145,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
     private async Task AnalyzePullRequestAsync(
         Repository repo,
-        ReportData reportData,
+        ReportAccumulator reportData,
         PullRequest pr,
         CancellationToken cancellationToken)
     {

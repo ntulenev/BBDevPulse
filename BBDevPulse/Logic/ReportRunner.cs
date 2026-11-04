@@ -95,41 +95,18 @@ internal sealed class ReportRunner : IReportRunner
         Dictionary<DisplayName, PersonCsvRow> peopleByName, CancellationToken cancellationToken)
     {
         var accumulator = new ReportAccumulator(parameters, peopleByName);
-        var reportData = accumulator.WorkingData;
         var coordinator = new RepositoryAnalysisCoordinator(_options.RepositoryConcurrency);
         await _presenter.RunWithRepositoryProgressAsync(filteredRepos.Count,
             (progress, token) => coordinator.RunAsync(filteredRepos,
-                (repo, itemToken) => _analyzer.AnalyzeAsync(repo, reportData, itemToken),
+                (repo, itemToken) => _analyzer.AnalyzeAsync(repo, accumulator, itemToken),
                 progress, token), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         accumulator.CompleteAnalysis(cancellationToken);
-        if (reportData.DeveloperStats.Count > 0)
-        {
-            EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
-        }
+        accumulator.EnrichDevelopers();
         var report = accumulator.Build(cancellationToken);
         _presenter.RenderReport(report);
         _presenter.RenderTelemetrySummary(_telemetryService.GetSnapshot());
         await _publisher.PublishAsync(report, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static void EnrichDeveloperStatsFromPeopleCsv(
-        ReportData reportData,
-        Dictionary<DisplayName, PersonCsvRow> peopleByName)
-    {
-        if (reportData.DeveloperStats.Count == 0 || peopleByName.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var stat in reportData.DeveloperStats.Values)
-        {
-            if (reportData.TryGetPerson(new DeveloperIdentity(stat.BitbucketUuid, stat.DisplayName), out var person))
-            {
-                stat.Grade = person.Grade;
-                stat.Department = person.Department;
-            }
-        }
     }
 
     private readonly IBitbucketClient _client;
