@@ -16,13 +16,15 @@ internal sealed class ReportAccumulator
     public ReportData WorkingData => _workingData ??
         throw new InvalidOperationException("The report has already been published.");
 
-    public ReportData Build()
+    public ReportData Build(CancellationToken cancellationToken = default)
     {
-        CompleteAnalysis();
+        CompleteAnalysis(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         var report = WorkingData.CreatePublishedSnapshot();
         _workingData = null;
         return report;
     }
 
-    public void CompleteAnalysis() => WorkingData.CompleteAnalysis();
+    public void CompleteAnalysis(CancellationToken cancellationToken = default) =>
+        WorkingData.CompleteAnalysis(cancellationToken);
 }

@@ -485,7 +485,7 @@ public sealed class ReportData
         public int Approvals { get; set; }
     }
 
-    internal void CompleteAnalysis()
+    internal void CompleteAnalysis(CancellationToken cancellationToken = default)
     {
         lock (_identityLock)
         {
@@ -504,8 +504,10 @@ public sealed class ReportData
             {
                 foreach (var result in ordered)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     ApplyResult(result);
                 }
+                cancellationToken.ThrowIfCancellationRequested();
             }
             catch
             {

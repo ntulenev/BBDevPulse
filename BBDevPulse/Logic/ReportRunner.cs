@@ -102,12 +102,12 @@ internal sealed class ReportRunner : IReportRunner
                 (repo, itemToken) => _analyzer.AnalyzeAsync(repo, reportData, itemToken),
                 progress, token), cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        accumulator.CompleteAnalysis();
+        accumulator.CompleteAnalysis(cancellationToken);
         if (reportData.DeveloperStats.Count > 0)
         {
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
         }
-        var report = accumulator.Build();
+        var report = accumulator.Build(cancellationToken);
         _presenter.RenderReport(report);
         _presenter.RenderTelemetrySummary(_telemetryService.GetSnapshot());
         await _publisher.PublishAsync(report, cancellationToken).ConfigureAwait(false);

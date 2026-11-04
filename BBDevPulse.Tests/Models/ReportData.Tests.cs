@@ -266,6 +266,18 @@ public sealed class ReportDataTests
     }
 
     [Fact]
+    public void CancelledAccumulationCannotPublishAReport()
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        Action build = () => accumulator.Build(cancellation.Token);
+        build.Should().Throw<OperationCanceledException>();
+        Action retry = () => accumulator.Build();
+        retry.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void PublishedReportIsIndependentOfCollectionReferencesHeldByProducer()
     {
         var data = new ReportData(CreateReportParameters());
