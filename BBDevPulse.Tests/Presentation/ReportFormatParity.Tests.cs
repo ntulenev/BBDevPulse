@@ -19,6 +19,65 @@ namespace BBDevPulse.Tests.Presentation;
 public sealed partial class ReportFormatParityTests
 {
     [Fact]
+    public async Task ZeroSizeAndUnavailableDataRemainDistinctAcrossFormats()
+    {
+        var start = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
+        var parameters = new ReportParameters(start, new Workspace("team"), new RepoNameFilter(""), [],
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, []);
+        var data = new ReportData(parameters);
+        data.Reports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, start,
+            null, null, PullRequestState.Open, new PullRequestId(1), 0, hasSizeData: true));
+        data.Reports.Add(new PullRequestReport("repo", "repo", "Bob", "main", start, start,
+            null, null, PullRequestState.Open, new PullRequestId(2), 0,
+            hasSizeData: false, hasCorrectionsData: false));
+        data.Freeze();
+        var calculator = new StatisticsCalculator();
+        var formatter = new DateDiffFormatter();
+        var html = new HtmlContentComposer(formatter, calculator).Compose(data);
+        var directory = Directory.CreateTempSubdirectory();
+        try
+        {
+            var options = new BitbucketOptions
+            {
+                Workspace = "team",
+                PageLength = 10,
+                Username = "user",
+                AppPassword = "unused",
+                RepoNameFilter = "",
+                RepoNameList = [],
+                BranchNameList = [],
+                RepoSearchMode = parameters.RepoSearchMode,
+                PrTimeFilterMode = parameters.PrTimeFilterMode,
+                Pdf = new PdfOptions { OutputPath = Path.Combine(directory.FullName, "report.pdf") }
+            };
+            var presenter = new SpectreReportPresenter(
+                new SpectreAuthPresenter(), new SpectreRepositoryListPresenter(),
+                new SpectreRepositoryAnalysisPresenter(), new SpectreBranchFilterPresenter(),
+                new SpectrePullRequestReportPresenter(formatter), new SpectreStatisticsPresenter(calculator, formatter));
+            var console = TestConsoleRunner.Run(console =>
+            {
+                console.Profile.Width = 240;
+                presenter.RenderReport(data);
+            });
+            var renderer = new QuestPdfReportRenderer(Options.Create(options), formatter, calculator, new PdfReportFileStore());
+            await renderer.RenderReportAsync(data);
+            using var pdf = PdfDocument.Open(Assert.Single(directory.GetFiles("*.pdf")).FullName);
+            var pdfText = string.Concat(pdf.GetPages().Select(page => page.Text));
+
+            foreach (var text in new[] { console, WebUtility.HtmlDecode(HtmlTag().Replace(html, "")), pdfText })
+            {
+                var compact = Layout().Replace(text, "");
+                Assert.Contains("XS(0)", compact);
+                Assert.Contains("Unavailable", compact);
+            }
+        }
+        finally
+        {
+            directory.Delete(recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task PublishedReportShowsSameThroughputAndTtfrInAllFormats()
     {
         var start = DateTimeOffset.UnixEpoch;

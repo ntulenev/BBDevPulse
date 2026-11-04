@@ -10,5 +10,7 @@ public enum DataAvailability
     /// <summary>The request did not yield usable data.</summary>
     Unavailable = 2,
     /// <summary>The data was obtained, including an empty or zero result.</summary>
-    Available = 3
+    Available = 3,
+    /// <summary>An aggregate is missing some or all source data.</summary>
+    Incomplete = 4
 }

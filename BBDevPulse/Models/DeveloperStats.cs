@@ -139,6 +139,10 @@ public sealed class DeveloperStats
     /// </summary>
     public bool HasCompleteCorrectionsData { get; set { EnsureMutable(); field = value; } } = true;
 
+    /// <summary>Whether all correction data used by this aggregate was available.</summary>
+    public DataAvailability CorrectionsAvailability => HasCompleteCorrectionsData
+        ? DataAvailability.Available : DataAvailability.Incomplete;
+
     /// <summary>
     /// Detailed list of pull requests authored by the developer.
     /// </summary>

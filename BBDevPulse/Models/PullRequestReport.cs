@@ -80,6 +80,8 @@ public sealed class PullRequestReport
         LinesRemoved = size.LinesRemoved;
         IsActivityOnlyMatch = isActivityOnlyMatch;
         HasSizeData = hasSizeData ?? (filesChanged > 0 || linesAdded > 0 || linesRemoved > 0);
+        SizeAvailability = HasSizeData ? DataAvailability.Available :
+            hasSizeData.HasValue ? DataAvailability.Unavailable : DataAvailability.Unknown;
         HasCorrectionsData = hasCorrectionsData;
     }
 
@@ -183,8 +185,15 @@ public sealed class PullRequestReport
     /// </summary>
     public bool HasSizeData { get; }
 
+    /// <summary>Availability of the pull request diffstat measurement.</summary>
+    public DataAvailability SizeAvailability { get; }
+
     /// <summary>Indicates whether correction data was available for this pull request.</summary>
     public bool HasCorrectionsData { get; }
+
+    /// <summary>Availability of the correction commit count.</summary>
+    public DataAvailability CorrectionsAvailability => HasCorrectionsData
+        ? DataAvailability.Available : DataAvailability.Unavailable;
 
     /// <summary>
     /// Pull request size tier based on churn.
