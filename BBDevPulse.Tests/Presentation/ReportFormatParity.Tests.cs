@@ -25,8 +25,15 @@ public sealed partial class ReportFormatParityTests
     {
         var start = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
         var parameters = new ReportParameters(start, new Workspace("team"), new RepoNameFilter(""), [],
-            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, [], pullRequestSizeMode: mode);
-        var data = new ReportData(parameters);
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, [], pullRequestSizeMode: mode,
+            teamFilter: "Core");
+        var data = new ReportData(parameters, new Dictionary<DisplayName, PersonCsvRow>
+        {
+            [new DisplayName("Alex Kim")] = new("Senior", "Core")
+        });
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{one}"), new DisplayName("Alex Kim")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{two}"), new DisplayName("Alex Kim")));
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Unknown")));
         data.MutableReports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, start,
             null, null, PullRequestState.Open, new PullRequestId(1), 0, hasSizeData: true));
         data.MutableReports.Add(new PullRequestReport("repo", "repo", "Bob", "main", start, start,
@@ -74,6 +81,11 @@ public sealed partial class ReportFormatParityTests
                 var compact = Layout().Replace(text, "");
                 Assert.Contains("XS(0)", compact);
                 Assert.Contains("Unavailable", compact);
+                Assert.Contains(Layout().Replace(ReportData.IdentityCollisionWarning, ""), compact);
+                Assert.Contains(Layout().Replace(ReportData.MissingUserUuidWarning, ""), compact);
+                Assert.Contains("AlexKim", compact);
+                Assert.Contains("{one}", compact);
+                Assert.Contains("{two}", compact);
                 if (mode == PullRequestSizeMode.Lines)
                 {
                     Assert.DoesNotContain("XS(1)", compact);
