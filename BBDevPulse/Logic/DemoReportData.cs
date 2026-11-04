@@ -47,7 +47,8 @@ internal static class DemoReportData
             showAllDetailsForDevelopers: true,
             toDateExclusive: end,
             isDemo: true);
-        var reportData = new ReportData(parameters, peopleByName);
+        var accumulator = new ReportAccumulator(parameters, peopleByName);
+        var reportData = accumulator.WorkingData;
         var stats = Developers.Select(name =>
         {
             var identity = new DeveloperIdentity(new UserUuid("demo:" + name), new DisplayName(name));
@@ -70,7 +71,7 @@ internal static class DemoReportData
             AddPullRequest(reportData, stats, PullRequests[index], index, start);
         }
 
-        return reportData;
+        return accumulator.Build();
     }
 
     private static void AddPullRequest(

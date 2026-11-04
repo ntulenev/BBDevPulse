@@ -94,7 +94,8 @@ internal sealed class ReportRunner : IReportRunner
     private async Task BuildReportsAsync(List<Repository> filteredRepos, ReportParameters parameters,
         Dictionary<DisplayName, PersonCsvRow> peopleByName, CancellationToken cancellationToken)
     {
-        var reportData = new ReportData(parameters, peopleByName);
+        var accumulator = new ReportAccumulator(parameters, peopleByName);
+        var reportData = accumulator.WorkingData;
         await _presenter.AnalyzeRepositoriesAsync(filteredRepos, async (repo, token) =>
         {
             await _analyzer.AnalyzeAsync(
@@ -107,10 +108,10 @@ internal sealed class ReportRunner : IReportRunner
         {
             EnrichDeveloperStatsFromPeopleCsv(reportData, peopleByName);
         }
-        reportData.Freeze();
-        _presenter.RenderReport(reportData);
+        var report = accumulator.Build();
+        _presenter.RenderReport(report);
         _presenter.RenderTelemetrySummary(_telemetryService.GetSnapshot());
-        await _publisher.PublishAsync(reportData, cancellationToken).ConfigureAwait(false);
+        await _publisher.PublishAsync(report, cancellationToken).ConfigureAwait(false);
     }
 
     private static void EnrichDeveloperStatsFromPeopleCsv(

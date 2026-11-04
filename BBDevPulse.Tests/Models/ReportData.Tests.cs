@@ -8,6 +8,29 @@ namespace BBDevPulse.Tests.Models;
 
 public sealed class ReportDataTests
 {
+    [Fact]
+    public void AccumulatorPublishesOnceAndDetachesCsvRows()
+    {
+        var additional = new List<PersonCsvRow> { new("Lead", "Core", "{a}") };
+        var people = new Dictionary<DisplayName, PersonCsvRow>
+        {
+            [new DisplayName("Alice")] = new("Junior", "Other") { AdditionalRows = additional }
+        };
+        var accumulator = new ReportAccumulator(CreateReportParameters(teamFilter: "Core"), people);
+        var working = accumulator.WorkingData;
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        additional.Clear();
+        people.Clear();
+
+        working.IsDeveloperIncluded(identity).Should().BeTrue();
+        var report = accumulator.Build();
+        report.IsDeveloperIncluded(identity).Should().BeTrue();
+        Action rebuild = () => accumulator.Build();
+        rebuild.Should().Throw<InvalidOperationException>();
+        Action modify = () => working.GetOrAddDeveloper(identity);
+        modify.Should().Throw<InvalidOperationException>();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("Core")]

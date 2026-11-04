@@ -74,7 +74,11 @@ public sealed class ReportData
             ? new Dictionary<string, PersonCsvRow>(StringComparer.Ordinal)
             : peopleByDisplayName.ToDictionary(
                 static entry => entry.Key.Value,
-                static entry => entry.Value,
+                static entry => entry.Value with
+                {
+                    AdditionalRows = Array.AsReadOnly(entry.Value.Rows.Skip(1)
+                        .Select(static row => row with { AdditionalRows = null }).ToArray())
+                },
                 StringComparer.Ordinal);
     }
 
