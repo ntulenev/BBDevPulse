@@ -27,6 +27,7 @@ internal sealed class BitbucketResponseReader
     {
         var page = await GetAsync<PaginatedResponse<T>>(uri, cancellationToken).ConfigureAwait(false);
         var next = string.IsNullOrWhiteSpace(page.Next) ? null : new Uri(page.Next, UriKind.RelativeOrAbsolute);
-        return new PaginatedResult<T>(page.Values ?? [], next);
+        return new PaginatedResult<T>(page.Values ?? throw new InvalidDataException(
+            "Bitbucket paginated response is missing the values array."), next);
     }
 }

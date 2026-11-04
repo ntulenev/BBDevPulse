@@ -71,7 +71,8 @@ internal sealed class BitbucketTransport : IBitbucketTransport
 
                 return result == null ? throw new InvalidOperationException("Bitbucket API response was empty.") : result;
             },
-            static ex => ex is RetryableBitbucketException,
+            static ex => ex is RetryableBitbucketException or HttpRequestException ||
+                         ex is OperationCanceledException { InnerException: TimeoutException },
             cancellationToken).ConfigureAwait(false);
     }
 
