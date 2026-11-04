@@ -23,7 +23,12 @@ public sealed class ReportDataTests
         people.Clear();
 
         working.IsDeveloperIncluded(identity).Should().BeTrue();
+        var workingStats = working.GetOrAddDeveloper(identity);
+        workingStats.CommentsAfter = 2;
         var report = accumulator.Build();
+        report.Should().NotBeSameAs(working);
+        report.DeveloperStats[DeveloperKey.FromIdentity(identity)].Should().NotBeSameAs(workingStats);
+        report.DeveloperStats[DeveloperKey.FromIdentity(identity)].CommentsAfter.Should().Be(2);
         report.IsDeveloperIncluded(identity).Should().BeTrue();
         Action rebuild = () => accumulator.Build();
         rebuild.Should().Throw<InvalidOperationException>();

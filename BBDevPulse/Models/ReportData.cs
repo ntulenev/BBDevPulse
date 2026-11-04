@@ -361,6 +361,32 @@ public sealed class ReportData
         }
     }
 
+    internal ReportData CreatePublishedSnapshot()
+    {
+        lock (_identityLock)
+        {
+            EnsureMutable();
+            var people = _peopleByDisplayName.ToDictionary(
+                static entry => new DisplayName(entry.Key), static entry => entry.Value);
+            var snapshot = new ReportData(Parameters, people)
+            {
+                HasMissingUserUuid = HasMissingUserUuid,
+                Reports = Reports.ToList()
+            };
+            foreach (var entry in _developers)
+            {
+                snapshot._developers.Add(entry.Key, entry.Value.Copy());
+            }
+            foreach (var entry in _observedIdentities)
+            {
+                snapshot._observedIdentities.Add(entry.Key, new HashSet<string>(entry.Value, StringComparer.OrdinalIgnoreCase));
+            }
+            snapshot.Freeze();
+            Freeze();
+            return snapshot;
+        }
+    }
+
     /// <summary>Ends accumulation after all analysis tasks finish. The report can then be read concurrently.</summary>
     internal void Freeze()
     {

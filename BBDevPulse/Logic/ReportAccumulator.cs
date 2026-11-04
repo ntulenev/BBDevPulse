@@ -18,8 +18,7 @@ internal sealed class ReportAccumulator
 
     public ReportData Build()
     {
-        var report = WorkingData;
-        report.Freeze();
+        var report = WorkingData.CreatePublishedSnapshot();
         _workingData = null;
         return report;
     }

@@ -159,6 +159,31 @@ public sealed class DeveloperStats
     /// </summary>
     public IList<DeveloperCommitActivity> CommitActivities { get; private set; } = new List<DeveloperCommitActivity>();
 
+    internal DeveloperStats Copy()
+    {
+        var copy = new DeveloperStats(DisplayName, BitbucketUuid)
+        {
+            Grade = Grade,
+            Department = Department,
+            PrsOpenedSince = PrsOpenedSince,
+            PrsMergedAfter = PrsMergedAfter,
+            CommentsAfter = CommentsAfter,
+            PeerCommentsAfter = PeerCommentsAfter,
+            ApprovalsAfter = ApprovalsAfter,
+            Corrections = Corrections,
+            HasCompleteCorrectionsData = HasCompleteCorrectionsData
+        };
+        foreach (var report in AuthoredPullRequests)
+            copy.AuthoredPullRequests.Add(report);
+        foreach (var comment in CommentActivities)
+            copy.CommentActivities.Add(comment);
+        foreach (var approval in ApprovalActivities)
+            copy.ApprovalActivities.Add(approval);
+        foreach (var commit in CommitActivities)
+            copy.CommitActivities.Add(commit);
+        return copy;
+    }
+
     internal void Freeze()
     {
         AuthoredPullRequests = Array.AsReadOnly(AuthoredPullRequests.ToArray());
