@@ -1,9 +1,11 @@
 using System.Text;
+
 using BBDevPulse.Logic;
 using BBDevPulse.Math;
 using BBDevPulse.Models;
 using BBDevPulse.Presentation.Formatters;
 using BBDevPulse.Presentation.Html;
+
 using FluentAssertions;
 
 namespace BBDevPulse.Tests.Logic;
