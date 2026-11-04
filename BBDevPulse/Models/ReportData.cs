@@ -1,5 +1,6 @@
 
 using BBDevPulse.Abstractions;
+using BBDevPulse.Logic;
 using BBDevPulse.Math;
 
 namespace BBDevPulse.Models;
@@ -261,13 +262,98 @@ public sealed class ReportData
 
     private readonly Dictionary<DeveloperKey, DeveloperStats> _developers = [];
     private readonly Dictionary<string, PersonCsvRow> _peopleByDisplayName;
-    internal void ApplyAnalysis(Action update)
+    private readonly HashSet<(string Workspace, string Repository, int Id)> _appliedPullRequests = [];
+
+    internal void ApplyResult(PullRequestAnalysisResult result)
     {
-        ArgumentNullException.ThrowIfNull(update);
+        ArgumentNullException.ThrowIfNull(result);
         lock (_identityLock)
         {
             EnsureMutable();
-            update();
+            var key = (result.Workspace.Value.ToUpperInvariant(), result.Repository.Value.ToUpperInvariant(), result.Id.Value);
+            if (!_appliedPullRequests.Add(key))
+            {
+                throw new InvalidOperationException("The pull request result has already been applied.");
+            }
+
+            foreach (var identity in result.ObservedIdentities)
+            {
+                ObserveDeveloperIdentity(identity);
+            }
+            if (result.Report is null)
+            {
+                return;
+            }
+
+            var report = result.Report;
+            if (result.Author.HasValue && result.IncludeAuthoredPullRequest)
+            {
+                var stats = GetOrAddDeveloper(result.Author.Value);
+                if (Parameters.IsInRange(result.CreatedOn))
+                {
+                    stats.PrsOpenedSince++;
+                }
+                if (Parameters.IsInRange(result.MergedOn))
+                {
+                    stats.PrsMergedAfter++;
+                }
+                if (result.HasCommits)
+                {
+                    stats.Corrections += result.Corrections;
+                }
+                else
+                {
+                    stats.HasCompleteCorrectionsData = false;
+                }
+                if (result.Comments is not null)
+                {
+                    stats.AuthoredPullRequests.Add(report);
+                    foreach (var commit in result.Commits)
+                    {
+                        stats.CommitActivities.Add(commit);
+                    }
+                }
+            }
+
+            foreach (var entry in result.CommentCounts)
+            {
+                if (result.Participants.TryGetValue(entry.Key, out var participant) && IsDeveloperIncluded(participant))
+                {
+                    var stats = GetOrAddDeveloper(participant);
+                    stats.CommentsAfter += entry.Value;
+                    if (result.Author.HasValue && !participant.IsSameIdentity(result.Author.Value))
+                    {
+                        stats.PeerCommentsAfter += entry.Value;
+                    }
+                }
+            }
+            foreach (var entry in result.ApprovalCounts)
+            {
+                if (result.Participants.TryGetValue(entry.Key, out var participant) && IsDeveloperIncluded(participant))
+                {
+                    GetOrAddDeveloper(participant).ApprovalsAfter += entry.Value;
+                }
+            }
+            if (result.Comments is not null)
+            {
+                foreach (var detail in result.Comments)
+                {
+                    if (IsDeveloperIncluded(detail.User))
+                    {
+                        GetOrAddDeveloper(detail.User).CommentActivities.Add(new DeveloperCommentActivity(
+                            report.Repository, report.RepositorySlug, result.Id, report.Author, detail.Date));
+                    }
+                }
+                foreach (var detail in result.Approvals!)
+                {
+                    if (IsDeveloperIncluded(detail.User))
+                    {
+                        GetOrAddDeveloper(detail.User).ApprovalActivities.Add(new DeveloperApprovalActivity(
+                            report.Repository, report.RepositorySlug, result.Id, report.Author, detail.Date));
+                    }
+                }
+            }
+            Reports.Add(report);
         }
     }
 

@@ -2,6 +2,7 @@ using FluentAssertions;
 
 using BBDevPulse.Models;
 using BBDevPulse.Math;
+using BBDevPulse.Logic;
 
 namespace BBDevPulse.Tests.Models;
 
@@ -71,9 +72,41 @@ public sealed class ReportDataTests
     {
         var data = new ReportData(CreateReportParameters());
         var identity = new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice"));
-        Parallel.For(0, 200, _ => data.ApplyAnalysis(() => data.GetOrAddDeveloper(identity).CommentsAfter++));
+        Parallel.For(0, 200, index =>
+        {
+            var id = new PullRequestId(index + 1);
+            var created = data.Parameters.FilterDate;
+            var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+            var pr = new PullRequest(id, PullRequestState.Open, null, created, null, null,
+                new User(identity.DisplayName, identity.Uuid), null);
+            var analysis = new ActivityAnalysisState(created, identity, true);
+            analysis.AddParticipant(identity);
+            analysis.CommentCounts.Add(identity.ToKey(), 1);
+            var result = new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr, [identity],
+                identity, true, CreatePullRequestReport(index + 1, created), null, 0, true,
+                analysis, [], null, null);
+            data.ApplyResult(result);
+        });
         data.Freeze();
         data.DeveloperStats.Values.Single().CommentsAfter.Should().Be(200);
+    }
+
+    [Fact]
+    public void PullRequestResultsAreAppliedOncePerWorkspaceAndRepository()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var id = new PullRequestId(1);
+        var first = PullRequestAnalysisResult.Skipped(data.Parameters.Workspace, new RepoSlug("repo"), id,
+            [new DeveloperIdentity(null, new DisplayName("unknown"))]);
+        data.ApplyResult(first);
+        data.HasMissingUserUuid.Should().BeTrue();
+        Action duplicate = () => data.ApplyResult(first);
+        duplicate.Should().Throw<InvalidOperationException>();
+
+        var anotherRepository = PullRequestAnalysisResult.Skipped(data.Parameters.Workspace,
+            new RepoSlug("other"), id, []);
+        Action separate = () => data.ApplyResult(anotherRepository);
+        separate.Should().NotThrow();
     }
 
     [Fact]

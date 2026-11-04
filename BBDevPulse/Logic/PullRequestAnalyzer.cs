@@ -155,19 +155,13 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var parametersFingerprint = BuildParametersFingerprint(parameters);
         var pullRequestFingerprint = BuildPullRequestFingerprint(pr);
 
+        var observedIdentities = new List<DeveloperIdentity>();
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
-        if (!authorIdentity.HasValue)
+        observedIdentities.Add(authorIdentity ?? new DeveloperIdentity(null, new DisplayName("unknown")));
+        if (!authorIdentity.HasValue || authorIdentity.Value.Uuid is null)
         {
-            reportData.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("unknown")));
+            reportData.ApplyResult(PullRequestAnalysisResult.Skipped(workspace, repo.Slug, pr.Id, observedIdentities));
             return;
-        }
-        if (authorIdentity.HasValue)
-        {
-            reportData.ObserveDeveloperIdentity(authorIdentity.Value);
-            if (authorIdentity.Value.Uuid is null)
-            {
-                return;
-            }
         }
         var includeAuthoredPullRequest = !parameters.HasTeamFilter ||
             (authorIdentity.HasValue && reportData.IsDeveloperIncluded(authorIdentity.Value));
@@ -203,15 +197,15 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         {
             if (activity.Actor.HasValue)
             {
-                reportData.ObserveDeveloperIdentity(activity.Actor.Value);
+                observedIdentities.Add(activity.Actor.Value);
             }
             if (activity.Comment is not null)
             {
-                reportData.ObserveDeveloperIdentity(activity.Comment.User);
+                observedIdentities.Add(activity.Comment.User);
             }
             if (activity.Approval is not null)
             {
-                reportData.ObserveDeveloperIdentity(activity.Approval.User);
+                observedIdentities.Add(activity.Approval.User);
             }
             if ((activity.Comment is not null && activity.Comment.User.Uuid is null) ||
                 (activity.Approval is not null && activity.Approval.User.Uuid is null) ||
@@ -246,6 +240,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var matchesFilter = parameters.IsInRange(pr.CreatedOn) || analysis.HasActivityInRange;
         if (!matchesFilter)
         {
+            reportData.ApplyResult(PullRequestAnalysisResult.Skipped(workspace, repo.Slug, pr.Id, observedIdentities));
             return;
         }
 
@@ -264,6 +259,7 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                     snapshot);
             }
 
+            reportData.ApplyResult(PullRequestAnalysisResult.Skipped(workspace, repo.Slug, pr.Id, observedIdentities));
             return;
         }
 
@@ -342,96 +338,11 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 hasCorrectionsData: snapshot.HasCommits)
             : null;
 
-        reportData.ApplyAnalysis(() =>
-        {
-            if (authorIdentity.HasValue && includeAuthoredPullRequest)
-            {
-                var authorStats = reportData.GetOrAddDeveloper(authorIdentity.Value);
-                if (parameters.IsInRange(pr.CreatedOn))
-                {
-                    authorStats.PrsOpenedSince++;
-                }
-
-                if (parameters.IsInRange(mergedOnResolved))
-                {
-                    authorStats.PrsMergedAfter++;
-                }
-
-                if (snapshot.HasCommits)
-                {
-                    authorStats.Corrections += corrections;
-                }
-                else
-                {
-                    authorStats.HasCompleteCorrectionsData = false;
-                }
-                if (collectDeveloperDetails && reportEntry is not null)
-                {
-                    authorStats.AuthoredPullRequests.Add(reportEntry);
-                    foreach (var commit in correctionCommitActivities)
-                    {
-                        authorStats.CommitActivities.Add(commit);
-                    }
-                }
-            }
-
-            foreach (var entry in analysis.CommentCounts)
-            {
-                if (analysis.Participants.TryGetValue(entry.Key, out var participant) &&
-                    reportData.IsDeveloperIncluded(participant))
-                {
-                    var participantStats = reportData.GetOrAddDeveloper(participant);
-                    participantStats.CommentsAfter += entry.Value;
-                    if (authorIdentity.HasValue && !participant.IsSameIdentity(authorIdentity.Value))
-                    {
-                        participantStats.PeerCommentsAfter += entry.Value;
-                    }
-                }
-            }
-
-            foreach (var entry in analysis.ApprovalCounts)
-            {
-                if (analysis.Participants.TryGetValue(entry.Key, out var participant) &&
-                    reportData.IsDeveloperIncluded(participant))
-                {
-                    reportData.GetOrAddDeveloper(participant).ApprovalsAfter += entry.Value;
-                }
-            }
-
-            if (collectDeveloperDetails)
-            {
-                foreach (var detail in detailedComments!)
-                {
-                    if (reportData.IsDeveloperIncluded(detail.User))
-                    {
-                        reportData.GetOrAddDeveloper(detail.User).CommentActivities.Add(new DeveloperCommentActivity(
-                            repositoryName,
-                            repo.Slug.Value,
-                            pr.Id,
-                            pullRequestAuthor,
-                            detail.Date));
-                    }
-                }
-
-                foreach (var detail in detailedApprovals!)
-                {
-                    if (reportData.IsDeveloperIncluded(detail.User))
-                    {
-                        reportData.GetOrAddDeveloper(detail.User).ApprovalActivities.Add(new DeveloperApprovalActivity(
-                            repositoryName,
-                            repo.Slug.Value,
-                            pr.Id,
-                            pullRequestAuthor,
-                            detail.Date));
-                    }
-                }
-            }
-
-            if (shouldDisplayPullRequest)
-            {
-                reportData.Reports.Add(reportEntry!);
-            }
-        });
+        cancellationToken.ThrowIfCancellationRequested();
+        reportData.ApplyResult(new PullRequestAnalysisResult(
+            workspace, repo, pr, observedIdentities, authorIdentity, includeAuthoredPullRequest,
+            reportEntry!, mergedOnResolved, corrections, snapshot.HasCommits, analysis,
+            correctionCommitActivities, detailedComments, detailedApprovals));
     }
 
     private async Task<IReadOnlyList<PullRequestCommitInfo>?> GetCorrectionCommitsAsync(
