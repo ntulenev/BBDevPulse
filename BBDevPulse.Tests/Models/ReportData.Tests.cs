@@ -29,6 +29,11 @@ public sealed class ReportDataTests
         report.Should().NotBeSameAs(working);
         report.DeveloperStats[DeveloperKey.FromIdentity(identity)].Should().NotBeSameAs(workingStats);
         report.DeveloperStats[DeveloperKey.FromIdentity(identity)].CommentsAfter.Should().Be(2);
+        Action changeReports = () => ((IList<PullRequestReport>)report.Reports).Clear();
+        changeReports.Should().Throw<NotSupportedException>();
+        Action changeDetails = () => ((IList<PullRequestReport>)report.DeveloperStats[DeveloperKey.FromIdentity(identity)]
+            .AuthoredPullRequests).Clear();
+        changeDetails.Should().Throw<NotSupportedException>();
         report.IsDeveloperIncluded(identity).Should().BeTrue();
         Action rebuild = () => accumulator.Build();
         rebuild.Should().Throw<InvalidOperationException>();
@@ -41,8 +46,8 @@ public sealed class ReportDataTests
     {
         var accumulator = new ReportAccumulator(CreateReportParameters());
         var date = accumulator.WorkingData.Parameters.FilterDate;
-        accumulator.WorkingData.Reports.Add(CreatePullRequestReport(2, date));
-        accumulator.WorkingData.Reports.Add(CreatePullRequestReport(1, date));
+        accumulator.WorkingData.MutableReports.Add(CreatePullRequestReport(2, date));
+        accumulator.WorkingData.MutableReports.Add(CreatePullRequestReport(1, date));
         var report = accumulator.Build();
         report.Reports.Select(item => item.Id.Value).Should().Equal(1, 2);
     }
@@ -68,8 +73,8 @@ public sealed class ReportDataTests
         var stats = data.GetOrAddDeveloper(identity);
         var created = data.Parameters.FilterDate;
         var report = CreatePullRequestReport(1, created, created.AddHours(6));
-        data.Reports.Add(report);
-        stats.AuthoredPullRequests.Add(report);
+        data.MutableReports.Add(report);
+        stats.MutableAuthoredPullRequests.Add(report);
         data.Freeze();
 
         Parallel.For(0, 128, _ =>
@@ -95,10 +100,10 @@ public sealed class ReportDataTests
     {
         var data = new ReportData(CreateReportParameters());
         var created = DateTimeOffset.UnixEpoch;
-        data.Reports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
-        data.Reports.Add(CreatePullRequestReport(2, created, created.AddDays(3)));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
+        data.MutableReports.Add(CreatePullRequestReport(2, created, created.AddDays(3)));
         data.GetTtfrStatistics(new StatisticsCalculator()).Count.Should().Be(2);
-        data.Reports.RemoveAt(1);
+        data.MutableReports.RemoveAt(1);
         var calculator = new Moq.Mock<BBDevPulse.Abstractions.IStatisticsCalculator>();
         calculator.Setup(x => x.Percentile(Moq.It.IsAny<IReadOnlyList<double>>(), 50)).Returns(0.5);
         var result = data.GetTtfrStatistics(calculator.Object);
@@ -208,9 +213,9 @@ public sealed class ReportDataTests
     public void PublishedReportIsIndependentOfCollectionReferencesHeldByProducer()
     {
         var data = new ReportData(CreateReportParameters());
-        var list = data.Reports;
+        var list = data.MutableReports;
         var stats = data.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("alice"), new DisplayName("Alice")));
-        var details = stats.AuthoredPullRequests;
+        var details = stats.MutableAuthoredPullRequests;
         var report = CreatePullRequestReport(1, DateTimeOffset.UnixEpoch);
         list.Add(report);
         details.Add(report);
@@ -220,7 +225,7 @@ public sealed class ReportDataTests
         details.Clear();
         data.Reports.Should().ContainSingle();
         stats.AuthoredPullRequests.Should().ContainSingle();
-        Assert.Throws<NotSupportedException>(() => data.Reports.Clear());
+        Assert.Throws<NotSupportedException>(() => ((IList<PullRequestReport>)data.Reports).Clear());
         Assert.Throws<InvalidOperationException>(() => stats.CommentsAfter++);
     }
 
@@ -256,10 +261,10 @@ public sealed class ReportDataTests
     {
         var data = new ReportData(CreateReportParameters());
         var created = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
-        data.Reports.Add(CreatePullRequestReport(1, created, created));
-        data.Reports.Add(CreatePullRequestReport(2, created, created.AddHours(2)));
-        data.Reports.Add(CreatePullRequestReport(3, created, created.AddHours(4)));
-        data.Reports.Add(CreatePullRequestReport(4, created));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created));
+        data.MutableReports.Add(CreatePullRequestReport(2, created, created.AddHours(2)));
+        data.MutableReports.Add(CreatePullRequestReport(3, created, created.AddHours(4)));
+        data.MutableReports.Add(CreatePullRequestReport(4, created));
 
         var statistics = data.GetTtfrStatistics(new StatisticsCalculator());
 
@@ -286,7 +291,7 @@ public sealed class ReportDataTests
         var calculator = new StatisticsCalculator();
         data.GetTtfrStatistics(calculator).Count.Should().Be(0);
         var created = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
-        data.Reports.Add(CreatePullRequestReport(1, created, created.AddHours(2)));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created.AddHours(2)));
         data.GetTtfrStatistics(calculator).Count.Should().Be(1);
     }
 
@@ -297,7 +302,7 @@ public sealed class ReportDataTests
             excludeWeekend: true,
             forcedIncludeDates: [new DateOnly(2026, 11, 7)]));
         var created = new DateTimeOffset(2026, 11, 7, 9, 0, 0, TimeSpan.Zero);
-        data.Reports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
+        data.MutableReports.Add(CreatePullRequestReport(1, created, created.AddDays(1)));
 
         var statistics = data.GetTtfrStatistics(new StatisticsCalculator());
 
@@ -439,8 +444,8 @@ public sealed class ReportDataTests
         var newerDate = new DateTimeOffset(2026, 2, 21, 10, 0, 0, TimeSpan.Zero);
         var olderDate = newerDate.AddHours(-4);
 
-        reportData.Reports.Add(CreatePullRequestReport(id: 2, createdOn: newerDate));
-        reportData.Reports.Add(CreatePullRequestReport(id: 1, createdOn: olderDate));
+        reportData.MutableReports.Add(CreatePullRequestReport(id: 2, createdOn: newerDate));
+        reportData.MutableReports.Add(CreatePullRequestReport(id: 1, createdOn: olderDate));
 
         // Act
         reportData.SortReportsByCreatedOn();
@@ -464,7 +469,7 @@ public sealed class ReportDataTests
             branchNameList: [],
             toDateExclusive: new DateTimeOffset(2026, 2, 25, 0, 0, 0, TimeSpan.Zero)));
 
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -476,7 +481,7 @@ public sealed class ReportDataTests
             state: PullRequestState.Merged,
             id: new PullRequestId(1),
             comments: 0));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoB",
             repositorySlug: "repob",
             author: "Bob",
@@ -488,7 +493,7 @@ public sealed class ReportDataTests
             state: PullRequestState.Merged,
             id: new PullRequestId(2),
             comments: 0));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoC",
             repositorySlug: "repoc",
             author: "Carol",
@@ -500,7 +505,7 @@ public sealed class ReportDataTests
             state: PullRequestState.Merged,
             id: new PullRequestId(3),
             comments: 0));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoD",
             repositorySlug: "repod",
             author: "External",

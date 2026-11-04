@@ -22,7 +22,7 @@ public sealed class ReportData
     private readonly Dictionary<string, HashSet<string>> _observedIdentities = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Records a Bitbucket identity before developer statistics can merge it with another identity.</summary>
-    public void ObserveDeveloperIdentity(DeveloperIdentity identity)
+    internal void ObserveDeveloperIdentity(DeveloperIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         EnsureMutable();
@@ -69,6 +69,7 @@ public sealed class ReportData
     {
         ArgumentNullException.ThrowIfNull(parameters);
         Parameters = parameters;
+        Reports = new System.Collections.ObjectModel.ReadOnlyCollection<PullRequestReport>(_reports);
         DeveloperStats = new System.Collections.ObjectModel.ReadOnlyDictionary<DeveloperKey, DeveloperStats>(_developers);
         _peopleByDisplayName = peopleByDisplayName is null
             ? new Dictionary<string, PersonCsvRow>(StringComparer.Ordinal)
@@ -90,7 +91,23 @@ public sealed class ReportData
     /// <summary>
     /// Gets the pull request reports.
     /// </summary>
-    public IList<PullRequestReport> Reports { get; private set; } = new List<PullRequestReport>();
+    public IReadOnlyList<PullRequestReport> Reports { get; private set; } = null!;
+
+    private IList<PullRequestReport> _reports = new List<PullRequestReport>();
+
+    internal IList<PullRequestReport> MutableReports {
+        get
+        {
+            EnsureMutable();
+            return _reports;
+        }
+    }
+
+    private void SetReports(IEnumerable<PullRequestReport> reports)
+    {
+        _reports = reports.ToList();
+        Reports = new System.Collections.ObjectModel.ReadOnlyCollection<PullRequestReport>(_reports);
+    }
 
     /// <summary>Calculates time-to-first-review statistics from the current reports.</summary>
     /// <param name="calculator">Calculator used for the median and 75th percentile.</param>
@@ -155,10 +172,10 @@ public sealed class ReportData
     /// <summary>
     /// Sorts reports by creation time, ascending.
     /// </summary>
-    public void SortReportsByCreatedOn()
+    internal void SortReportsByCreatedOn()
     {
         EnsureMutable();
-        Reports = Reports.OrderBy(static report => report.CreatedOn).ToList();
+        SetReports(Reports.OrderBy(static report => report.CreatedOn));
     }
 
     /// <summary>Checks whether a developer belongs to the selected team.</summary>
@@ -249,7 +266,7 @@ public sealed class ReportData
     /// <summary>Gets or creates the mutable statistics entry for a developer.</summary>
     /// <param name="identity">Developer identity with a display name.</param>
     /// <returns>The current statistics entry.</returns>
-    public DeveloperStats GetOrAddDeveloper(DeveloperIdentity identity)
+    internal DeveloperStats GetOrAddDeveloper(DeveloperIdentity identity)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         ObserveDeveloperIdentity(identity);
@@ -317,10 +334,10 @@ public sealed class ReportData
                 }
                 if (result.Comments is not null)
                 {
-                    stats.AuthoredPullRequests.Add(report);
+                    stats.MutableAuthoredPullRequests.Add(report);
                     foreach (var commit in result.Commits)
                     {
-                        stats.CommitActivities.Add(commit);
+                        stats.MutableCommitActivities.Add(commit);
                     }
                 }
             }
@@ -350,7 +367,7 @@ public sealed class ReportData
                 {
                     if (IsDeveloperIncluded(detail.User))
                     {
-                        GetOrAddDeveloper(detail.User).CommentActivities.Add(new DeveloperCommentActivity(
+                        GetOrAddDeveloper(detail.User).MutableCommentActivities.Add(new DeveloperCommentActivity(
                             report.Repository, report.RepositorySlug, result.Id, report.Author, detail.Date));
                     }
                 }
@@ -358,12 +375,12 @@ public sealed class ReportData
                 {
                     if (IsDeveloperIncluded(detail.User))
                     {
-                        GetOrAddDeveloper(detail.User).ApprovalActivities.Add(new DeveloperApprovalActivity(
+                        GetOrAddDeveloper(detail.User).MutableApprovalActivities.Add(new DeveloperApprovalActivity(
                             report.Repository, report.RepositorySlug, result.Id, report.Author, detail.Date));
                     }
                 }
             }
-            Reports.Add(report);
+            MutableReports.Add(report);
         }
     }
 
@@ -460,11 +477,11 @@ public sealed class ReportData
                 static entry => new DisplayName(entry.Key), static entry => entry.Value);
             var snapshot = new ReportData(Parameters, people)
             {
-                HasMissingUserUuid = HasMissingUserUuid,
-                Reports = Reports.OrderBy(static report => report.CreatedOn)
-                    .ThenBy(static report => report.RepositorySlug, StringComparer.OrdinalIgnoreCase)
-                    .ThenBy(static report => report.Id.Value).ToList()
+                HasMissingUserUuid = HasMissingUserUuid
             };
+            snapshot.SetReports(Reports.OrderBy(static report => report.CreatedOn)
+                .ThenBy(static report => report.RepositorySlug, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(static report => report.Id.Value));
             foreach (var entry in _developers.OrderBy(static entry => entry.Key.ToString(), StringComparer.OrdinalIgnoreCase))
             {
                 snapshot._developers.Add(entry.Key, entry.Value.Copy());
@@ -492,7 +509,7 @@ public sealed class ReportData
             stats.Freeze();
         }
 
-        Reports = Array.AsReadOnly(Reports.ToArray());
+        SetReports(Reports);
         _frozen = true;
     }
 

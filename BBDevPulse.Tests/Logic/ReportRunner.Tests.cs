@@ -265,7 +265,7 @@ public sealed class ReportRunnerTests
             .Callback<Repository, ReportData, CancellationToken>((repository, reportData, _) =>
             {
                 analyzedRepositories.Add(repository);
-                reportData.Reports.Add(new PullRequestReport(
+                reportData.MutableReports.Add(new PullRequestReport(
                     repository.DisplayName,
                     repository.Slug.Value,
                     "Alice",

@@ -100,7 +100,7 @@ internal static class DemoReportData
             linesAdded: item.Added,
             linesRemoved: item.Removed,
             isActivityOnlyMatch: authorStats is null);
-        reportData.Reports.Add(report);
+        reportData.MutableReports.Add(report);
 
         if (authorStats is not null)
         {
@@ -111,10 +111,10 @@ internal static class DemoReportData
             }
 
             authorStats.Corrections += item.Corrections;
-            authorStats.AuthoredPullRequests.Add(report);
+            authorStats.MutableAuthoredPullRequests.Add(report);
             if (item.Corrections > 0)
             {
-                authorStats.CommitActivities.Add(new DeveloperCommitActivity(
+                authorStats.MutableCommitActivities.Add(new DeveloperCommitActivity(
                     repo, slug, id,
                     (101 + index).ToString("x40", System.Globalization.CultureInfo.InvariantCulture),
                     "Refine synthetic implementation",
@@ -130,11 +130,11 @@ internal static class DemoReportData
             reviewer.ApprovalsAfter++;
             for (var comment = 0; comment < item.Comments; comment++)
             {
-                reviewer.CommentActivities.Add(new DeveloperCommentActivity(
+                reviewer.MutableCommentActivities.Add(new DeveloperCommentActivity(
                     repo, slug, id, author, created.AddHours(3 + comment)));
             }
 
-            reviewer.ApprovalActivities.Add(new DeveloperApprovalActivity(
+            reviewer.MutableApprovalActivities.Add(new DeveloperApprovalActivity(
                 repo, slug, id, author, created.AddHours(5)));
         }
     }

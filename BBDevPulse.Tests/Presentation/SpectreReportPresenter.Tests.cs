@@ -410,8 +410,8 @@ public sealed class SpectreReportPresenterTests
         // Arrange
         var parameters = CreateReportParameters();
         var reportData = new ReportData(parameters);
-        reportData.Reports.Add(CreateReport(2, new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero)));
-        reportData.Reports.Add(CreateReport(1, new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero)));
+        reportData.MutableReports.Add(CreateReport(2, new DateTimeOffset(2026, 2, 21, 0, 0, 0, TimeSpan.Zero)));
+        reportData.MutableReports.Add(CreateReport(1, new DateTimeOffset(2026, 2, 20, 0, 0, 0, TimeSpan.Zero)));
 
         var pullRequestReportPresenter = new Mock<IPullRequestReportPresenter>(MockBehavior.Strict);
         var renderPullRequestCalls = 0;

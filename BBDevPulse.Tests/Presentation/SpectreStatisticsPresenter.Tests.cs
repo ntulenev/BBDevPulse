@@ -72,17 +72,17 @@ public sealed class SpectreStatisticsPresenterTests
             [],
             toDateExclusive: BaseDate.AddDays(4)));
 
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 1,
             mergedOn: BaseDate.AddDays(1),
             firstReactionOn: null,
             rejectedOn: BaseDate.AddDays(2)));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 2,
             mergedOn: BaseDate.AddDays(5),
             firstReactionOn: null,
             rejectedOn: null));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoB",
             repositorySlug: "repob",
             author: "External",
@@ -214,8 +214,8 @@ public sealed class SpectreStatisticsPresenterTests
             statisticsCalculator.Object,
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null, comments: 1));
-        reportData.Reports.Add(CreateReport(2, mergedOn: null, firstReactionOn: null, comments: 4));
+        reportData.MutableReports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null, comments: 1));
+        reportData.MutableReports.Add(CreateReport(2, mergedOn: null, firstReactionOn: null, comments: 4));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderCommentsStats(reportData));
@@ -300,7 +300,7 @@ public sealed class SpectreStatisticsPresenterTests
         // Arrange
         var presenter = CreatePresenter();
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null));
+        reportData.MutableReports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderMergeTimeStats(reportData));
@@ -333,8 +333,8 @@ public sealed class SpectreStatisticsPresenterTests
 
         var presenter = new SpectreStatisticsPresenter(statisticsCalculator.Object, dateDiffFormatter.Object);
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(1, mergedOn: BaseDate.AddDays(1), firstReactionOn: null));
-        reportData.Reports.Add(CreateReport(2, mergedOn: BaseDate.AddDays(3), firstReactionOn: null));
+        reportData.MutableReports.Add(CreateReport(1, mergedOn: BaseDate.AddDays(1), firstReactionOn: null));
+        reportData.MutableReports.Add(CreateReport(2, mergedOn: BaseDate.AddDays(3), firstReactionOn: null));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderMergeTimeStats(reportData));
@@ -372,7 +372,7 @@ public sealed class SpectreStatisticsPresenterTests
         var reportData = CreateReportData(excludeWeekend: true);
         var created = new DateTimeOffset(2026, 2, 20, 12, 0, 0, TimeSpan.Zero); // Friday
         var merged = new DateTimeOffset(2026, 2, 23, 12, 0, 0, TimeSpan.Zero); // Monday
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -418,7 +418,7 @@ public sealed class SpectreStatisticsPresenterTests
         var reportData = CreateReportData(excludedDays: [new DateOnly(2026, 2, 3)]);
         var created = new DateTimeOffset(2026, 2, 2, 12, 0, 0, TimeSpan.Zero); // Monday
         var merged = new DateTimeOffset(2026, 2, 4, 12, 0, 0, TimeSpan.Zero); // Wednesday
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoA",
             repositorySlug: "repoa",
             author: "Alice",
@@ -462,7 +462,7 @@ public sealed class SpectreStatisticsPresenterTests
         // Arrange
         var presenter = CreatePresenter();
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null));
+        reportData.MutableReports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderTtfrStats(reportData));
@@ -495,8 +495,8 @@ public sealed class SpectreStatisticsPresenterTests
 
         var presenter = new SpectreStatisticsPresenter(statisticsCalculator.Object, dateDiffFormatter.Object);
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: BaseDate.AddDays(1)));
-        reportData.Reports.Add(CreateReport(2, mergedOn: null, firstReactionOn: BaseDate.AddDays(2)));
+        reportData.MutableReports.Add(CreateReport(1, mergedOn: null, firstReactionOn: BaseDate.AddDays(1)));
+        reportData.MutableReports.Add(CreateReport(2, mergedOn: null, firstReactionOn: BaseDate.AddDays(2)));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderTtfrStats(reportData));
@@ -543,8 +543,8 @@ public sealed class SpectreStatisticsPresenterTests
             statisticsCalculator.Object,
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null, corrections: 0));
-        reportData.Reports.Add(CreateReport(2, mergedOn: null, firstReactionOn: null, corrections: 3));
+        reportData.MutableReports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null, corrections: 0));
+        reportData.MutableReports.Add(CreateReport(2, mergedOn: null, firstReactionOn: null, corrections: 3));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderCorrectionsStats(reportData));
@@ -579,7 +579,7 @@ public sealed class SpectreStatisticsPresenterTests
         // Arrange
         var presenter = CreatePresenter();
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null));
+        reportData.MutableReports.Add(CreateReport(1, mergedOn: null, firstReactionOn: null));
 
         // Act
         var output = TestConsoleRunner.Run(_ => presenter.RenderPullRequestSizeStats(reportData));
@@ -609,14 +609,14 @@ public sealed class SpectreStatisticsPresenterTests
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
 
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             1,
             mergedOn: null,
             firstReactionOn: null,
             filesChanged: 3,
             linesAdded: 100,
             linesRemoved: 20));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             2,
             mergedOn: null,
             firstReactionOn: null,
@@ -655,14 +655,14 @@ public sealed class SpectreStatisticsPresenterTests
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
 
         var reportData = CreateReportData(pullRequestSizeMode: PullRequestSizeMode.Files);
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 1,
             mergedOn: null,
             firstReactionOn: null,
             filesChanged: 4,
             linesAdded: 1000,
             linesRemoved: 400));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 2,
             mergedOn: null,
             firstReactionOn: null,
@@ -700,12 +700,12 @@ public sealed class SpectreStatisticsPresenterTests
             new Mock<IDateDiffFormatter>(MockBehavior.Strict).Object);
 
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 1,
             mergedOn: null,
             firstReactionOn: null,
             corrections: 2));
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "RepoB",
             repositorySlug: "repob",
             author: "External",
@@ -775,7 +775,7 @@ public sealed class SpectreStatisticsPresenterTests
             dateDiffFormatter.Object);
 
         var reportData = CreateReportData();
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 1,
             mergedOn: BaseDate.AddDays(10),
             firstReactionOn: BaseDate.AddDays(9),
@@ -786,7 +786,7 @@ public sealed class SpectreStatisticsPresenterTests
             filesChanged: 4,
             linesAdded: 150,
             linesRemoved: 50));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 2,
             mergedOn: BaseDate.AddDays(8),
             firstReactionOn: BaseDate.AddDays(1),
@@ -797,7 +797,7 @@ public sealed class SpectreStatisticsPresenterTests
             filesChanged: 3,
             linesAdded: 100,
             linesRemoved: 20));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 3,
             mergedOn: BaseDate.AddDays(2),
             firstReactionOn: BaseDate.AddDays(7),
@@ -808,7 +808,7 @@ public sealed class SpectreStatisticsPresenterTests
             filesChanged: 2,
             linesAdded: 90,
             linesRemoved: 10));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 4,
             mergedOn: BaseDate.AddDays(1),
             firstReactionOn: BaseDate.AddDays(1),
@@ -819,7 +819,7 @@ public sealed class SpectreStatisticsPresenterTests
             filesChanged: 8,
             linesAdded: 500,
             linesRemoved: 100));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 5,
             mergedOn: BaseDate.AddDays(3),
             firstReactionOn: BaseDate.AddDays(2),
@@ -868,7 +868,7 @@ public sealed class SpectreStatisticsPresenterTests
             dateDiffFormatter.Object);
 
         var reportData = CreateReportData(pullRequestSizeMode: PullRequestSizeMode.Files);
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 11,
             mergedOn: null,
             firstReactionOn: null,
@@ -880,7 +880,7 @@ public sealed class SpectreStatisticsPresenterTests
             filesChanged: 2,
             linesAdded: 3000,
             linesRemoved: 700));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 12,
             mergedOn: null,
             firstReactionOn: null,
@@ -892,7 +892,7 @@ public sealed class SpectreStatisticsPresenterTests
             filesChanged: 12,
             linesAdded: 100,
             linesRemoved: 20));
-        reportData.Reports.Add(CreateReport(
+        reportData.MutableReports.Add(CreateReport(
             id: 13,
             mergedOn: null,
             firstReactionOn: null,
@@ -1038,10 +1038,10 @@ public sealed class SpectreStatisticsPresenterTests
             filesChanged: 3,
             linesAdded: 30,
             linesRemoved: 20);
-        developer.AuthoredPullRequests.Add(report);
-        developer.CommentActivities.Add(new DeveloperCommentActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(3)));
-        developer.ApprovalActivities.Add(new DeveloperApprovalActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(4)));
-        developer.CommitActivities.Add(new DeveloperCommitActivity(
+        developer.MutableAuthoredPullRequests.Add(report);
+        developer.MutableCommentActivities.Add(new DeveloperCommentActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(3)));
+        developer.MutableApprovalActivities.Add(new DeveloperApprovalActivity("RepoA", "repoa", new PullRequestId(7), "Bob", BaseDate.AddHours(4)));
+        developer.MutableCommitActivities.Add(new DeveloperCommitActivity(
             "RepoA",
             "repoa",
             new PullRequestId(7),
@@ -1079,10 +1079,10 @@ public sealed class SpectreStatisticsPresenterTests
             pullRequestSizeMode: PullRequestSizeMode.Files,
             showAllDetailsForDevelopers: true);
         var developer = reportData.GetOrAddDeveloper(new DeveloperIdentity(new UserUuid("test:Alice"), new DisplayName("Alice")));
-        developer.AuthoredPullRequests.Add(CreateReport(
+        developer.MutableAuthoredPullRequests.Add(CreateReport(
             id: 7, mergedOn: null, firstReactionOn: null,
             filesChanged: 4, linesAdded: 60, linesRemoved: 20));
-        developer.AuthoredPullRequests.Add(CreateReport(
+        developer.MutableAuthoredPullRequests.Add(CreateReport(
             id: 8, mergedOn: null, firstReactionOn: null,
             hasSizeData: false));
 

@@ -25,9 +25,9 @@ public sealed partial class ReportFormatParityTests
         var parameters = new ReportParameters(start, new Workspace("team"), new RepoNameFilter(""), [],
             RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, []);
         var data = new ReportData(parameters);
-        data.Reports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, start,
+        data.MutableReports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, start,
             null, null, PullRequestState.Open, new PullRequestId(1), 0, hasSizeData: true));
-        data.Reports.Add(new PullRequestReport("repo", "repo", "Bob", "main", start, start,
+        data.MutableReports.Add(new PullRequestReport("repo", "repo", "Bob", "main", start, start,
             null, null, PullRequestState.Open, new PullRequestId(2), 0,
             hasSizeData: false, hasCorrectionsData: false));
         data.Freeze();
@@ -130,7 +130,7 @@ public sealed partial class ReportFormatParityTests
         void AddReport(int id, PullRequestState state, int? reactionHours, bool activityOnly = false)
         {
             var end = start.AddHours(22);
-            data.Reports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, end,
+            data.MutableReports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, end,
                 state == PullRequestState.Merged ? end : null, state == PullRequestState.Declined ? end : null,
                 state, new PullRequestId(id), 0, firstReactionOn: reactionHours.HasValue ? start.AddHours(reactionHours.Value) : null,
                 isActivityOnlyMatch: activityOnly));

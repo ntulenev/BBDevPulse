@@ -92,7 +92,7 @@ public sealed class HtmlContentComposerTests
         var reportData = CreateDetailedReportData(PullRequestSizeMode.Files);
         var developer = reportData.DeveloperStats.Values.Single(stat => stat.DisplayName.Value == "Alice");
         var created = reportData.Parameters.FilterDate;
-        developer.AuthoredPullRequests.Add(new PullRequestReport(
+        developer.MutableAuthoredPullRequests.Add(new PullRequestReport(
             "Repo One", "repo-one", "Alice", "develop", created, created,
             null, null, PullRequestState.Open, new PullRequestId(201), 0,
             hasSizeData: false));
@@ -143,7 +143,7 @@ public sealed class HtmlContentComposerTests
             linesAdded: 60,
             linesRemoved: 20,
             isActivityOnlyMatch: true);
-        reportData.Reports.Add(report);
+        reportData.MutableReports.Add(report);
         var developer = reportData.GetOrAddDeveloper(new DeveloperIdentity(
             new UserUuid("{alice-1}"),
             new DisplayName("Alice")));
@@ -153,10 +153,10 @@ public sealed class HtmlContentComposerTests
         developer.PeerCommentsAfter = 1;
         developer.ApprovalsAfter = 1;
         developer.Corrections = 2;
-        developer.AuthoredPullRequests.Add(report);
-        developer.CommentActivities.Add(new DeveloperCommentActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(5)));
-        developer.ApprovalActivities.Add(new DeveloperApprovalActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(6)));
-        developer.CommitActivities.Add(new DeveloperCommitActivity(
+        developer.MutableAuthoredPullRequests.Add(report);
+        developer.MutableCommentActivities.Add(new DeveloperCommentActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(5)));
+        developer.MutableApprovalActivities.Add(new DeveloperApprovalActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(6)));
+        developer.MutableCommitActivities.Add(new DeveloperCommitActivity(
             "Repo One",
             "repo-one",
             new PullRequestId(200),

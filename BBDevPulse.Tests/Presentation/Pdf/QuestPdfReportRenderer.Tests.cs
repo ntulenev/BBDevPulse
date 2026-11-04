@@ -517,7 +517,7 @@ public sealed class QuestPdfReportRendererTests
         var reportData = new ReportData(CreateParameters());
         var filterDate = reportData.Parameters.FilterDate;
 
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "Repo One",
             repositorySlug: "repo one",
             author: "Alice",
@@ -531,7 +531,7 @@ public sealed class QuestPdfReportRendererTests
             comments: 3,
             firstReactionOn: filterDate.AddHours(3)));
 
-        reportData.Reports.Add(new PullRequestReport(
+        reportData.MutableReports.Add(new PullRequestReport(
             repository: "Repo Two",
             repositorySlug: "repo-two",
             author: "Bob",
@@ -585,7 +585,7 @@ public sealed class QuestPdfReportRendererTests
             filesChanged: 4,
             linesAdded: 60,
             linesRemoved: 20);
-        reportData.Reports.Add(report);
+        reportData.MutableReports.Add(report);
         var developer = reportData.GetOrAddDeveloper(new DeveloperIdentity(
             new UserUuid("{alice-1}"),
             new DisplayName("Alice")));
@@ -594,10 +594,10 @@ public sealed class QuestPdfReportRendererTests
         developer.CommentsAfter = 1;
         developer.ApprovalsAfter = 1;
         developer.Corrections = 2;
-        developer.AuthoredPullRequests.Add(report);
-        developer.CommentActivities.Add(new DeveloperCommentActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(5)));
-        developer.ApprovalActivities.Add(new DeveloperApprovalActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(6)));
-        developer.CommitActivities.Add(new DeveloperCommitActivity(
+        developer.MutableAuthoredPullRequests.Add(report);
+        developer.MutableCommentActivities.Add(new DeveloperCommentActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(5)));
+        developer.MutableApprovalActivities.Add(new DeveloperApprovalActivity("Repo One", "repo-one", new PullRequestId(200), "Alice", filterDate.AddHours(6)));
+        developer.MutableCommitActivities.Add(new DeveloperCommitActivity(
             "Repo One",
             "repo-one",
             new PullRequestId(200),
