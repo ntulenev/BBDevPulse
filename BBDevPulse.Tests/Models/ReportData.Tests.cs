@@ -146,6 +146,33 @@ public sealed class ReportDataTests
             new RepoSlug("other"), id, []);
         Action separate = () => data.ApplyResult(anotherRepository);
         separate.Should().NotThrow();
+        var anotherWorkspace = PullRequestAnalysisResult.Skipped(new Workspace("other"), new RepoSlug("repo"), id, []);
+        Action wrongWorkspace = () => data.ApplyResult(anotherWorkspace);
+        wrongWorkspace.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void PullRequestResultDoesNotShareMutableAnalysisState()
+    {
+        var data = new ReportData(CreateReportParameters());
+        var identity = new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice"));
+        var created = data.Parameters.FilterDate;
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, created, null, null,
+            new User(identity.DisplayName, identity.Uuid), null);
+        var analysis = new ActivityAnalysisState(created, identity, true);
+        analysis.AddParticipant(identity);
+        analysis.CommentCounts.Add(identity.ToKey(), 1);
+        var observed = new List<DeveloperIdentity> { identity };
+        var result = new PullRequestAnalysisResult(data.Parameters.Workspace, repository, pr,
+            observed, identity, true, CreatePullRequestReport(1, created), null, 0, true,
+            analysis, [], null, null);
+        observed.Clear();
+        analysis.CommentCounts[identity.ToKey()] = 100;
+        analysis.Participants.Clear();
+
+        data.ApplyResult(result);
+        data.DeveloperStats[DeveloperKey.FromIdentity(identity)].CommentsAfter.Should().Be(1);
     }
 
     [Fact]

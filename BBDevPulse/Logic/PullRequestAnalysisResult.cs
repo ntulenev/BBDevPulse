@@ -8,6 +8,10 @@ internal sealed class PullRequestAnalysisResult
     private PullRequestAnalysisResult(Workspace workspace, RepoSlug repository, PullRequestId id,
         IReadOnlyList<DeveloperIdentity> observedIdentities)
     {
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(repository);
+        ArgumentNullException.ThrowIfNull(id);
+        ArgumentNullException.ThrowIfNull(observedIdentities);
         Workspace = workspace;
         Repository = repository;
         Id = id;

@@ -274,6 +274,10 @@ public sealed class ReportData
         lock (_identityLock)
         {
             EnsureMutable();
+            if (!string.Equals(result.Workspace.Value, Parameters.Workspace.Value, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException("The pull request belongs to a different workspace.", nameof(result));
+            }
             var key = (result.Workspace.Value.ToUpperInvariant(), result.Repository.Value.ToUpperInvariant(), result.Id.Value);
             if (_appliedPullRequests.Contains(key))
             {
