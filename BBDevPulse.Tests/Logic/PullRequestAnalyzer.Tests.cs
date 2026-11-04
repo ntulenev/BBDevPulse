@@ -421,6 +421,7 @@ public sealed class PullRequestAnalyzerTests
             client,
             new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
             new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
@@ -440,6 +441,7 @@ public sealed class PullRequestAnalyzerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             activityAnalyzer,
             new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
@@ -459,6 +461,7 @@ public sealed class PullRequestAnalyzerTests
             new Mock<IBitbucketClient>(MockBehavior.Strict).Object,
             new Mock<IActivityAnalyzer>(MockBehavior.Strict).Object,
             analysisCache,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
@@ -479,6 +482,7 @@ public sealed class PullRequestAnalyzerTests
             client,
             activityAnalyzer,
             new Mock<IPullRequestAnalysisCache>(MockBehavior.Strict).Object,
+            new PullRequestAnalysisCacheKeyFactory(),
             options);
 
         // Assert
@@ -1540,6 +1544,7 @@ public sealed class PullRequestAnalyzerTests
             client,
             activityAnalyzer,
             resolvedAnalysisCache,
+            new PullRequestAnalysisCacheKeyFactory(),
             CreateBitbucketOptions(pullRequestConcurrency));
     }
 

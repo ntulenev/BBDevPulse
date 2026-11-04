@@ -1,7 +1,4 @@
-using System.Globalization;
 using System.Runtime.ExceptionServices;
-using System.Security.Cryptography;
-using System.Text;
 
 using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
@@ -22,22 +19,26 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
     /// <param name="client">Bitbucket API client.</param>
     /// <param name="activityAnalyzer">Activity analyzer.</param>
     /// <param name="analysisCache">Pull request analysis cache.</param>
+    /// <param name="cacheKeys">Creates cache fingerprints.</param>
     /// <param name="options">Bitbucket options.</param>
     public PullRequestAnalyzer(
         IBitbucketClient client,
         IActivityAnalyzer activityAnalyzer,
         IPullRequestAnalysisCache analysisCache,
+        IPullRequestAnalysisCacheKeyFactory cacheKeys,
         IOptions<BitbucketOptions> options)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(activityAnalyzer);
         ArgumentNullException.ThrowIfNull(analysisCache);
+        ArgumentNullException.ThrowIfNull(cacheKeys);
         ArgumentNullException.ThrowIfNull(options);
 
         var maxConcurrentPullRequests = options.Value.PullRequestConcurrency;
         _client = client;
         _activityAnalyzer = activityAnalyzer;
         _analysisCache = analysisCache;
+        _cacheKeys = cacheKeys;
         _maxConcurrentPullRequests = maxConcurrentPullRequests;
     }
 
@@ -152,8 +153,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var filterDate = parameters.FilterDate;
         var workspace = parameters.Workspace;
         var collectDeveloperDetails = parameters.ShowAllDetailsForDevelopers;
-        var parametersFingerprint = BuildParametersFingerprint(parameters);
-        var pullRequestFingerprint = BuildPullRequestFingerprint(pr);
+        var parametersFingerprint = _cacheKeys.BuildParametersFingerprint(parameters);
+        var pullRequestFingerprint = _cacheKeys.BuildPullRequestFingerprint(pr);
 
         var observedIdentities = new List<DeveloperIdentity>();
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
@@ -575,46 +576,9 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
     }
 
-    private static string BuildParametersFingerprint(ReportParameters parameters)
-    {
-        ArgumentNullException.ThrowIfNull(parameters);
-
-        var rawFingerprint = string.Join(
-            '\n',
-            parameters.FilterDate.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
-            parameters.ToDateExclusive?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            parameters.ShowAllDetailsForDevelopers ? "1" : "0");
-
-        return ComputeFingerprint(rawFingerprint);
-    }
-
-    private static string BuildPullRequestFingerprint(PullRequest pullRequest)
-    {
-        ArgumentNullException.ThrowIfNull(pullRequest);
-
-        var rawFingerprint = string.Join(
-            '\n',
-            pullRequest.Id.Value.ToString(CultureInfo.InvariantCulture),
-            pullRequest.State.ToString(),
-            pullRequest.CreatedOn.UtcDateTime.ToString("O", CultureInfo.InvariantCulture),
-            pullRequest.UpdatedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            pullRequest.ClosedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            pullRequest.MergedOn?.UtcDateTime.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-            pullRequest.Author?.DisplayName.Value ?? string.Empty,
-            pullRequest.Author?.Uuid?.Value ?? string.Empty,
-            pullRequest.Destination?.Branch?.Name ?? string.Empty);
-
-        return ComputeFingerprint(rawFingerprint);
-    }
-
-    private static string ComputeFingerprint(string value)
-    {
-        var fingerprintBytes = SHA256.HashData(Encoding.UTF8.GetBytes(value));
-        return Convert.ToHexString(fingerprintBytes);
-    }
-
     private readonly IBitbucketClient _client;
     private readonly IActivityAnalyzer _activityAnalyzer;
     private readonly IPullRequestAnalysisCache _analysisCache;
+    private readonly IPullRequestAnalysisCacheKeyFactory _cacheKeys;
     private readonly int _maxConcurrentPullRequests;
 }
