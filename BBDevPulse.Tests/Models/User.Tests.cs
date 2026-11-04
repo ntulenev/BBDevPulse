@@ -21,7 +21,7 @@ public sealed class UserTests
         act.Should().Throw<ArgumentNullException>();
     }
 
-    [Fact(DisplayName = "Constructor throws when UUID is null")]
+    [Fact(DisplayName = "Constructor preserves a missing UUID")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenUuidIsNullThrowsArgumentNullException()
     {
@@ -30,10 +30,10 @@ public sealed class UserTests
         UserUuid uuid = null!;
 
         // Act
-        Action act = () => _ = new User(displayName, uuid);
+        var user = new User(displayName, uuid);
 
         // Assert
-        act.Should().Throw<ArgumentNullException>();
+        user.Uuid.Should().BeNull();
     }
 
     [Fact(DisplayName = "Constructor sets properties")]

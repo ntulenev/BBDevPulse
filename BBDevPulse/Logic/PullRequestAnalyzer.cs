@@ -156,9 +156,18 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         var pullRequestFingerprint = BuildPullRequestFingerprint(pr);
 
         var authorIdentity = pr.Author?.ToDeveloperIdentity();
+        if (!authorIdentity.HasValue)
+        {
+            reportData.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("unknown")));
+            return;
+        }
         if (authorIdentity.HasValue)
         {
             reportData.ObserveDeveloperIdentity(authorIdentity.Value);
+            if (authorIdentity.Value.Uuid is null)
+            {
+                return;
+            }
         }
         var includeAuthoredPullRequest = !parameters.HasTeamFilter ||
             (authorIdentity.HasValue && reportData.IsDeveloperIncluded(authorIdentity.Value));
@@ -204,6 +213,13 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             {
                 reportData.ObserveDeveloperIdentity(activity.Approval.User);
             }
+            if ((activity.Comment is not null && activity.Comment.User.Uuid is null) ||
+                (activity.Approval is not null && activity.Approval.User.Uuid is null) ||
+                (activity.Actor.HasValue && activity.Actor.Value.Uuid is null &&
+                 activity.Comment is null && activity.Approval is null))
+            {
+                continue;
+            }
             if (parameters.HasTeamFilter &&
                 parameters.IsInRange(activity.ActivityDate) &&
                 HasIncludedTeamActivity(activity, reportData))
@@ -215,12 +231,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
 
             if (collectDeveloperDetails)
             {
-                if (activity.Comment is not null && parameters.IsInRange(activity.Comment.Date))
+                if (activity.Comment is not null && activity.Comment.User.Uuid is not null && parameters.IsInRange(activity.Comment.Date))
                 {
                     detailedComments!.Add((activity.Comment.User, activity.Comment.Date));
                 }
 
-                if (activity.Approval is not null && parameters.IsInRange(activity.Approval.Date))
+                if (activity.Approval is not null && activity.Approval.User.Uuid is not null && parameters.IsInRange(activity.Approval.Date))
                 {
                     detailedApprovals!.Add((activity.Approval.User, activity.Approval.Date));
                 }

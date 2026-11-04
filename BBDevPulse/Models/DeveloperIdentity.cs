@@ -34,17 +34,13 @@ public readonly struct DeveloperIdentity
     /// <returns>True when identities match.</returns>
     public bool IsSameIdentity(DeveloperIdentity other)
     {
-        if (Uuid is not null && other.Uuid is not null)
-        {
-            return string.Equals(Uuid.Value, other.Uuid.Value, StringComparison.OrdinalIgnoreCase);
-        }
-
-        return string.Equals(DisplayName.Value, other.DisplayName.Value, StringComparison.OrdinalIgnoreCase);
+        return Uuid is not null && other.Uuid is not null &&
+            string.Equals(Uuid.Value, other.Uuid.Value, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
     /// Builds a stable dictionary key for this identity.
     /// </summary>
-    /// <returns>UUID when available; otherwise display name.</returns>
-    public string ToKey() => Uuid?.Value ?? DisplayName.Value;
+    /// <returns>UUID of the developer.</returns>
+    public string ToKey() => Uuid?.Value ?? throw new InvalidOperationException("A user UUID is required for identity.");
 }

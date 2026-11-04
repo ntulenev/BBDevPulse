@@ -30,14 +30,12 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
             analysis.MergedOnFromActivity = mergedOnFromActivity;
         }
 
-        if (!activity.TryGetActor(out var activityUser))
+        if (activity.TryGetActor(out var activityUser) && activityUser.Uuid is not null)
         {
-            return;
+            analysis.AddParticipant(activityUser);
         }
 
-        analysis.AddParticipant(activityUser);
-
-        if (activity.Comment is not null)
+        if (activity.Comment is not null && activity.Comment.User.Uuid is not null)
         {
             if (parameters.IsInRange(activity.Comment.Date))
             {
@@ -60,7 +58,7 @@ internal sealed class ActivityAnalyzer : IActivityAnalyzer
             }
         }
 
-        if (activity.Approval is not null)
+        if (activity.Approval is not null && activity.Approval.User.Uuid is not null)
         {
             if (parameters.IsInRange(activity.Approval.Date))
             {

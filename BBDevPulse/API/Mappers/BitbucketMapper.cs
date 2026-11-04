@@ -68,8 +68,9 @@ internal sealed class BitbucketMapper : IBitbucketMapper
         }
 
         return new User(
-            new DisplayName(dto.DisplayName ?? string.Empty),
-            new UserUuid(dto.Uuid ?? string.Empty));
+            new DisplayName(!string.IsNullOrWhiteSpace(dto.DisplayName) ? dto.DisplayName :
+                !string.IsNullOrWhiteSpace(dto.Uuid) ? dto.Uuid : "unknown"),
+            string.IsNullOrWhiteSpace(dto.Uuid) ? null : new UserUuid(dto.Uuid));
     }
 
     private static PullRequestDestination? Map(PullRequestDestinationDto? dto)

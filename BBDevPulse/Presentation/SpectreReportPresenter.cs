@@ -101,6 +101,11 @@ public sealed class SpectreReportPresenter : IReportPresenter
     {
         ArgumentNullException.ThrowIfNull(reportData);
 
+        if (reportData.HasMissingUserUuid)
+        {
+            AnsiConsole.MarkupLine("[bold red]" + Markup.Escape(ReportData.MissingUserUuidWarning) + "[/]");
+        }
+
         var collisions = reportData.GetIdentityCollisions();
         if (collisions.Count > 0)
         {

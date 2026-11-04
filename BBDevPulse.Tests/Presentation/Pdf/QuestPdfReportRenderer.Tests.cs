@@ -163,6 +163,9 @@ public sealed class QuestPdfReportRendererTests
             new Mock<IStatisticsCalculator>(MockBehavior.Strict).Object,
             fileStore.Object);
         var reportData = new ReportData(CreateParameters());
+        reportData.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Missing UUID")));
+        reportData.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{a}"), new DisplayName("Alice")));
+        reportData.ObserveDeveloperIdentity(new DeveloperIdentity(new UserUuid("{b}"), new DisplayName("Alice")));
 
         // Act
         await renderer.RenderReportAsync(reportData);

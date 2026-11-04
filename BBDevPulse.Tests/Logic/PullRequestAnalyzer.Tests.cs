@@ -35,8 +35,101 @@ public sealed class PullRequestAnalyzerTests
         client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
         await CreateAnalyzer(client.Object, new ActivityAnalyzer()).AnalyzeAsync(repository, data, CancellationToken.None);
         data.GetIdentityCollisions().Should().ContainSingle().Which.Uuids.Should().Equal("{a}", "{b}");
-        data.DeveloperStats.Should().HaveCount(1);
+        data.DeveloperStats.Should().HaveCount(2);
+        data.DeveloperStats[new DeveloperKey(new UserUuid("{b}"))].PeerCommentsAfter.Should().Be(1);
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TeamFilterIncludesBothSameNamedUsersButKeepsTheirStatisticsSeparate(bool reverse)
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var data = new ReportData(CreateParameters(date.AddDays(-1), teamFilter: "Core"),
+            new Dictionary<DisplayName, PersonCsvRow> { [new DisplayName("Alice")] = new("Senior", "Core") });
+        var first = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+        var second = new User(new DisplayName("Alice"), new UserUuid("{b}"));
+        var firstPr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, first, null);
+        var secondPr = new PullRequest(new PullRequestId(2), PullRequestState.Open, null, date, null, null, second, null);
+        var reviewer = second.ToDeveloperIdentity();
+        var comment = new PullRequestActivity(date.AddHours(1), null, reviewer,
+            new ActivityComment(reviewer, date.AddHours(1)), null);
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable<PullRequest>(reverse ? [secondPr, firstPr] : [firstPr, secondPr]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.Is<PullRequestId>(id => id.Value == 1), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable([comment]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.Is<PullRequestId>(id => id.Value == 2), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
+
+        await CreateAnalyzer(client.Object, new ActivityAnalyzer()).AnalyzeAsync(repository, data, CancellationToken.None);
+
+        data.Reports.Should().HaveCount(2).And.OnlyContain(report => report.IncludeInMetrics);
+        data.DeveloperStats.Should().HaveCount(2);
+        var firstStats = data.DeveloperStats[new DeveloperKey(new UserUuid("{a}"))];
+        var secondStats = data.DeveloperStats[new DeveloperKey(new UserUuid("{b}"))];
+        firstStats.PrsOpenedSince.Should().Be(1);
+        firstStats.CommentsAfter.Should().Be(0);
+        secondStats.PrsOpenedSince.Should().Be(1);
+        secondStats.CommentsAfter.Should().Be(1);
+        secondStats.PeerCommentsAfter.Should().Be(1);
+        var collision = data.GetIdentityCollisions().Should().ContainSingle().Subject;
+        collision.Name.Should().Be("Alice");
+        collision.Uuids.Should().Equal("{a}", "{b}");
+    }
+
+    [Fact]
+    public async Task MissingAuthorUuidExcludesPullRequestAndRaisesWarning()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var data = new ReportData(CreateParameters(date.AddDays(-1)));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null,
+            new User(new DisplayName("Alice"), null), null);
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable([pr]));
+
+        await CreateAnalyzer(client.Object, new ActivityAnalyzer()).AnalyzeAsync(repository, data, CancellationToken.None);
+
+        data.HasMissingUserUuid.Should().BeTrue();
+        data.Reports.Should().BeEmpty();
+        data.DeveloperStats.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MissingReviewerUuidExcludesActivityAndRaisesWarning()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+        var data = new ReportData(CreateParameters(date.AddDays(-1), showAllDetailsForDevelopers: true));
+        var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+        var reviewer = new DeveloperIdentity(null, new DisplayName("Reviewer"));
+        var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null, author, null);
+        var activity = new PullRequestActivity(date.AddHours(1), null, reviewer,
+            new ActivityComment(reviewer, date.AddHours(1)), new ActivityApproval(reviewer, date.AddHours(1)));
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable([pr]));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable([activity]));
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(), It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
+
+        await CreateAnalyzer(client.Object, new ActivityAnalyzer()).AnalyzeAsync(repository, data, CancellationToken.None);
+
+        data.HasMissingUserUuid.Should().BeTrue();
+        data.DeveloperStats.Should().ContainSingle();
+        var report = data.Reports.Should().ContainSingle().Subject;
+        report.Comments.Should().Be(0);
+        report.FirstReactionOn.Should().BeNull();
+    }
+
     [Fact]
     public async Task AnalyzeAsyncStopsSchedulingAfterHandlerFailure()
     {
@@ -44,7 +137,7 @@ public sealed class PullRequestAnalyzerTests
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pullRequests = Enumerable.Range(1, 2).Select(id => new PullRequest(
             new PullRequestId(id), PullRequestState.Open, closedOn: null,
-            createdOn: date, updatedOn: null, mergedOn: null, author: null, destination: null)).ToArray();
+            createdOn: date, updatedOn: null, mergedOn: null, author: new User(new DisplayName("Author"), new UserUuid("{author}")), destination: null)).ToArray();
         var failure = new InvalidOperationException("activity failed");
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
         client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
@@ -110,7 +203,7 @@ public sealed class PullRequestAnalyzerTests
         var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
         var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open,
             closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
-            author: null, destination: null);
+            author: new User(new DisplayName("Author"), new UserUuid("{author}")), destination: null);
         using var cancellation = new CancellationTokenSource();
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
         client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
@@ -222,7 +315,7 @@ public sealed class PullRequestAnalyzerTests
         var data = new ReportData(CreateParameters(date.AddDays(-1)));
         var pullRequest = new PullRequest(new PullRequestId(1), PullRequestState.Open,
             closedOn: null, createdOn: date, updatedOn: null, mergedOn: null,
-            author: null, destination: null);
+            author: new User(new DisplayName("Author"), new UserUuid("{author}")), destination: null);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var sourceFailure = new InvalidOperationException("second page failed");
@@ -396,7 +489,7 @@ public sealed class PullRequestAnalyzerTests
             createdOn: filterDate.AddDays(1),
             updatedOn: null,
             mergedOn: null,
-            author: null,
+            author: new User(new DisplayName("Author"), new UserUuid("{author}")),
             destination: new PullRequestDestination(new PullRequestBranch("develop")));
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
@@ -527,7 +620,7 @@ public sealed class PullRequestAnalyzerTests
                     createdOn: filterDate.AddDays(-30),
                     updatedOn: filterDate.AddDays(-29),
                     mergedOn: null,
-                    author: null,
+                    author: new User(new DisplayName("Author"), new UserUuid("{author}")),
                     destination: null);
                 _ = shouldStop(historicalPullRequest);
                 return ToAsyncEnumerable([pullRequest]);
@@ -629,7 +722,7 @@ public sealed class PullRequestAnalyzerTests
         activityStopPredicateCalled.Should().BeTrue();
     }
 
-    [Fact(DisplayName = "AnalyzeAsync uses unknown author label and skips author stats when author is missing")]
+    [Fact(DisplayName = "AnalyzeAsync excludes PR and warns when author is missing")]
     [Trait("Category", "Unit")]
     public async Task AnalyzeAsyncWhenAuthorIsMissingUsesUnknownAuthorAndNoAuthorStats()
     {
@@ -675,8 +768,8 @@ public sealed class PullRequestAnalyzerTests
         await analyzer.AnalyzeAsync(repository, reportData, cancellationToken);
 
         // Assert
-        reportData.Reports.Should().ContainSingle();
-        reportData.Reports[0].Author.Should().Be("unknown");
+        reportData.Reports.Should().BeEmpty();
+        reportData.HasMissingUserUuid.Should().BeTrue();
         reportData.DeveloperStats.Should().BeEmpty();
     }
 
@@ -695,7 +788,7 @@ public sealed class PullRequestAnalyzerTests
             createdOn: filterDate.AddDays(1),
             updatedOn: null,
             mergedOn: null,
-            author: null,
+            author: new User(new DisplayName("Author"), new UserUuid("{author}")),
             destination: null);
 
         var client = new Mock<IBitbucketClient>(MockBehavior.Strict);

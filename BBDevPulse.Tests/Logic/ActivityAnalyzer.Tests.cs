@@ -41,7 +41,7 @@ public sealed class ActivityAnalyzerTests
         act.Should().Throw<ArgumentNullException>();
     }
 
-    [Fact(DisplayName = "Analyze returns early when actor cannot be resolved")]
+    [Fact(DisplayName = "Analyze uses comment and approval authors when actor is absent")]
     [Trait("Category", "Unit")]
     public void AnalyzeWhenActorIsMissingSkipsCommentAndApprovalAggregation()
     {
@@ -65,11 +65,11 @@ public sealed class ActivityAnalyzerTests
         // Assert
         analysis.LastActivity.Should().Be(createdOn.AddHours(1));
         analysis.MergedOnFromActivity.Should().Be(createdOn.AddHours(2));
-        analysis.Participants.Should().BeEmpty();
-        analysis.TotalComments.Should().Be(0);
-        analysis.CommentCounts.Should().BeEmpty();
-        analysis.ApprovalCounts.Should().BeEmpty();
-        analysis.FirstReactionOn.Should().BeNull();
+        analysis.Participants.Should().ContainKey(user.ToKey());
+        analysis.TotalComments.Should().Be(1);
+        analysis.CommentCounts[user.ToKey()].Should().Be(1);
+        analysis.ApprovalCounts[user.ToKey()].Should().Be(1);
+        analysis.FirstReactionOn.Should().Be(createdOn.AddMinutes(15));
         analysis.HasActivityInRange.Should().BeTrue();
     }
 

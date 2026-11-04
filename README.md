@@ -151,9 +151,11 @@ If diffstat is unavailable, that PR has no size value and is omitted from size a
 
 ### Duplicate display names
 
-If the Bitbucket data read during a run contains the same display name for different UUIDs, a red warning at the beginning of the console, HTML, and PDF reports lists the name and UUIDs. Check the report manually: developer statistics may be combined and cannot be considered fully accurate. Names and UUIDs are compared without regard to case; users without a UUID cannot establish a collision. Detection covers identities observed in the PRs and activities fetched for the run, not every user in the workspace.
+Developer statistics and identity comparisons use Bitbucket UUIDs, ignoring case. Different UUIDs remain separate even when their display names match. If Bitbucket does not provide a UUID for a user, console, HTML, and PDF reports show a warning: that user's activity is excluded, and a PR whose author has no UUID is excluded entirely. Missing authors are treated the same way. The warning covers users encountered in the data fetched for the run.
 
-This is expected to be unlikely in small organizations. The warning does not resolve collisions; a fix for separating identities will be prepared if an actual collision is encountered. The screenshots below use synthetic identities added specifically for this example.
+CSV enrichment and team selection still match display names. When different Bitbucket UUIDs share a name, a warning lists the name and UUIDs. For example, if the CSV assigns Alex Kim to Platform, both Bitbucket users named Alex Kim pass the Platform filter, even if only one belongs to the team. Their statistics remain separate, but the team report can include the wrong person. CSV name matching is case-sensitive; collision detection is case-insensitive. Detection covers identities observed during the run, not every account in the workspace. The screenshots below show a synthetic collision added to a demo report; no team filter is applied in the screenshots.
+
+In the current version, such collisions are assumed to be unlikely in a small organization. A future enhancement will add an optional UUID field to the CSV to resolve these cases.
 
 <details>
 <summary>Show example warning screenshots</summary>

@@ -237,7 +237,7 @@ public sealed class BitbucketMapperTests
         result.State.Should().Be(PullRequestState.Merged);
         result.Author.Should().NotBeNull();
         result.Author!.DisplayName.Value.Should().Be("Alice");
-        result.Author.Uuid.Value.Should().Be("{alice-1}");
+        result.Author.Uuid!.Value.Should().Be("{alice-1}");
         result.Destination.Should().NotBeNull();
         result.Destination!.Branch!.Name.Should().Be("develop");
     }
@@ -314,7 +314,7 @@ public sealed class BitbucketMapperTests
         result.State.Should().Be(PullRequestState.Open);
     }
 
-    [Fact(DisplayName = "Map pull request throws when author display name is missing")]
+    [Fact(DisplayName = "Map pull request uses UUID when author display name is missing")]
     [Trait("Category", "Unit")]
     public void MapPullRequestWhenAuthorDisplayNameIsMissingThrowsArgumentException()
     {
@@ -333,13 +333,13 @@ public sealed class BitbucketMapperTests
         };
 
         // Act
-        Action act = () => _ = mapper.Map(dto);
+        var result = mapper.Map(dto);
 
         // Assert
-        act.Should().Throw<ArgumentException>();
+        result.Author!.DisplayName.Value.Should().Be("{author-1}");
     }
 
-    [Fact(DisplayName = "Map pull request throws when author UUID is missing")]
+    [Fact(DisplayName = "Map pull request preserves missing author UUID")]
     [Trait("Category", "Unit")]
     public void MapPullRequestWhenAuthorUuidIsMissingThrowsArgumentException()
     {
@@ -358,10 +358,11 @@ public sealed class BitbucketMapperTests
         };
 
         // Act
-        Action act = () => _ = mapper.Map(dto);
+        var result = mapper.Map(dto);
 
         // Assert
-        act.Should().Throw<ArgumentException>();
+        result.Author.Should().NotBeNull();
+        result.Author!.Uuid.Should().BeNull();
     }
 
     [Fact(DisplayName = "Map pull request maps destination branch with missing name to empty string")]

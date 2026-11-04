@@ -26,6 +26,18 @@ public sealed class SpectreReportPresenterTests
         var output = TestConsoleRunner.Run(_ => presenter.RenderReport(data));
         output.Should().Contain("Different Bitbucket users share the same display name.");
         output.Should().Contain("Alice [team]: {a}, {b}");
+        var normalized = string.Join(" ", output.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        normalized.Should().Contain(ReportData.IdentityCollisionWarning);
+    }
+
+    [Fact]
+    public void RenderReportShowsMissingUuidWarning()
+    {
+        var data = new ReportData(CreateReportParameters());
+        data.ObserveDeveloperIdentity(new DeveloperIdentity(null, new DisplayName("Alice")));
+        var presenter = CreateSut(pullRequestReportPresenter: new Mock<IPullRequestReportPresenter>().Object,
+            statisticsPresenter: new Mock<IStatisticsPresenter>().Object);
+        TestConsoleRunner.Run(_ => presenter.RenderReport(data)).Replace("\n", " ").Replace("\r", "").Replace("  ", " ").Should().Contain(ReportData.MissingUserUuidWarning);
     }
 
     [Fact(DisplayName = "Team menu shows counts and selected team members with grades")]
