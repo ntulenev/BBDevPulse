@@ -183,60 +183,12 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 cancellationToken).ConfigureAwait(false);
         }
 
-        var analysis = new ActivityAnalysisState(
-            pr.CreatedOn,
-            authorIdentity,
-            pr.IsCreatedInRange(parameters));
-        var detailedComments = collectDeveloperDetails
-            ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
-            : null;
-        var detailedApprovals = collectDeveloperDetails
-            ? new List<(DeveloperIdentity User, DateTimeOffset Date)>()
-            : null;
-
-        foreach (var activity in snapshot.Activities)
-        {
-            if (activity.Actor.HasValue)
-            {
-                observedIdentities.Add(activity.Actor.Value);
-            }
-            if (activity.Comment is not null)
-            {
-                observedIdentities.Add(activity.Comment.User);
-            }
-            if (activity.Approval is not null)
-            {
-                observedIdentities.Add(activity.Approval.User);
-            }
-            if ((activity.Comment is not null && activity.Comment.User.Uuid is null) ||
-                (activity.Approval is not null && activity.Approval.User.Uuid is null) ||
-                (activity.Actor.HasValue && activity.Actor.Value.Uuid is null &&
-                 activity.Comment is null && activity.Approval is null))
-            {
-                continue;
-            }
-            if (parameters.HasTeamFilter &&
-                parameters.IsInRange(activity.ActivityDate) &&
-                HasIncludedTeamActivity(activity, reportData))
-            {
-                analysis.HasIncludedTeamActivity = true;
-            }
-
-            _activityAnalyzer.Analyze(analysis, activity, parameters);
-
-            if (collectDeveloperDetails)
-            {
-                if (activity.Comment is not null && activity.Comment.User.Uuid is not null && parameters.IsInRange(activity.Comment.Date))
-                {
-                    detailedComments!.Add((activity.Comment.User, activity.Comment.Date));
-                }
-
-                if (activity.Approval is not null && activity.Approval.User.Uuid is not null && parameters.IsInRange(activity.Approval.Date))
-                {
-                    detailedApprovals!.Add((activity.Approval.User, activity.Approval.Date));
-                }
-            }
-        }
+        var activityResult = PullRequestActivityAnalysis.Analyze(
+            pr, snapshot, parameters, authorIdentity, reportData.IsDeveloperIncluded, _activityAnalyzer);
+        observedIdentities.AddRange(activityResult.ObservedIdentities);
+        var analysis = activityResult.Analysis;
+        var detailedComments = activityResult.DetailedComments;
+        var detailedApprovals = activityResult.DetailedApprovals;
 
         var matchesFilter = parameters.IsInRange(pr.CreatedOn) || analysis.HasActivityInRange;
         if (!matchesFilter)
@@ -520,21 +472,6 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         }
 
         return activities;
-    }
-
-    private static bool HasIncludedTeamActivity(PullRequestActivity activity, ReportData reportData)
-    {
-        if (activity.Actor.HasValue && reportData.IsDeveloperIncluded(activity.Actor.Value))
-        {
-            return true;
-        }
-
-        if (activity.Comment is not null && reportData.IsDeveloperIncluded(activity.Comment.User))
-        {
-            return true;
-        }
-
-        return activity.Approval is not null && reportData.IsDeveloperIncluded(activity.Approval.User);
     }
 
     private async Task<PullRequestSizeSummary?> GetPullRequestSizeSafeAsync(
