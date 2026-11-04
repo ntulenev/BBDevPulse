@@ -36,6 +36,17 @@ public sealed class ReportDataTests
         modify.Should().Throw<InvalidOperationException>();
     }
 
+    [Fact]
+    public void PublishedReportsHaveStableOrderForEqualCreationTimes()
+    {
+        var accumulator = new ReportAccumulator(CreateReportParameters());
+        var date = accumulator.WorkingData.Parameters.FilterDate;
+        accumulator.WorkingData.Reports.Add(CreatePullRequestReport(2, date));
+        accumulator.WorkingData.Reports.Add(CreatePullRequestReport(1, date));
+        var report = accumulator.Build();
+        report.Reports.Select(item => item.Id.Value).Should().Equal(1, 2);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("Core")]

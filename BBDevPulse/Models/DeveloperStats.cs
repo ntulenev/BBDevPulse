@@ -173,13 +173,18 @@ public sealed class DeveloperStats
             Corrections = Corrections,
             HasCompleteCorrectionsData = HasCompleteCorrectionsData
         };
-        foreach (var report in AuthoredPullRequests)
+        foreach (var report in AuthoredPullRequests.OrderBy(static item => item.CreatedOn)
+            .ThenBy(static item => item.RepositorySlug, StringComparer.OrdinalIgnoreCase).ThenBy(static item => item.Id.Value))
             copy.AuthoredPullRequests.Add(report);
-        foreach (var comment in CommentActivities)
+        foreach (var comment in CommentActivities.OrderBy(static item => item.Date)
+            .ThenBy(static item => item.RepositorySlug, StringComparer.OrdinalIgnoreCase).ThenBy(static item => item.PullRequestId.Value))
             copy.CommentActivities.Add(comment);
-        foreach (var approval in ApprovalActivities)
+        foreach (var approval in ApprovalActivities.OrderBy(static item => item.Date)
+            .ThenBy(static item => item.RepositorySlug, StringComparer.OrdinalIgnoreCase).ThenBy(static item => item.PullRequestId.Value))
             copy.ApprovalActivities.Add(approval);
-        foreach (var commit in CommitActivities)
+        foreach (var commit in CommitActivities.OrderBy(static item => item.Date)
+            .ThenBy(static item => item.RepositorySlug, StringComparer.OrdinalIgnoreCase).ThenBy(static item => item.PullRequestId.Value)
+            .ThenBy(static item => item.CommitHash, StringComparer.Ordinal))
             copy.CommitActivities.Add(commit);
         return copy;
     }

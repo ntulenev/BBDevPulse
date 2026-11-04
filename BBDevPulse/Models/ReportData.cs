@@ -457,9 +457,11 @@ public sealed class ReportData
             var snapshot = new ReportData(Parameters, people)
             {
                 HasMissingUserUuid = HasMissingUserUuid,
-                Reports = Reports.ToList()
+                Reports = Reports.OrderBy(static report => report.CreatedOn)
+                    .ThenBy(static report => report.RepositorySlug, StringComparer.OrdinalIgnoreCase)
+                    .ThenBy(static report => report.Id.Value).ToList()
             };
-            foreach (var entry in _developers)
+            foreach (var entry in _developers.OrderBy(static entry => entry.Key.ToString(), StringComparer.OrdinalIgnoreCase))
             {
                 snapshot._developers.Add(entry.Key, entry.Value.Copy());
             }
