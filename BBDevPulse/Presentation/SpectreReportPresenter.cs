@@ -106,14 +106,12 @@ public sealed class SpectreReportPresenter : IReportPresenter
             AnsiConsole.MarkupLine("[bold red]" + Markup.Escape(ReportData.MissingUserUuidWarning) + "[/]");
         }
 
-        var collisions = reportData.GetIdentityCollisions();
-        if (collisions.Count > 0)
+        foreach (var collision in reportData.GetIdentityCollisionNotices())
         {
-            AnsiConsole.MarkupLine("[bold red]" + Markup.Escape(ReportData.IdentityCollisionWarning) + "[/]");
-            foreach (var collision in collisions)
-            {
-                AnsiConsole.MarkupLine("[red]" + Markup.Escape(collision.Name + ": " + string.Join(", ", collision.Uuids)) + "[/]");
-            }
+            var color = collision.IsError ? "red" : "yellow";
+            AnsiConsole.MarkupLine("[bold " + color + "]" + Markup.Escape(ReportData.IdentityCollisionWarning) + "[/]");
+            AnsiConsole.MarkupLine("[" + color + "]" + Markup.Escape(collision.Name + ": " + string.Join(", ", collision.Uuids)) + "[/]");
+            AnsiConsole.MarkupLine("[" + color + "]" + Markup.Escape(collision.Message) + "[/]");
         }
 
         _pullRequestReportPresenter.RenderPullRequestTable(reportData, reportData.Parameters.FilterDate);

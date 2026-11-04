@@ -58,17 +58,16 @@ public sealed class HtmlContentComposer : IHtmlContentComposer
             _ = warning.Append(HtmlPresentationHelpers.Encode(ReportData.MissingUserUuidWarning));
             _ = warning.AppendLine("</strong></div>");
         }
-        var collisions = reportData.GetIdentityCollisions();
-        if (collisions.Count > 0)
+        foreach (var collision in reportData.GetIdentityCollisionNotices())
         {
-            _ = warning.Append("<div role=\"alert\" style=\"padding:12px 16px;border:2px solid #b91c1c;background:#fef2f2;color:#991b1b;margin-bottom:16px\"><strong>");
+            var border = collision.IsError ? "#b91c1c" : "#d97706";
+            var background = collision.IsError ? "#fef2f2" : "#fffbeb";
+            var color = collision.IsError ? "#991b1b" : "#92400e";
+            _ = warning.Append(CultureInfo.InvariantCulture, $"<div role=\"alert\" style=\"padding:12px 16px;border:2px solid {border};background:{background};color:{color};margin-bottom:16px\"><strong>");
             _ = warning.Append(HtmlPresentationHelpers.Encode(ReportData.IdentityCollisionWarning));
-            _ = warning.Append("</strong><ul>");
-            foreach (var collision in collisions)
-            {
-                _ = warning.Append("<li>").Append(HtmlPresentationHelpers.Encode(collision.Name + ": " + string.Join(", ", collision.Uuids))).Append("</li>");
-            }
-            _ = warning.AppendLine("</ul></div>");
+            _ = warning.Append("</strong><p>").Append(HtmlPresentationHelpers.Encode(collision.Message)).Append("</p><ul><li>");
+            _ = warning.Append(HtmlPresentationHelpers.Encode(collision.Name + ": " + string.Join(", ", collision.Uuids)));
+            _ = warning.AppendLine("</li></ul></div>");
         }
         if (reportData.Parameters.IsDemo)
         {

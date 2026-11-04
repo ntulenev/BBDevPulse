@@ -100,6 +100,11 @@ try
     await host.Services.GetRequiredService<IReportRunner>()
         .RunAsync(shutdown.Token).ConfigureAwait(false);
 }
+catch (PeopleCsvFormatException exception)
+{
+    Console.Error.WriteLine(exception.Message);
+    Environment.ExitCode = 1;
+}
 catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
 {
     Environment.ExitCode = 130;

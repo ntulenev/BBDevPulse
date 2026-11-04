@@ -111,16 +111,14 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                         _ = column.Item().Border(1).BorderColor(Colors.Red.Medium).Padding(6)
                             .Text(ReportData.MissingUserUuidWarning).Bold().FontColor(Colors.Red.Darken3);
                     }
-                    var collisions = reportData.GetIdentityCollisions();
-                    if (collisions.Count > 0)
+                    foreach (var collision in reportData.GetIdentityCollisionNotices())
                     {
-                        column.Item().Border(1).BorderColor(Colors.Red.Medium).Padding(6).Column(warning =>
+                        var color = collision.IsError ? Colors.Red.Darken3 : Colors.Orange.Darken3;
+                        column.Item().Border(1).BorderColor(color).Padding(6).Column(warning =>
                         {
-                            _ = warning.Item().Text(ReportData.IdentityCollisionWarning).Bold().FontColor(Colors.Red.Darken3);
-                            foreach (var collision in collisions)
-                            {
-                                _ = warning.Item().Text(collision.Name + ": " + string.Join(", ", collision.Uuids)).FontColor(Colors.Red.Darken3);
-                            }
+                            _ = warning.Item().Text(ReportData.IdentityCollisionWarning).Bold().FontColor(color);
+                            _ = warning.Item().Text(collision.Message).FontColor(color);
+                            _ = warning.Item().Text(collision.Name + ": " + string.Join(", ", collision.Uuids)).FontColor(color);
                         });
                     }
                     ComposePullRequestSection(

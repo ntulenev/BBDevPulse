@@ -57,7 +57,7 @@ internal static class DemoReportData
             }
 
             var developer = reportData.GetOrAddDeveloper(identity);
-            if (peopleByName.TryGetValue(identity.DisplayName, out var person))
+            if (reportData.TryGetPerson(identity, out var person))
             {
                 developer.Grade = person.Grade;
                 developer.Department = person.Department;
