@@ -419,9 +419,9 @@ public sealed class BitbucketClientTests
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
 
-    [Fact(DisplayName = "GetRepositoriesAsync treats null page values as empty")]
+    [Fact(DisplayName = "GetRepositoriesAsync rejects null page values")]
     [Trait("Category", "Unit")]
-    public async Task GetRepositoriesAsyncWhenPageValuesAreNullReturnsEmptySequence()
+    public async Task GetRepositoriesAsyncWhenPageValuesAreNullThrows()
     {
         // Arrange
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
@@ -444,10 +444,10 @@ public sealed class BitbucketClientTests
         var client = CreateClient(transport.Object, mapper.Object);
 
         // Act
-        var result = await ReadAllAsync(client.GetRepositoriesAsync(new Workspace("ws"), null, cancellationToken));
+        Func<Task> act = async () => await ReadAllAsync(client.GetRepositoriesAsync(new Workspace("ws"), null, cancellationToken));
 
         // Assert
-        result.Should().BeEmpty();
+        await act.Should().ThrowAsync<InvalidDataException>();
         mapCalls.Should().Be(0);
     }
 
@@ -660,9 +660,9 @@ public sealed class BitbucketClientTests
         pullRequestsUriBuilder.VerifyAll();
     }
 
-    [Fact(DisplayName = "GetPullRequestsAsync treats null page values as empty")]
+    [Fact(DisplayName = "GetPullRequestsAsync rejects null page values")]
     [Trait("Category", "Unit")]
-    public async Task GetPullRequestsAsyncWhenPageValuesAreNullReturnsEmptySequence()
+    public async Task GetPullRequestsAsyncWhenPageValuesAreNullThrows()
     {
         // Arrange
         var options = CreateOptions(fromDate: "2026-02-15", toDate: "2026-03-31");
@@ -694,14 +694,14 @@ public sealed class BitbucketClientTests
         var client = CreateClient(transport.Object, mapper.Object, options);
 
         // Act
-        var result = await ReadAllAsync(client.GetPullRequestsAsync(
+        Func<Task> act = async () => await ReadAllAsync(client.GetPullRequestsAsync(
             new Workspace("ws"),
             new RepoSlug("repo"),
             _ => false,
             cancellationToken));
 
         // Assert
-        result.Should().BeEmpty();
+        await act.Should().ThrowAsync<InvalidDataException>();
         mapCalls.Should().Be(0);
     }
 
@@ -962,9 +962,9 @@ public sealed class BitbucketClientTests
         result[0].ActivityDate.Should().Be(firstModel.ActivityDate);
     }
 
-    [Fact(DisplayName = "GetPullRequestActivityAsync treats null page values as empty")]
+    [Fact(DisplayName = "GetPullRequestActivityAsync rejects null page values")]
     [Trait("Category", "Unit")]
-    public async Task GetPullRequestActivityAsyncWhenPageValuesAreNullReturnsEmptySequence()
+    public async Task GetPullRequestActivityAsyncWhenPageValuesAreNullThrows()
     {
         // Arrange
         var transport = new Mock<IBitbucketTransport>(MockBehavior.Strict);
@@ -990,7 +990,7 @@ public sealed class BitbucketClientTests
         var client = CreateClient(transport.Object, mapper.Object);
 
         // Act
-        var result = await ReadAllAsync(client.GetPullRequestActivityAsync(
+        Func<Task> act = async () => await ReadAllAsync(client.GetPullRequestActivityAsync(
             new Workspace("ws"),
             new RepoSlug("repo"),
             new PullRequestId(1),
@@ -998,7 +998,7 @@ public sealed class BitbucketClientTests
             cancellationToken));
 
         // Assert
-        result.Should().BeEmpty();
+        await act.Should().ThrowAsync<InvalidDataException>();
         mapCalls.Should().Be(0);
     }
 

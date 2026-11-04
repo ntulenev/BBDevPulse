@@ -172,7 +172,7 @@ public sealed class TransportDtosTests
         dto.Date.Should().Be(new DateTimeOffset(2026, 2, 20, 10, 0, 0, TimeSpan.Zero));
     }
 
-    [Fact(DisplayName = "PaginatedResponse defaults values to empty list and supports next link")]
+    [Fact(DisplayName = "PaginatedResponse leaves missing values unset and supports next link")]
     [Trait("Category", "Unit")]
     public void PaginatedResponseWhenConstructedHasExpectedDefaultsAndSetters()
     {
@@ -187,8 +187,7 @@ public sealed class TransportDtosTests
         var next = response.Next;
 
         // Assert
-        values.Should().NotBeNull();
-        values.Should().BeEmpty();
+        values.Should().BeNull();
         next.Should().Be("https://example.test/page/2");
     }
 }

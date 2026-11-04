@@ -6,6 +6,9 @@ using FluentAssertions;
 
 using BBDevPulse.Abstractions;
 using BBDevPulse.API;
+using BBDevPulse.Configuration;
+
+using Microsoft.Extensions.Options;
 
 using Moq;
 
@@ -226,6 +229,95 @@ public sealed class BitbucketTransportTests
         result.DisplayName.Should().Be("Alice");
         telemetryService.Verify(x => x.TrackRequest(url), Times.Once);
     }
+
+    [Fact]
+    public async Task GetAsyncRetriesConnectionFailureAndSucceeds()
+    {
+        var calls = 0;
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+        {
+            if (++calls == 1)
+                throw new HttpRequestException("Connection reset");
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"displayname\":\"Alice\"}") };
+        }));
+        var telemetry = CreateTelemetryService();
+        var transport = new BitbucketTransport(client, CreateRealRetryPolicy(1), telemetry.Object);
+
+        var result = await transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), CancellationToken.None);
+
+        result.DisplayName.Should().Be("Alice");
+        calls.Should().Be(2);
+        telemetry.Verify(x => x.TrackRequest(It.IsAny<Uri>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task GetAsyncStopsAfterRetryBudgetIsExhausted()
+    {
+        var calls = 0;
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+        {
+            calls++;
+            throw new HttpRequestException("Connection reset");
+        }));
+        var transport = new BitbucketTransport(client, CreateRealRetryPolicy(1), CreateTelemetryService().Object);
+
+        Func<Task> act = () => transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), CancellationToken.None);
+
+        await act.Should().ThrowAsync<HttpRequestException>();
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetAsyncRetriesHttpClientTimeout()
+    {
+        var calls = 0;
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+        {
+            if (++calls == 1)
+                throw new TaskCanceledException("Timed out", new TimeoutException());
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") };
+        }));
+        var transport = new BitbucketTransport(client, CreateRealRetryPolicy(1), CreateTelemetryService().Object);
+
+        await transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), CancellationToken.None);
+
+        calls.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task GetAsyncDoesNotRetryCallerCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var calls = 0;
+        using var client = new HttpClient(new StubHttpMessageHandler(_ =>
+        {
+            calls++;
+            cancellation.Cancel();
+            throw new TaskCanceledException("Cancelled", new TimeoutException());
+        }));
+        var transport = new BitbucketTransport(client, CreateRealRetryPolicy(2), CreateTelemetryService().Object);
+
+        Func<Task> act = () => transport.GetAsync<SampleDto>(new Uri("https://example.test/user"), cancellation.Token);
+
+        await act.Should().ThrowAsync<OperationCanceledException>();
+        calls.Should().Be(1);
+    }
+
+    private static RetryPolicyHelper CreateRealRetryPolicy(int retries) => new(Options.Create(new BitbucketOptions
+    {
+        Workspace = "ws",
+        PageLength = 25,
+        Username = "user",
+        AppPassword = "pass",
+        RepoNameFilter = "",
+        RepoNameList = [],
+        BranchNameList = [],
+        RepoSearchMode = BBDevPulse.Models.RepoSearchMode.FilterFromTheList,
+        PrTimeFilterMode = BBDevPulse.Models.PrTimeFilterMode.CreatedOnOnly,
+        MaxRetries = retries,
+        RetryDelayStepSeconds = 1,
+        MaxRetryDelaySeconds = 1
+    }));
 
     private sealed class StubHttpMessageHandler(
         Func<HttpRequestMessage, HttpResponseMessage> handler)

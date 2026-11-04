@@ -146,6 +146,8 @@ Names are trimmed and compared ignoring case. A UUID is filled only when exactly
 
 ### Analysis cache and telemetry
 
+Paginated API responses must contain a non-null `values` array; an empty array is valid. Malformed pages fail the corresponding request instead of being treated as empty. For supplemental commits and diffstat requests, the unavailable-data policy below still applies. Transient HTTP responses, network errors, and HTTP client timeouts use the configured retry limit and delay; caller cancellation stops retries.
+
 In live mode, BBDevPulse caches PR activity, correction commits, and diffstat snapshots in `AppContext.BaseDirectory/cache/pull-request-analysis`. An unchanged PR can reuse its snapshot on a later run. The cache has no automatic eviction. When telemetry is enabled, the console shows actual HTTP requests, cache hits/misses/stores, estimated avoided requests, and a request breakdown by API endpoint.
 
 Cached supplemental data distinguishes a successful empty or zero measurement from a failed request and from data not requested. Older version 2 entries without explicit availability remain readable when their data can be interpreted safely; when a field was not available, its original reason remains unknown and the application may retry the request. Cached sizes without recorded line-count completeness are treated as misses and fetched again. Contradictory or malformed cache entries are also treated as misses. Cache validity does not establish that the Bitbucket activity response is historically complete.
