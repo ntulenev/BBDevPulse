@@ -1,5 +1,6 @@
 using BBDevPulse.Abstractions;
 using BBDevPulse.Models;
+using BBDevPulse.Presentation.Formatters;
 
 using Spectre.Console;
 
@@ -107,7 +108,7 @@ public sealed class SpectreReportPresenter : IReportPresenter
 
         foreach (var mismatch in reportData.GetNameMismatches())
         {
-            AnsiConsole.MarkupLine("[yellow]" + Markup.Escape($"CSV name mismatch (UUID: {mismatch.Uuid}): Bitbucket: {mismatch.BitbucketName}; CSV: {mismatch.CsvName}") + "[/]");
+            AnsiConsole.MarkupLine("[yellow]" + Markup.Escape(NameMismatchFormatter.Format(mismatch)) + "[/]");
         }
 
         foreach (var collision in reportData.GetIdentityCollisionNotices())

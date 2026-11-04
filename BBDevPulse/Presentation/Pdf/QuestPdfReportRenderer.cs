@@ -4,6 +4,7 @@ using BBDevPulse.Abstractions;
 using BBDevPulse.Configuration;
 using BBDevPulse.Math;
 using BBDevPulse.Models;
+using BBDevPulse.Presentation.Formatters;
 
 using Microsoft.Extensions.Options;
 
@@ -114,7 +115,7 @@ internal sealed class QuestPdfReportRenderer : IPdfReportRenderer
                     foreach (var mismatch in reportData.GetNameMismatches())
                     {
                         _ = column.Item().Border(1).BorderColor(Colors.Orange.Darken3).Padding(6)
-                            .Text($"CSV name mismatch (UUID: {mismatch.Uuid}): Bitbucket: {mismatch.BitbucketName}; CSV: {mismatch.CsvName}")
+                            .Text(NameMismatchFormatter.Format(mismatch))
                             .FontColor(Colors.Orange.Darken3);
                     }
                     foreach (var collision in reportData.GetIdentityCollisionNotices())

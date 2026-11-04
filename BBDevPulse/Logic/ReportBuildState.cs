@@ -20,7 +20,7 @@ internal sealed class ReportBuildState
     public bool HasMissingUserUuid { get; private set; }
 
     private readonly Dictionary<string, HashSet<string>> _observedIdentities = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<(string Name, string Uuid), string> _observedNames = [];
+    private readonly Dictionary<(string Name, string Uuid), string> _observedNamesByIdentity = [];
 
     /// <summary>Records a Bitbucket identity before developer statistics can merge it with another identity.</summary>
     internal void ObserveDeveloperIdentity(DeveloperIdentity identity)
@@ -39,8 +39,10 @@ internal sealed class ReportBuildState
             {
                 return;
             }
+
             var uuidKey = identity.Uuid.Value.Trim().Trim('{', '}').ToUpperInvariant();
-            _observedNames.TryAdd((identity.DisplayName.Value, uuidKey), identity.Uuid.Value);
+            _ = _observedNamesByIdentity.TryAdd((identity.DisplayName.Value, uuidKey), identity.Uuid.Value);
+
             if (!_observedIdentities.TryGetValue(identity.DisplayName.Value, out var uuids))
             {
                 uuids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -217,12 +219,16 @@ internal sealed class ReportBuildState
         return _peopleByDisplayName.TryGetValue(displayName.Value, out person);
     }
 
-    /// <summary>Resolves CSV metadata by name and, when provided, UUID.</summary>
+    /// <summary>Resolves CSV metadata by UUID.</summary>
     public bool TryGetPerson(DeveloperIdentity identity, out PersonCsvRow person)
     {
         ArgumentNullException.ThrowIfNull(identity.DisplayName, nameof(identity));
         person = default;
-        if (identity.Uuid is null) return false;
+        if (identity.Uuid is null)
+        {
+            return false;
+        }
+
         foreach (var rows in _peopleByDisplayName.Values)
         {
             foreach (var row in rows.Rows)
@@ -234,15 +240,17 @@ internal sealed class ReportBuildState
                 }
             }
         }
+
         return false;
     }
 
     /// <summary>Returns observed Bitbucket names that differ from the CSV name for the same UUID.</summary>
+    /// <returns>UUIDs and their differing Bitbucket and CSV names.</returns>
     public IReadOnlyList<(string Uuid, string BitbucketName, string CsvName)> GetNameMismatches()
     {
         lock (_identityLock)
         {
-            return (from observed in _observedNames
+            return (from observed in _observedNamesByIdentity
                     let uuid = observed.Value
                     from entry in _peopleByDisplayName
                     from row in entry.Value.Rows
@@ -542,9 +550,9 @@ internal sealed class ReportBuildState
             {
                 snapshot._observedIdentities.Add(entry.Key, new HashSet<string>(entry.Value, StringComparer.OrdinalIgnoreCase));
             }
-            foreach (var entry in _observedNames)
+            foreach (var entry in _observedNamesByIdentity)
             {
-                snapshot._observedNames.Add(entry.Key, entry.Value);
+                snapshot._observedNamesByIdentity.Add(entry.Key, entry.Value);
             }
             snapshot.Freeze();
             Freeze();

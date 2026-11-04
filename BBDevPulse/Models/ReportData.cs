@@ -42,12 +42,13 @@ public sealed class ReportData
     /// <summary>Returns notices for name collisions.</summary>
     public IReadOnlyList<IdentityCollisionNotice> GetIdentityCollisionNotices() => _state.GetIdentityCollisionNotices();
     /// <summary>Returns observed name discrepancies for matching UUIDs.</summary>
+    /// <returns>UUIDs and their differing Bitbucket and CSV names.</returns>
     public IReadOnlyList<(string Uuid, string BitbucketName, string CsvName)> GetNameMismatches() => _state.GetNameMismatches();
     /// <summary>Checks whether an identity belongs to the selected team.</summary>
     public bool IsDeveloperIncluded(DeveloperIdentity identity) => _state.IsDeveloperIncluded(identity);
     /// <summary>Looks up CSV metadata by name.</summary>
     public bool TryGetPerson(DisplayName name, out PersonCsvRow person) => _state.TryGetPerson(name, out person);
-    /// <summary>Looks up CSV metadata by identity.</summary>
+    /// <summary>Looks up CSV metadata by UUID.</summary>
     public bool TryGetPerson(DeveloperIdentity identity, out PersonCsvRow person) => _state.TryGetPerson(identity, out person);
 
     // Internal fixture support. Published instances wrap a frozen, detached state.

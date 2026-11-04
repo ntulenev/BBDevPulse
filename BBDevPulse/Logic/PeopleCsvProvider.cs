@@ -116,18 +116,15 @@ internal sealed class PeopleCsvProvider : IPeopleCsvProvider
             {
                 throw new PeopleCsvFormatException($"Missing UUID at line {lineNumber}.");
             }
+
             entries.Add((name, new PersonCsvRow(grade, department, uuid), lineNumber));
         }
 
         var uuids = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in entries)
         {
-            if (entry.Row.Uuid is null)
-            {
-                continue;
-            }
-
-            var uuidKey = entry.Row.Uuid.Trim().Trim('{', '}');
+            // Each entry has a UUID validated while reading its line.
+            var uuidKey = entry.Row.Uuid!.Trim().Trim('{', '}');
             if (uuids.TryGetValue(uuidKey, out var previousLine))
             {
                 throw new PeopleCsvFormatException(
