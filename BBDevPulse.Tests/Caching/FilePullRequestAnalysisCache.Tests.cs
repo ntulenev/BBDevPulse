@@ -12,6 +12,47 @@ namespace BBDevPulse.Tests.Caching;
 public sealed class FilePullRequestAnalysisCacheTests : IDisposable
 {
     [Fact]
+    public void VersionTwoEntryWithoutAvailabilityFieldsRemainsReadable()
+    {
+        var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(), CreateTelemetryService().Object, _cacheDirectory);
+        var workspace = new Workspace("ws");
+        var repo = new RepoSlug("repo");
+        var id = new PullRequestId(1);
+        var snapshot = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [], hasCommits: true);
+        cache.Store(workspace, repo, id, "pr", "parameters", snapshot);
+        var path = Directory.EnumerateFiles(_cacheDirectory, "*.json", SearchOption.AllDirectories).Single();
+        var document = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        var cached = document["Snapshot"]!.AsObject();
+        cached.Remove("CommitsAvailability");
+        cached.Remove("SizeAvailability");
+        File.WriteAllText(path, document.ToJsonString());
+
+        cache.TryGet(workspace, repo, id, "pr", "parameters", out var loaded).Should().BeTrue();
+        loaded.CommitsAvailability.Should().Be(DataAvailability.Available);
+        loaded.SizeAvailability.Should().Be(DataAvailability.Unknown);
+    }
+
+    [Fact]
+    public void ConcurrentWritersLeaveACompleteReadableDocument()
+    {
+        var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(), CreateTelemetryService().Object, _cacheDirectory);
+        var workspace = new Workspace("ws");
+        var repo = new RepoSlug("repo");
+        var id = new PullRequestId(1);
+        Parallel.For(0, 20, index =>
+        {
+            var snapshot = new PullRequestAnalysisSnapshot([], [], new PullRequestSizeSummary(1, index, 0), [],
+                hasCommits: true, hasSize: true);
+            cache.Store(workspace, repo, id, "pr", "parameters", snapshot);
+        });
+
+        cache.TryGet(workspace, repo, id, "pr", "parameters", out var loaded).Should().BeTrue();
+        loaded.HasSize.Should().BeTrue();
+        loaded.SizeSummary.LinesAdded.Should().BeInRange(0, 19);
+        Directory.EnumerateFiles(_cacheDirectory, "*.tmp", SearchOption.AllDirectories).Should().BeEmpty();
+    }
+
+    [Fact]
     public void CachePreservesMissingSizeAndRejectsOldVersion()
     {
         var telemetry = CreateTelemetryService();
