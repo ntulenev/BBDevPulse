@@ -19,6 +19,72 @@ namespace BBDevPulse.Tests.Logic;
 public sealed class PullRequestAnalyzerTests
 {
     [Fact]
+    public async Task RepositoryAndPullRequestLimitsComposeWithoutLosingResults()
+    {
+        var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+        var repositories = new[]
+        {
+            new Repository(new RepoName("Repo A"), new RepoSlug("repo-a")),
+            new Repository(new RepoName("Repo B"), new RepoSlug("repo-b"))
+        };
+        var author = new User(new DisplayName("Alice"), new UserUuid("{a}"));
+        var prs = Enumerable.Range(1, 3).Select(id => new PullRequest(new PullRequestId(id),
+            PullRequestState.Open, null, date, null, null, author, null)).ToArray();
+        var allStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var active = 0;
+        var maximum = 0;
+        var sync = new object();
+        var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+        client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable(prs));
+        client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+            .Returns(() => WaitForRelease());
+        client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+        client.Setup(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+            It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).ReturnsAsync(PullRequestSizeSummary.Empty);
+        var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer(), pullRequestConcurrency: 2);
+        var accumulator = new ReportAccumulator(CreateParameters(date.AddDays(-1)));
+        var coordinator = new RepositoryAnalysisCoordinator(2);
+        var run = coordinator.RunAsync(repositories,
+            (repo, token) => analyzer.AnalyzeAsync(repo, accumulator.WorkingData, token), _ => { }, CancellationToken.None);
+
+        await allStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        maximum.Should().Be(4);
+        release.SetResult();
+        await run;
+        var report = accumulator.Build();
+        report.Reports.Should().HaveCount(6);
+        report.DeveloperStats.Values.Single().PrsOpenedSince.Should().Be(6);
+        maximum.Should().Be(4);
+        active.Should().Be(0);
+
+        async IAsyncEnumerable<PullRequestActivity> WaitForRelease()
+        {
+            var current = Interlocked.Increment(ref active);
+            lock (sync)
+            {
+                maximum = System.Math.Max(maximum, current);
+            }
+            if (current == 4)
+            {
+                allStarted.TrySetResult();
+            }
+            try
+            {
+                await release.Task;
+            }
+            finally
+            {
+                Interlocked.Decrement(ref active);
+            }
+            yield break;
+        }
+    }
+
+    [Fact]
     public async Task PullRequestConcurrencyIsBoundedPerRepository()
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
