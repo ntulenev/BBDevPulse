@@ -253,6 +253,7 @@ internal sealed class BitbucketClient : IBitbucketClient
         CancellationToken cancellationToken)
     {
         var filesChanged = 0;
+        var hasLineData = true;
         var linesAdded = 0;
         var linesRemoved = 0;
 
@@ -262,12 +263,17 @@ internal sealed class BitbucketClient : IBitbucketClient
             cancellationToken).ConfigureAwait(false))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            filesChanged++;
-            linesAdded += entry.LinesAdded ?? 0;
-            linesRemoved += entry.LinesRemoved ?? 0;
+            if (entry.LinesAdded < 0 || entry.LinesRemoved < 0)
+            {
+                throw new InvalidDataException("Bitbucket diffstat contains a negative line count.");
+            }
+            filesChanged = checked(filesChanged + 1);
+            hasLineData &= entry.LinesAdded.HasValue && entry.LinesRemoved.HasValue;
+            linesAdded = checked(linesAdded + (entry.LinesAdded ?? 0));
+            linesRemoved = checked(linesRemoved + (entry.LinesRemoved ?? 0));
         }
 
-        return new PullRequestSizeSummary(filesChanged, linesAdded, linesRemoved);
+        return new PullRequestSizeSummary(filesChanged, linesAdded, linesRemoved, hasLineData);
     }
 
 

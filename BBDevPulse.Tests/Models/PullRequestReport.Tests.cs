@@ -35,6 +35,21 @@ public sealed class PullRequestReportTests
         unspecified.HasSizeData.Should().BeFalse();
     }
 
+    [Fact]
+    public void IncompleteLineCountsDoNotHideValidFileCount()
+    {
+        var created = DateTimeOffset.UnixEpoch;
+        var report = new PullRequestReport("Repo", "repo", "Alice", "main", created, created,
+            null, null, PullRequestState.Open, new PullRequestId(1), 0,
+            filesChanged: 7, linesAdded: 3, hasSizeData: true, hasLineSizeData: false);
+        report.SizeAvailability.Should().Be(DataAvailability.Incomplete);
+        report.HasSizeDataForMode(PullRequestSizeMode.Files).Should().BeTrue();
+        report.GetSizeMetricValue(PullRequestSizeMode.Files).Should().Be(7);
+        report.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().BeFalse();
+        Action getLines = () => report.GetSizeMetricValue(PullRequestSizeMode.Lines);
+        getLines.Should().Throw<InvalidOperationException>();
+    }
+
     [Fact(DisplayName = "Constructor throws when repository is null")]
     [Trait("Category", "Unit")]
     public void ConstructorWhenRepositoryIsNullThrowsArgumentNullException()

@@ -51,8 +51,14 @@ public sealed class PullRequestAnalysisSnapshot
         HasCommits = hasCommits ?? hasEnrichment;
         HasSize = hasSize ?? hasEnrichment;
         CommitsAvailability = ResolveAvailability(commitsAvailability, HasCommits, nameof(commitsAvailability));
-        SizeAvailability = ResolveAvailability(sizeAvailability, HasSize, nameof(sizeAvailability));
-        if (hasEnrichment && (!HasCommits || !HasSize || commitActivities.Any(static item => !item.HasSizeData)))
+        var resolvedSize = sizeAvailability ?? (HasSize && !sizeSummary.HasLineData ? DataAvailability.Incomplete : null);
+        SizeAvailability = ResolveAvailability(resolvedSize, HasSize, nameof(sizeAvailability), allowIncomplete: true);
+        if (HasSize && (SizeAvailability == DataAvailability.Incomplete) == sizeSummary.HasLineData)
+        {
+            throw new ArgumentException("Size availability must agree with line completeness.", nameof(sizeAvailability));
+        }
+        if (hasEnrichment && (!HasCommits || !HasSize || !sizeSummary.HasLineData ||
+            commitActivities.Any(static item => !item.HasSizeData || !item.SizeSummary.HasLineData)))
         {
             throw new ArgumentException("Complete enrichment requires commits, size and all detailed commit sizes.", nameof(hasEnrichment));
         }
@@ -90,10 +96,12 @@ public sealed class PullRequestAnalysisSnapshot
     /// <summary>Availability of the pull request diffstat.</summary>
     public DataAvailability SizeAvailability { get; }
 
-    private static DataAvailability ResolveAvailability(DataAvailability? availability, bool available, string parameter)
+    private static DataAvailability ResolveAvailability(DataAvailability? availability, bool available, string parameter,
+        bool allowIncomplete = false)
     {
         var resolved = availability ?? (available ? DataAvailability.Available : DataAvailability.Unknown);
-        if (!Enum.IsDefined(resolved) || (resolved == DataAvailability.Available) != available)
+        var hasData = resolved == DataAvailability.Available || (allowIncomplete && resolved == DataAvailability.Incomplete);
+        if (!Enum.IsDefined(resolved) || hasData != available)
         {
             throw new ArgumentException("Availability must agree with the data flag.", parameter);
         }

@@ -155,7 +155,8 @@ public sealed class PullRequestAnalysisCacheMapperTests
             {
                 FilesChanged = 3,
                 LinesAdded = 25,
-                LinesRemoved = 5
+                LinesRemoved = 5,
+                HasLineData = true
             },
             CommitActivities =
             [
@@ -171,7 +172,8 @@ public sealed class PullRequestAnalysisCacheMapperTests
                     {
                         FilesChanged = 1,
                         LinesAdded = 5,
-                        LinesRemoved = 2
+                        LinesRemoved = 2,
+                        HasLineData = true
                     }
                 }
             ],

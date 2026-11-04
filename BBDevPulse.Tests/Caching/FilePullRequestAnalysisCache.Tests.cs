@@ -25,11 +25,46 @@ public sealed class FilePullRequestAnalysisCacheTests : IDisposable
         var cached = document["Snapshot"]!.AsObject();
         cached.Remove("CommitsAvailability");
         cached.Remove("SizeAvailability");
+        cached["SizeSummary"]!.AsObject().Remove("HasLineData");
         File.WriteAllText(path, document.ToJsonString());
 
         cache.TryGet(workspace, repo, id, "pr", "parameters", out var loaded).Should().BeTrue();
         loaded.CommitsAvailability.Should().Be(DataAvailability.Available);
         loaded.SizeAvailability.Should().Be(DataAvailability.Unknown);
+    }
+
+    [Fact]
+    public void CachedSizeWithMissingFieldIsNotTreatedAsMeasuredZero()
+    {
+        var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(), CreateTelemetryService().Object, _cacheDirectory);
+        var workspace = new Workspace("ws");
+        var repo = new RepoSlug("repo");
+        var id = new PullRequestId(1);
+        var snapshot = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [], hasSize: true);
+        cache.Store(workspace, repo, id, "pr", "parameters", snapshot);
+        var path = Directory.EnumerateFiles(_cacheDirectory, "*.json", SearchOption.AllDirectories).Single();
+        var document = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        document["Snapshot"]!["SizeSummary"]!.AsObject().Remove("LinesRemoved");
+        File.WriteAllText(path, document.ToJsonString());
+
+        cache.TryGet(workspace, repo, id, "pr", "parameters", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void LegacyCachedSizeWithoutLineCompletenessIsRefetched()
+    {
+        var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(), CreateTelemetryService().Object, _cacheDirectory);
+        var workspace = new Workspace("ws");
+        var repo = new RepoSlug("repo");
+        var id = new PullRequestId(1);
+        var snapshot = new PullRequestAnalysisSnapshot([], [], PullRequestSizeSummary.Empty, [], hasSize: true);
+        cache.Store(workspace, repo, id, "pr", "parameters", snapshot);
+        var path = Directory.EnumerateFiles(_cacheDirectory, "*.json", SearchOption.AllDirectories).Single();
+        var document = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        document["Snapshot"]!["SizeSummary"]!.AsObject().Remove("HasLineData");
+        File.WriteAllText(path, document.ToJsonString());
+
+        cache.TryGet(workspace, repo, id, "pr", "parameters", out _).Should().BeFalse();
     }
 
     [Fact]

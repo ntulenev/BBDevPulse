@@ -6,7 +6,7 @@ namespace BBDevPulse.Models;
 public readonly record struct PullRequestSizeSummary
 {
     /// <summary>Creates a size measurement whose total line count fits into an integer.</summary>
-    public PullRequestSizeSummary(int FilesChanged, int LinesAdded, int LinesRemoved)
+    public PullRequestSizeSummary(int FilesChanged, int LinesAdded, int LinesRemoved, bool hasLineData = true)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(FilesChanged);
         ArgumentOutOfRangeException.ThrowIfNegative(LinesAdded);
@@ -15,16 +15,20 @@ public readonly record struct PullRequestSizeSummary
         this.FilesChanged = FilesChanged;
         this.LinesAdded = LinesAdded;
         this.LinesRemoved = LinesRemoved;
+        HasLineData = hasLineData;
     }
 
     /// <summary>Number of files in the diff.</summary>
     public int FilesChanged { get; }
 
-    /// <summary>Number of lines added.</summary>
+    /// <summary>Known added lines; partial when <see cref="HasLineData"/> is false.</summary>
     public int LinesAdded { get; }
 
-    /// <summary>Number of lines removed.</summary>
+    /// <summary>Known removed lines; partial when <see cref="HasLineData"/> is false.</summary>
     public int LinesRemoved { get; }
+
+    /// <summary>Whether all file entries contained both line counts.</summary>
+    public bool HasLineData { get; }
 
     /// <summary>
     /// Empty size summary.
@@ -34,10 +38,12 @@ public readonly record struct PullRequestSizeSummary
     /// <summary>
     /// Total changed lines (added + removed).
     /// </summary>
-    public int LineChurn => LinesAdded + LinesRemoved;
+    public int LineChurn => HasLineData ? LinesAdded + LinesRemoved :
+        throw new InvalidOperationException("Line counts are incomplete.");
 
     /// <summary>
     /// Net changed lines (added - removed).
     /// </summary>
-    public int NetLines => LinesAdded - LinesRemoved;
+    public int NetLines => HasLineData ? LinesAdded - LinesRemoved :
+        throw new InvalidOperationException("Line counts are incomplete.");
 }

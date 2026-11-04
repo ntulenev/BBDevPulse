@@ -18,18 +18,23 @@ namespace BBDevPulse.Tests.Presentation;
 
 public sealed partial class ReportFormatParityTests
 {
-    [Fact]
-    public async Task ZeroSizeAndUnavailableDataRemainDistinctAcrossFormats()
+    [Theory]
+    [InlineData(PullRequestSizeMode.Lines)]
+    [InlineData(PullRequestSizeMode.Files)]
+    public async Task ZeroSizeAndUnavailableDataRemainDistinctAcrossFormats(PullRequestSizeMode mode)
     {
         var start = new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero);
         var parameters = new ReportParameters(start, new Workspace("team"), new RepoNameFilter(""), [],
-            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, []);
+            RepoSearchMode.SearchByFilter, PrTimeFilterMode.CreatedOnOnly, [], pullRequestSizeMode: mode);
         var data = new ReportData(parameters);
         data.MutableReports.Add(new PullRequestReport("repo", "repo", "Alice", "main", start, start,
             null, null, PullRequestState.Open, new PullRequestId(1), 0, hasSizeData: true));
         data.MutableReports.Add(new PullRequestReport("repo", "repo", "Bob", "main", start, start,
             null, null, PullRequestState.Open, new PullRequestId(2), 0,
             hasSizeData: false, hasCorrectionsData: false));
+        data.MutableReports.Add(new PullRequestReport("repo", "repo", "Carol", "main", start, start,
+            null, null, PullRequestState.Open, new PullRequestId(3), 0, filesChanged: 7, linesAdded: 1,
+            hasSizeData: true, hasLineSizeData: false));
         data.Freeze();
         var calculator = new StatisticsCalculator();
         var formatter = new DateDiffFormatter();
@@ -69,6 +74,14 @@ public sealed partial class ReportFormatParityTests
                 var compact = Layout().Replace(text, "");
                 Assert.Contains("XS(0)", compact);
                 Assert.Contains("Unavailable", compact);
+                if (mode == PullRequestSizeMode.Lines)
+                {
+                    Assert.DoesNotContain("XS(1)", compact);
+                }
+                else
+                {
+                    Assert.Contains("M(7)", compact);
+                }
             }
         }
         finally

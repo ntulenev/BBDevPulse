@@ -88,9 +88,9 @@ public sealed class DeveloperCommitActivity
     {
         return mode switch
         {
-            PullRequestSizeMode.Lines => HasSizeData,
+            PullRequestSizeMode.Lines => HasSizeData && SizeSummary.HasLineData,
             PullRequestSizeMode.Files => HasSizeData,
-            _ => HasSizeData
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
     }
 
@@ -101,11 +101,15 @@ public sealed class DeveloperCommitActivity
     /// <returns>Metric value for the mode.</returns>
     public int GetSizeMetricValue(PullRequestSizeMode mode)
     {
+        if (!HasSizeDataForMode(mode))
+        {
+            throw new InvalidOperationException("The selected commit size measurement is unavailable.");
+        }
         return mode switch
         {
             PullRequestSizeMode.Lines => SizeSummary.LineChurn,
             PullRequestSizeMode.Files => SizeSummary.FilesChanged,
-            _ => SizeSummary.LineChurn
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
     }
 }

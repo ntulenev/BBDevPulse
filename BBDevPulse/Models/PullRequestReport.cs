@@ -27,6 +27,7 @@ public sealed class PullRequestReport
     /// <param name="isActivityOnlyMatch">Whether this pull request is shown because the selected team was active on it.</param>
     /// <param name="hasSizeData">Whether diffstat size data is available.</param>
     /// <param name="hasCorrectionsData">Whether correction data is available.</param>
+    /// <param name="hasLineSizeData">Whether all diffstat line counts are available.</param>
     public PullRequestReport(
         string repository,
         string repositorySlug,
@@ -46,7 +47,8 @@ public sealed class PullRequestReport
         int linesRemoved = 0,
         bool isActivityOnlyMatch = false,
         bool? hasSizeData = null,
-        bool hasCorrectionsData = true)
+        bool hasCorrectionsData = true,
+        bool? hasLineSizeData = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(repository);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositorySlug);
@@ -80,7 +82,12 @@ public sealed class PullRequestReport
         LinesRemoved = size.LinesRemoved;
         IsActivityOnlyMatch = isActivityOnlyMatch;
         HasSizeData = hasSizeData ?? (filesChanged > 0 || linesAdded > 0 || linesRemoved > 0);
-        SizeAvailability = HasSizeData ? DataAvailability.Available :
+        if (!HasSizeData && hasLineSizeData == true)
+        {
+            throw new ArgumentException("Line counts cannot be available without diffstat data.", nameof(hasLineSizeData));
+        }
+        HasLineSizeData = HasSizeData && (hasLineSizeData ?? true);
+        SizeAvailability = HasSizeData ? (HasLineSizeData ? DataAvailability.Available : DataAvailability.Incomplete) :
             hasSizeData.HasValue ? DataAvailability.Unavailable : DataAvailability.Unknown;
         HasCorrectionsData = hasCorrectionsData;
     }
@@ -168,7 +175,8 @@ public sealed class PullRequestReport
     /// <summary>
     /// Total changed lines (added + removed).
     /// </summary>
-    public int LineChurn => LinesAdded + LinesRemoved;
+    public int LineChurn => HasLineSizeData ? LinesAdded + LinesRemoved :
+        throw new InvalidOperationException("Line counts are unavailable or incomplete.");
 
     /// <summary>
     /// Gets a value indicating whether the pull request is shown only because the selected team had activity on it.
@@ -185,6 +193,9 @@ public sealed class PullRequestReport
     /// </summary>
     public bool HasSizeData { get; }
 
+    /// <summary>Whether line counts are complete for the pull request.</summary>
+    public bool HasLineSizeData { get; }
+
     /// <summary>Availability of the pull request diffstat measurement.</summary>
     public DataAvailability SizeAvailability { get; }
 
@@ -198,7 +209,7 @@ public sealed class PullRequestReport
     /// <summary>
     /// Pull request size tier based on churn.
     /// </summary>
-    public string SizeTier => PullRequestSizeClassifier.Classify(LineChurn);
+    public string SizeTier => GetSizeTier(PullRequestSizeMode.Lines);
 
     /// <summary>
     /// Indicates whether size data is available for the selected size mode.
@@ -209,9 +220,9 @@ public sealed class PullRequestReport
     {
         return mode switch
         {
-            PullRequestSizeMode.Lines => HasSizeData,
+            PullRequestSizeMode.Lines => HasLineSizeData,
             PullRequestSizeMode.Files => HasSizeData,
-            _ => HasSizeData
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
     }
 
@@ -222,11 +233,15 @@ public sealed class PullRequestReport
     /// <returns>Size metric value.</returns>
     public int GetSizeMetricValue(PullRequestSizeMode mode)
     {
+        if (!HasSizeDataForMode(mode))
+        {
+            throw new InvalidOperationException("The selected size measurement is unavailable.");
+        }
         return mode switch
         {
             PullRequestSizeMode.Lines => LineChurn,
             PullRequestSizeMode.Files => FilesChanged,
-            _ => LineChurn
+            _ => throw new ArgumentOutOfRangeException(nameof(mode))
         };
     }
 

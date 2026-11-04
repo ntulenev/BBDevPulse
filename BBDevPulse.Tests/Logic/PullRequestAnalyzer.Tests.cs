@@ -476,6 +476,53 @@ public sealed class PullRequestAnalyzerTests
     }
 
     [Fact]
+    public async Task IncompleteDiffstatIsRetriedWithoutLosingKnownFileCount()
+    {
+        var cacheDirectory = Path.Combine(Path.GetTempPath(), "BBDevPulse.Tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);
+            var parameters = CreateParameters(date.AddDays(-1));
+            var repository = new Repository(new RepoName("Repo"), new RepoSlug("repo"));
+            var pr = new PullRequest(new PullRequestId(1), PullRequestState.Open, null, date, null, null,
+                new User(new DisplayName("Alice"), new UserUuid("{a}")), null);
+            var client = new Mock<IBitbucketClient>(MockBehavior.Strict);
+            client.Setup(x => x.GetPullRequestsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<Func<PullRequest, bool>>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable([pr]));
+            client.Setup(x => x.GetPullRequestActivityAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<Func<PullRequestActivity, bool>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => ToAsyncEnumerable<PullRequestActivity>([]));
+            client.Setup(x => x.GetPullRequestCommitsAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>())).Returns(() => ToAsyncEnumerable<PullRequestCommitInfo>([]));
+            client.SetupSequence(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                    It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new PullRequestSizeSummary(2, 3, 0, hasLineData: false))
+                .ThrowsAsync(new InvalidOperationException("temporary error"))
+                .ReturnsAsync(new PullRequestSizeSummary(2, 3, 1));
+            var cache = new FilePullRequestAnalysisCache(new PullRequestAnalysisCacheMapper(),
+                new Mock<IBitbucketTelemetryService>().Object, cacheDirectory);
+            var analyzer = CreateAnalyzer(client.Object, new ActivityAnalyzer(), analysisCache: cache);
+
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                var report = new ReportData(parameters);
+                await analyzer.AnalyzeAsync(repository, report, CancellationToken.None);
+                var entry = report.Reports.Single();
+                entry.HasSizeDataForMode(PullRequestSizeMode.Files).Should().BeTrue();
+                entry.GetSizeMetricValue(PullRequestSizeMode.Files).Should().Be(2);
+                entry.HasSizeDataForMode(PullRequestSizeMode.Lines).Should().Be(attempt == 2);
+            }
+            client.Verify(x => x.GetPullRequestSizeAsync(It.IsAny<Workspace>(), It.IsAny<RepoSlug>(),
+                It.IsAny<PullRequestId>(), It.IsAny<CancellationToken>()), Times.Exactly(3));
+        }
+        finally
+        {
+            if (Directory.Exists(cacheDirectory))
+                Directory.Delete(cacheDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task AnalyzeAsyncWaitsForActiveHandlerAndPreservesPageFailure()
     {
         var date = new DateTimeOffset(2026, 2, 23, 9, 0, 0, TimeSpan.Zero);

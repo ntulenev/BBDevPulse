@@ -264,8 +264,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             return;
         }
 
-        if (!snapshot.HasCommits || !snapshot.HasSize ||
-            (collectDeveloperDetails && snapshot.CommitActivities.Any(static activity => !activity.HasSizeData)))
+        if (!snapshot.HasCommits || !snapshot.HasSize || !snapshot.SizeSummary.HasLineData ||
+            (collectDeveloperDetails && snapshot.CommitActivities.Any(static activity => !activity.HasSizeData || !activity.SizeSummary.HasLineData)))
         {
             snapshot = await EnrichAnalysisSnapshotAsync(
                 snapshot,
@@ -336,7 +336,8 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
                 sizeSummary.LinesRemoved,
                 isActivityOnlyMatch: !includeAuthoredPullRequest,
                 hasSizeData: snapshot.HasSize,
-                hasCorrectionsData: snapshot.HasCommits)
+                hasCorrectionsData: snapshot.HasCommits,
+                hasLineSizeData: snapshot.HasSize && snapshot.SizeSummary.HasLineData)
             : null;
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -443,10 +444,11 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             await GetCorrectionCommitsAsync(parameters.Workspace, repo.Slug, pr.Id,
                 pr.CreatedOn, parameters, cancellationToken).ConfigureAwait(false);
         var correctionCommits = loadedCommits ?? snapshot.CorrectionCommits;
-        var loadedSize = snapshot.HasSize ? snapshot.SizeSummary :
+        var loadedSize = snapshot.HasSize && snapshot.SizeSummary.HasLineData ? snapshot.SizeSummary :
             await GetPullRequestSizeSafeAsync(parameters.Workspace, repo.Slug, pr.Id,
                 cancellationToken).ConfigureAwait(false);
-        var sizeSummary = loadedSize ?? snapshot.SizeSummary;
+        var effectiveSize = loadedSize ?? (snapshot.HasSize ? snapshot.SizeSummary : (PullRequestSizeSummary?)null);
+        var sizeSummary = effectiveSize ?? snapshot.SizeSummary;
 
         IReadOnlyList<DeveloperCommitActivity> commitActivities = [];
         if (collectDeveloperDetails && hasAuthorIdentity && loadedCommits is not null && correctionCommits.Count > 0)
@@ -466,12 +468,13 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
             correctionCommits,
             sizeSummary,
             commitActivities,
-            hasEnrichment: loadedCommits is not null && loadedSize is not null &&
-                commitActivities.All(static activity => activity.HasSizeData),
+            hasEnrichment: loadedCommits is not null && effectiveSize is not null && effectiveSize.Value.HasLineData &&
+                commitActivities.All(static activity => activity.HasSizeData && activity.SizeSummary.HasLineData),
             hasCommits: loadedCommits is not null,
-            hasSize: loadedSize is not null,
+            hasSize: effectiveSize is not null,
             commitsAvailability: loadedCommits is null ? DataAvailability.Unavailable : DataAvailability.Available,
-            sizeAvailability: loadedSize is null ? DataAvailability.Unavailable : DataAvailability.Available);
+            sizeAvailability: effectiveSize is null ? DataAvailability.Unavailable :
+                effectiveSize.Value.HasLineData ? DataAvailability.Available : DataAvailability.Incomplete);
     }
 
     private async Task<IReadOnlyList<DeveloperCommitActivity>> GetCommitActivitiesAsync(
@@ -496,14 +499,14 @@ internal sealed class PullRequestAnalyzer : IPullRequestAnalyzer
         foreach (var commit in correctionCommits)
         {
             PullRequestSizeSummary? sizeSummary;
-            if (cachedSizes.TryGetValue(commit.Hash, out var cachedSize))
+            if (cachedSizes.TryGetValue(commit.Hash, out var cachedSize) && cachedSize.HasLineData)
             {
                 sizeSummary = cachedSize;
             }
             else
             {
                 sizeSummary = await GetCommitSizeSafeAsync(workspace, repoSlug, commit.Hash, cancellationToken)
-                    .ConfigureAwait(false);
+                    .ConfigureAwait(false) ?? (cachedSizes.ContainsKey(commit.Hash) ? cachedSize : null);
             }
             activities.Add(new DeveloperCommitActivity(
                 repositoryName,
